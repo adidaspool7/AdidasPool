@@ -45,16 +45,22 @@ Interview flow:
 """
 
 
+def normalize_skill_name(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized if normalized else None
+
+
 def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
     focus = candidate.target_skill.strip() if candidate.target_skill else None
-    normalized_focus = focus.lower() if focus else None
+    normalized_focus = normalize_skill_name(focus)
 
     if normalized_focus:
         filtered_skills = [
             skill
             for skill in candidate.skills
-            if (skill_name := skill.name.strip())
-            and skill_name.lower() == normalized_focus
+            if normalize_skill_name(skill.name) == normalized_focus
         ]
         skills_block = "\n".join(
             [
@@ -76,7 +82,7 @@ def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
                 skill_name
                 for skill in candidate.skills
                 if (skill_name := skill.name.strip())
-                and (not normalized_focus or skill_name.lower() != normalized_focus)
+                and normalize_skill_name(skill_name) != normalized_focus
             }
         )
         if normalized_focus

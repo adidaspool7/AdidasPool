@@ -109,13 +109,17 @@ export async function POST(request: NextRequest) {
       parsed.data.candidate.target_skill
     );
     const enforcedTargetSkill = normalizedSessionTargetSkill ?? normalizedRequestTargetSkill;
+    const normalizedCandidateSkills = parsed.data.candidate.skills.map((skill) => ({
+      ...skill,
+      normalizedName: normalizeSkillString(skill.name)?.toLowerCase() ?? null,
+    }));
 
-    const normalizedCandidateSkills = enforcedTargetSkill
+    const scopedCandidateSkills = enforcedTargetSkill
       ? (() => {
           const targetLower = enforcedTargetSkill.toLowerCase();
-          const matchingSkills = parsed.data.candidate.skills.filter(
-            (skill) => skill.name.trim().toLowerCase() === targetLower
-          );
+          const matchingSkills = normalizedCandidateSkills
+            .filter((skill) => skill.normalizedName === targetLower)
+            .map((skill) => ({ name: skill.name, category: skill.category }));
           return matchingSkills.length > 0
             ? matchingSkills
             : [{ name: enforcedTargetSkill, category: null }];
@@ -126,7 +130,7 @@ export async function POST(request: NextRequest) {
       candidate: {
         ...parsed.data.candidate,
         target_skill: enforcedTargetSkill,
-        skills: normalizedCandidateSkills,
+        skills: scopedCandidateSkills,
       },
     });
 
