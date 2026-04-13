@@ -143,7 +143,7 @@ export default function InterviewRuntimePage() {
   const busyRef = useRef(false);
   const endedRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const sttTranscriptRef = useRef<string>("");   // mirrors sttTranscript state for async access
+  const sttTranscriptRef = useRef<string>("");   // stable ref for access across renders
 
   // ── Camera state
   const [cameraDevices, setCameraDevices] = useState<Array<{ deviceId: string; label: string }>>(
@@ -500,11 +500,19 @@ export default function InterviewRuntimePage() {
     }
   }
 
+  /** Append STT fallback guidance into chat when SpeechRecognition is unavailable. */
+  function appendSttFallback(lines: ChatLine[]): ChatLine[] {
+    if (!getBrowserSpeechRecognition()) {
+      return [...lines, { role: "assistant", content: `⚠️ ${STT_FALLBACK_MESSAGE}` }];
+    }
+    return lines;
+  }
+
   // ─── Browser STT (SpeechRecognition) ─────────────────────────────────────────
   function startSpeechRecognition() {
     const SR = getBrowserSpeechRecognition();
     if (!SR) {
-      setChat((prev) => [...prev, { role: "assistant", content: `⚠️ ${STT_FALLBACK_MESSAGE}` }]);
+      setChat((prev) => appendSttFallback(prev));
       return;
     }
 
@@ -652,11 +660,7 @@ export default function InterviewRuntimePage() {
       aiSessionIdRef.current = data.session.aiSessionId;
       setQuestion(data.firstQuestion);
       const initialChat: ChatLine[] = [{ role: "assistant", content: data.firstQuestion }];
-      // Show STT fallback guidance in chat when speech recognition is unavailable
-      if (!getBrowserSpeechRecognition()) {
-        initialChat.push({ role: "assistant", content: `⚠️ ${STT_FALLBACK_MESSAGE}` });
-      }
-      setChat(initialChat);
+      setChat(appendSttFallback(initialChat));
       if (ttsEnabled) speakText(data.firstQuestion);
       startIntegrityMonitor();
       resetQuestionTimer();
@@ -923,7 +927,7 @@ export default function InterviewRuntimePage() {
 
                 {isRecording && (
                   <p className="text-xs text-muted-foreground" aria-live="polite">
-                    🎙️ Recording… {sttTranscript ? <><em>Heard: &ldquo;{sttTranscript}&rdquo;</em></> : "speak your answer"}
+                    🎙️ Recording… {sttTranscript ? <em>Heard: &ldquo;{sttTranscript}&rdquo;</em> : "speak your answer"}
                   </p>
                 )}
 
