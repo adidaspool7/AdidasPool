@@ -112,6 +112,7 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - **STT working** ✅ — `window.SpeechRecognition` (Chrome/Edge); live transcript shown; populates chat.
 - **Close button immediate** ✅ — Return to Dashboard always available once `ended = true`, before evaluation loads.
 - **Voice transcript in chat** ✅ — STT result appears as "You: [transcript]" in chat.
+- **Selected-skill scope hard enforcement** ✅ — realtime API now enforces persisted `interview_sessions.target_skill`, frontend no longer injects first profile skill fallback, and FastAPI prompt contract forces all questions to stay strictly on selected skill.
 
 ### Planned Modes (Phase 4)
 - **Language Assessment mode**: CEFR-rubric scoring, single-language focus, free-form conversation

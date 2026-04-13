@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const { data: sessionRow, error: sessionError } = await db
       .from("interview_sessions")
-      .select("id, candidate_id, status, signed_token_hash, token_expires_at")
+      .select("id, candidate_id, status, signed_token_hash, token_expires_at, target_skill")
       .eq("id", tokenPayload.interviewId)
       .single();
 
@@ -87,8 +87,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedSessionTargetSkill =
+      typeof interview.targetSkill === "string" && interview.targetSkill.trim()
+        ? interview.targetSkill.trim()
+        : null;
+    const normalizedRequestTargetSkill =
+      typeof parsed.data.candidate.target_skill === "string" &&
+      parsed.data.candidate.target_skill.trim()
+        ? parsed.data.candidate.target_skill.trim()
+        : null;
+    const enforcedTargetSkill = normalizedSessionTargetSkill ?? normalizedRequestTargetSkill;
+
+    const normalizedCandidateSkills = enforcedTargetSkill
+      ? (() => {
+          const targetLower = enforcedTargetSkill.toLowerCase();
+          const matchingSkills = parsed.data.candidate.skills.filter(
+            (skill) => skill.name.trim().toLowerCase() === targetLower
+          );
+          return matchingSkills.length > 0
+            ? matchingSkills
+            : [{ name: enforcedTargetSkill, category: null }];
+        })()
+      : parsed.data.candidate.skills;
+
     const startResult = await callPython("/interview/start", {
-      candidate: parsed.data.candidate,
+      candidate: {
+        ...parsed.data.candidate,
+        target_skill: enforcedTargetSkill,
+        skills: normalizedCandidateSkills,
+      },
     });
 
     // Update session status + insert first transcript turn

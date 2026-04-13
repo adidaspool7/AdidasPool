@@ -623,7 +623,7 @@ export default function InterviewRuntimePage() {
           candidate: {
             candidate_id: profile.id,
             full_name: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
-            target_skill: profile.skills?.[0]?.name ?? null,
+            target_skill: null,
             skills: (profile.skills || []).map((s) => ({
               name: s.name,
               category: s.category ?? null,

@@ -40,18 +40,48 @@ Interview flow:
 - Deterministic stop conditions:
   - max 12 technical questions
   - end if evidence_confidence >= 0.85 and at least 6 questions asked
-  - end if user repeatedly refuses technical answers
-  - when ending, append {END_INTERVIEW_SENTINEL} token at response end.
+- end if user repeatedly refuses technical answers
+- when ending, append {END_INTERVIEW_SENTINEL} token at response end.
 """
 
 
 def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
-    skills_block = "\n".join(
-        [
-            f"- {skill.name}" + (f" ({skill.category})" if skill.category else "")
+    focus = candidate.target_skill.strip() if candidate.target_skill else None
+    normalized_focus = focus.lower() if focus else None
+
+    if normalized_focus:
+        filtered_skills = [
+            skill
             for skill in candidate.skills
+            if skill.name.strip().lower() == normalized_focus
         ]
-    ) or "- None provided"
+        skills_block = "\n".join(
+            [
+                f"- {skill.name}" + (f" ({skill.category})" if skill.category else "")
+                for skill in filtered_skills
+            ]
+        ) or f"- {focus} (selected target skill)"
+    else:
+        skills_block = "\n".join(
+            [
+                f"- {skill.name}" + (f" ({skill.category})" if skill.category else "")
+                for skill in candidate.skills
+            ]
+        ) or "- None provided"
+
+    off_topic_skills = (
+        sorted(
+            {
+                skill.name.strip()
+                for skill in candidate.skills
+                if skill.name.strip()
+                and (not normalized_focus or skill.name.strip().lower() != normalized_focus)
+            }
+        )
+        if normalized_focus
+        else []
+    )
+    off_topic_block = ", ".join(off_topic_skills) if off_topic_skills else "None listed"
     projects_block = "\n".join(
         [
             f"- {project.title or 'Untitled'}: {project.description}"
@@ -64,16 +94,34 @@ def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
         ]
     ) or "- None provided"
 
-    focus = candidate.target_skill or "highest-signal technical skill in provided profile"
+    scope_block = (
+        f"""
+Skill scope contract (MANDATORY):
+- The only allowed interview topic is: {focus}
+- Every question must directly assess {focus} implementation ability.
+- Do NOT ask about unrelated tools/frameworks/cloud products, even if they appear in resume context.
+- If the candidate answers with off-topic technologies, acknowledge briefly and immediately ask the next question strictly about {focus}.
+- Off-topic skills you must avoid unless explicitly needed to explain {focus}: {off_topic_block}
+""".strip()
+        if focus
+        else """
+Skill scope contract (MANDATORY):
+- Keep each question tied to one concrete technical skill present in the candidate profile.
+- Do not drift into unrelated domains.
+""".strip()
+    )
+
+    focus_label = focus or "highest-signal technical skill in provided profile"
     return f"""
 {INTERVIEWER_PERSONA_PROMPT}
 {INTERVIEW_GUARDRAILS_PROMPT}
 {INTERVIEW_FLOW_PROMPT}
+{scope_block}
 
 Candidate context:
 - Candidate ID: {candidate.candidate_id}
 - Candidate Name: {candidate.full_name or "Unknown"}
-- Primary validation focus: {focus}
+- Primary validation focus: {focus_label}
 
 Extracted skills:
 {skills_block}
