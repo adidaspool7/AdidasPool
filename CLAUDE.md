@@ -105,12 +105,13 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
   - `proctoring/` — log proctoring events
   - `results/` — save evaluation result
 
-### Known Bugs (to fix in Phase 2)
-1. **Timer resets on clarification** — per-question timer should not reset when the candidate asks a clarifying question. Fix: track `turnType` and only reset timer on `type = "question"` turns.
-2. **TTS not working** — Python backend returns no audio. Fix: switch to `window.speechSynthesis` browser API on client side.
-3. **STT accuracy unknown** — `window.SpeechRecognition` not yet validated in production.
-4. **No close button until results** — after interview ends, user must wait for evaluation before popup can be closed. Fix: show close button after `terminate` call, poll for results separately.
-5. **Voice answer transcript not shown** — spoken answers should appear in chat as text. Fix: display STT transcript in chat bubble immediately.
+### Bug Fix Status (Phase 2 + Phase 3 — completed 2026-04-13)
+- **Timer no-reset on clarification** ✅ — input ending with `?` is treated as clarification; `resetQuestionTimer()` skipped.
+- **Total timer removed** ✅ — only per-question timer remains.
+- **TTS working** ✅ — `window.speechSynthesis` speaks each AI reply; toggle in UI.
+- **STT working** ✅ — `window.SpeechRecognition` (Chrome/Edge); live transcript shown; populates chat.
+- **Close button immediate** ✅ — Return to Dashboard always available once `ended = true`, before evaluation loads.
+- **Voice transcript in chat** ✅ — STT result appears as "You: [transcript]" in chat.
 
 ### Planned Modes (Phase 4)
 - **Language Assessment mode**: CEFR-rubric scoring, single-language focus, free-form conversation

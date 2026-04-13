@@ -9,10 +9,10 @@
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 2.1 | Timer does not reset on clarification turns | ⬜ | Track `turnType` server-side; only reset on `type = "question"` |
-| 2.2 | Close button appears only after evaluation completes | ⬜ | Show close after `terminate` call; poll for results separately |
-| 2.3 | Voice answer transcript shown in chat | ⬜ | Display STT result in chat bubble immediately after recording |
-| 2.4 | Remove total 30-min timer | ⬜ | Keep only per-question timer |
+| 2.1 | Timer does not reset on clarification turns | ✅ | Frontend heuristic: input ending with `?` → `isClarification=true`, timer not reset |
+| 2.2 | Close button appears only after evaluation completes | ✅ | `setEnded(true)` fires before fetch; Return button never disabled in ended view |
+| 2.3 | Voice answer transcript shown in chat | ✅ | Browser `SpeechRecognition` populates chat; see Phase 3 |
+| 2.4 | Remove total 30-min timer | ✅ | Per-question timer only; total timer state/refs/handlers removed |
 
 ---
 
@@ -20,10 +20,10 @@
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 3.1 | Replace Python TTS placeholder with `window.speechSynthesis` | ⬜ | Client-side only; Chrome/Edge |
-| 3.2 | Replace Python STT with `window.SpeechRecognition` | ⬜ | Client-side only; Chrome/Edge |
+| 3.1 | Replace Python TTS placeholder with `window.speechSynthesis` | ✅ | `speakText()` called on every AI reply; TTS toggle in interview UI |
+| 3.2 | Replace Python STT with `window.SpeechRecognition` | ✅ | `startSpeechRecognition()` drives transcript; shown live as user speaks |
 | 3.3 | Validate STT accuracy with test candidate answers | ⬜ | Manual QA — at least 5 test cases |
-| 3.4 | Handle browser permission errors (mic denied) | ⬜ | Show graceful error message + fallback to text input |
+| 3.4 | Handle browser permission errors (mic denied) | ✅ | Error message shown; falls back to text input |
 
 ---
 

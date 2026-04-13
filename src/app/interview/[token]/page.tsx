@@ -5,11 +5,34 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@client/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@client/components/ui/card";
 import { Input } from "@client/components/ui/input";
-import { buildAudioPayload, formatTime, AudioPayload } from "@/lib/interview-utils";
+import { formatTime } from "@/lib/interview-utils";
 
 // ─── Timer constants ──────────────────────────────────────────────────────────
-const TOTAL_INTERVIEW_SECONDS = 30 * 60; // 30 minutes
+// Total interview timer removed (Phase 2 — only per-question timer remains)
 const QUESTION_SECONDS = 3 * 60; // 3 minutes per question
+
+// ─── Browser API types ────────────────────────────────────────────────────────
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  continuous: boolean;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RealtimeStartResponse = {
@@ -19,14 +42,10 @@ type RealtimeStartResponse = {
     status: "running";
   };
   firstQuestion: string;
-  audioBase64?: string | null;
-  audioMimeType?: string | null;
 };
 
 type RealtimeTurnResponse = {
   assistant_reply?: string;
-  audio_base64?: string | null;
-  audio_mime_type?: string | null;
   should_end?: boolean;
   evaluation?: EvaluationResult | null;
   error?: string;
@@ -66,6 +85,29 @@ function isTrackTypeActive(stream: MediaStream | null, kind: "audio" | "video"):
   return tracks.some((track) => track.enabled && track.readyState === "live");
 }
 
+/** Detect if a user message is a clarification question rather than an answer. */
+function isClarificationText(text: string): boolean {
+  const t = text.trim();
+  return t.endsWith("?");
+}
+
+/** Speak text with the browser TTS API (Chrome/Edge). No-op on unsupported browsers. */
+function speakText(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel(); // stop any current speech
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
+function getBrowserSpeechRecognition(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as Record<string, unknown>;
+  return (w["SpeechRecognition"] ?? w["webkitSpeechRecognition"] ?? null) as SpeechRecognitionConstructor | null;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function InterviewRuntimePage() {
   const params = useParams<{ token: string }>();
@@ -81,18 +123,17 @@ export default function InterviewRuntimePage() {
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [input, setInput] = useState("");
-  const [mode, setMode] = useState<"text" | "voice">("text");
   const [clipboardState, setClipboardState] = useState("unknown");
-  const [audioWarning, setAudioWarning] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [sttTranscript, setSttTranscript] = useState("");  // live STT transcript
+  const [sttSupported, setSttSupported] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
 
   // ── Evaluation results
   const [evaluation, setEvaluation] = useState<TerminateResponse | null>(null);
 
-  // ── Timers
-  const [totalTimeLeft, setTotalTimeLeft] = useState(TOTAL_INTERVIEW_SECONDS);
+  // ── Per-question timer only (total timer removed)
   const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_SECONDS);
-  const totalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const questionTimeoutFiredRef = useRef(false);
 
@@ -105,10 +146,9 @@ export default function InterviewRuntimePage() {
   const monitorRef = useRef<number | null>(null);
   const focusRef = useRef(true);
   const violationStateRef = useRef<Record<string, boolean>>({});
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const busyRef = useRef(false);
   const endedRef = useRef(false);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   // ── Camera state
   const [cameraDevices, setCameraDevices] = useState<Array<{ deviceId: string; label: string }>>(
@@ -120,6 +160,11 @@ export default function InterviewRuntimePage() {
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+
+  // Detect STT support on mount
+  useEffect(() => {
+    setSttSupported(getBrowserSpeechRecognition() !== null);
+  }, []);
 
   // ─── Camera helpers ──────────────────────────────────────────────────────────
   async function refreshCameraDevices(preferredDeviceId?: string) {
@@ -161,20 +206,6 @@ export default function InterviewRuntimePage() {
     if (audioContextRef.current.state === "suspended") {
       await audioContextRef.current.resume();
     }
-  }
-
-  async function playAudioWithFallback(
-    audioBase64: string | null | undefined,
-    audioMimeType: string | null | undefined,
-    context: string
-  ) {
-    const payload = buildAudioPayload(audioBase64, audioMimeType);
-    if (!payload.valid) return;
-    await ensureAudioContextReady();
-    new Audio(payload.url).play().catch((playbackError) => {
-      console.error(`${context} audio playback failed:`, playbackError);
-      setAudioWarning("Audio playback failed. Continue using text.");
-    });
   }
 
   // ─── Proctoring ──────────────────────────────────────────────────────────────
@@ -222,11 +253,6 @@ export default function InterviewRuntimePage() {
     const videoTracks = stream.getVideoTracks();
     const appliedCameraId =
       videoTracks.length > 0 ? videoTracks[0].getSettings().deviceId : undefined;
-    if (!appliedCameraId && preferredCameraId) {
-      console.warn(
-        "Camera deviceId unavailable from track settings; browser may apply default camera"
-      );
-    }
     await refreshCameraDevices(appliedCameraId);
     await emitProctoring("media_permission_granted", "INFO");
 
@@ -241,16 +267,12 @@ export default function InterviewRuntimePage() {
           await emitProctoring("clipboard_permission_not_granted", "WARNING", {
             state: result.state || "unknown",
           });
-        } else {
-          await emitProctoring("clipboard_permission_granted", "INFO");
         }
       } catch {
         setClipboardState("unavailable");
-        await emitProctoring("clipboard_permission_unavailable", "WARNING");
       }
     } else {
       setClipboardState("unavailable");
-      await emitProctoring("clipboard_permission_unavailable", "WARNING");
     }
     return appliedCameraId;
   }
@@ -336,17 +358,17 @@ export default function InterviewRuntimePage() {
   }
 
   // ─── Timer management ────────────────────────────────────────────────────────
-  function stopAllTimers() {
-    if (totalTimerRef.current) {
-      clearInterval(totalTimerRef.current);
-      totalTimerRef.current = null;
-    }
+  function stopQuestionTimer() {
     if (questionTimerRef.current) {
       clearInterval(questionTimerRef.current);
       questionTimerRef.current = null;
     }
   }
 
+  /**
+   * Reset and restart the per-question countdown.
+   * Only call this when a new question arrives — NOT on clarification turns.
+   */
   function resetQuestionTimer() {
     questionTimeoutFiredRef.current = false;
     setQuestionTimeLeft(QUESTION_SECONDS);
@@ -362,27 +384,13 @@ export default function InterviewRuntimePage() {
     }, 1000);
   }
 
-  function startTotalTimer() {
-    if (totalTimerRef.current) clearInterval(totalTimerRef.current);
-    let remaining = TOTAL_INTERVIEW_SECONDS;
-    totalTimerRef.current = setInterval(() => {
-      remaining -= 1;
-      setTotalTimeLeft(remaining);
-      if (remaining <= 0) {
-        clearInterval(totalTimerRef.current!);
-        totalTimerRef.current = null;
-        void handleTotalTimeout();
-      }
-    }, 1000);
-  }
-
   // ─── Turn sending ─────────────────────────────────────────────────────────────
   const sendTurnWithText = useCallback(
-    async (text: string, isTimeoutAdvance = false) => {
+    async (text: string, opts: { isTimeoutAdvance?: boolean; isClarification?: boolean } = {}) => {
       if (!interviewIdRef.current || !aiSessionIdRef.current) return;
       if (endedRef.current) return;
       setBusy(true);
-      const displayText = text || (isTimeoutAdvance ? "[Time expired – no answer provided]" : "");
+      const displayText = text || (opts.isTimeoutAdvance ? "[Time expired – no answer provided]" : "");
       setChat((prev) => [...prev, { role: "user", content: displayText }]);
       try {
         const response = await fetch("/api/interview/realtime/turn", {
@@ -405,14 +413,13 @@ export default function InterviewRuntimePage() {
         setQuestion(assistantText);
         if (assistantText.length > 0) {
           setChat((prev) => [...prev, { role: "assistant", content: assistantText }]);
+          if (ttsEnabled) speakText(assistantText);
         }
-
-        await playAudioWithFallback(data.audio_base64, data.audio_mime_type, "Interview turn");
 
         if (data.should_end) {
           await finishInterview(data.evaluation ?? null);
-        } else {
-          // Reset per-question timer on each new core question
+        } else if (!opts.isClarification) {
+          // Only reset the per-question timer when this is a new question, not a clarification
           resetQuestionTimer();
         }
       } catch (e) {
@@ -422,14 +429,15 @@ export default function InterviewRuntimePage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token]
+    [token, ttsEnabled]
   );
 
   async function sendTurn() {
     if (!input.trim() || busy || !interviewIdRef.current || !aiSessionIdRef.current) return;
     const text = input.trim();
     setInput("");
-    await sendTurnWithText(text);
+    const clarification = isClarificationText(text);
+    await sendTurnWithText(text, { isClarification: clarification });
   }
 
   // ─── Question timeout ─────────────────────────────────────────────────────────
@@ -440,23 +448,18 @@ export default function InterviewRuntimePage() {
     });
     const partialText = input.trim();
     setInput("");
-    await sendTurnWithText(partialText, true);
-  }
-
-  // ─── Total timeout ────────────────────────────────────────────────────────────
-  async function handleTotalTimeout() {
-    if (endedRef.current) return;
-    await emitProctoring("total_interview_timeout", "CRITICAL");
-    await terminateInterview("total_timeout");
+    // Timeout advance is never a clarification — always counts as submitting
+    await sendTurnWithText(partialText, { isTimeoutAdvance: true, isClarification: false });
   }
 
   // ─── Finalize interview (backend-driven end) ──────────────────────────────────
   async function finishInterview(evalData: EvaluationResult | null) {
     endedRef.current = true;
     setEnded(true);
-    stopAllTimers();
+    stopQuestionTimer();
     if (monitorRef.current) window.clearInterval(monitorRef.current);
     stopMediaStream();
+    window.speechSynthesis?.cancel();
     await emitProctoring("interview_ended", "INFO", { evaluation: evalData ?? null });
 
     if (evalData) {
@@ -473,10 +476,11 @@ export default function InterviewRuntimePage() {
   async function terminateInterview(reason = "user_early_exit") {
     if (endedRef.current) return;
     endedRef.current = true;
-    setEnded(true);
-    stopAllTimers();
+    setEnded(true);           // Show ended view immediately — Return button visible at once
+    stopQuestionTimer();
     if (monitorRef.current) window.clearInterval(monitorRef.current);
     stopMediaStream();
+    window.speechSynthesis?.cancel();
     setBusy(true);
     try {
       const response = await fetch("/api/interview/realtime/terminate", {
@@ -501,109 +505,74 @@ export default function InterviewRuntimePage() {
     }
   }
 
-  // ─── Voice recording (STT) ────────────────────────────────────────────────────
-  async function startVoiceRecording() {
-    if (!streamRef.current) return;
-    // Use audio-only stream from existing media stream
-    const audioTracks = streamRef.current.getAudioTracks();
-    if (!audioTracks.length) {
-      setError("No audio track available for voice recording");
+  // ─── Browser STT (SpeechRecognition) ─────────────────────────────────────────
+  function startSpeechRecognition() {
+    const SR = getBrowserSpeechRecognition();
+    if (!SR) {
+      setError("SpeechRecognition is not supported in this browser. Use Chrome or Edge.");
       return;
     }
-    const audioStream = new MediaStream(audioTracks);
 
-    // Pick a supported MIME type
-    const preferredMime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"].find(
-      (m) => MediaRecorder.isTypeSupported(m)
-    );
-
-    audioChunksRef.current = [];
-    const recorder = new MediaRecorder(audioStream, preferredMime ? { mimeType: preferredMime } : {});
-    mediaRecorderRef.current = recorder;
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data);
-    };
-
-    recorder.onstop = () => {
-      void submitVoiceTurn();
-    };
-
-    recorder.start();
+    setSttTranscript("");
     setIsRecording(true);
-    setMode("voice");
-    await emitProctoring("voice_capture_started", "INFO");
+
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      setSttTranscript(transcript);
+      setInput(transcript); // Mirror into the text input for review
+    };
+
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error !== "aborted") {
+        setError(`STT error: ${e.error}`);
+      }
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.start();
+    void emitProctoring("voice_capture_started", "INFO");
   }
 
-  async function stopVoiceRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+  function stopSpeechRecognition() {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
     setIsRecording(false);
-    setMode("text");
-    await emitProctoring("voice_capture_stopped", "INFO");
+    void emitProctoring("voice_capture_stopped", "INFO");
   }
 
-  async function submitVoiceTurn() {
-    const chunks = audioChunksRef.current;
-    if (!chunks.length || !interviewIdRef.current || !aiSessionIdRef.current) return;
-    if (endedRef.current) return;
-
-    const mimeType =
-      mediaRecorderRef.current?.mimeType || "audio/webm";
-    const blob = new Blob(chunks, { type: mimeType });
-
-    // Convert to base64 efficiently
-    const arrayBuffer = await blob.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-    const base64 = btoa(binary);
-
-    setBusy(true);
-    setChat((prev) => [...prev, { role: "user", content: "[Voice message]" }]);
-    try {
-      const response = await fetch("/api/interview/realtime/turn", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          interviewId: interviewIdRef.current,
-          aiSessionId: aiSessionIdRef.current,
-          userAudioBase64: base64,
-          mode: "voice",
-        }),
-      });
-      const data = (await response.json()) as RealtimeTurnResponse;
-      if (!response.ok) throw new Error(data.error || "Voice turn failed");
-
-      const assistantText = data.assistant_reply ?? "";
-      setQuestion(assistantText);
-      if (assistantText.length > 0) {
-        setChat((prev) => [...prev, { role: "assistant", content: assistantText }]);
-      }
-
-      await playAudioWithFallback(data.audio_base64, data.audio_mime_type, "Voice turn");
-
-      if (data.should_end) {
-        await finishInterview(data.evaluation ?? null);
-      } else {
-        resetQuestionTimer();
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Voice turn failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleVoiceCapture() {
+  function toggleVoiceCapture() {
     if (isRecording) {
-      await stopVoiceRecording();
+      stopSpeechRecognition();
     } else {
-      await startVoiceRecording();
+      startSpeechRecognition();
     }
+  }
+
+  /** Submit the transcript collected by STT as a regular text turn. */
+  async function submitVoiceTurn() {
+    const transcript = sttTranscript.trim() || input.trim();
+    if (!transcript) return;
+    setSttTranscript("");
+    setInput("");
+    await sendTurnWithText(transcript, { isClarification: isClarificationText(transcript) });
   }
 
   // ─── Begin interview ──────────────────────────────────────────────────────────
@@ -614,6 +583,7 @@ export default function InterviewRuntimePage() {
       if (!token) throw new Error("Missing interview token");
       await document.documentElement.requestFullscreen();
       await requestPermissions();
+      await ensureAudioContextReady();
       await emitProctoring("consent_accepted", "INFO");
       setStarted(true);
 
@@ -634,7 +604,6 @@ export default function InterviewRuntimePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          mode,
           candidate: {
             candidate_id: profile.id,
             full_name: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
@@ -675,9 +644,8 @@ export default function InterviewRuntimePage() {
       aiSessionIdRef.current = data.session.aiSessionId;
       setQuestion(data.firstQuestion);
       setChat([{ role: "assistant", content: data.firstQuestion }]);
-      await playAudioWithFallback(data.audioBase64, data.audioMimeType, "Interview intro");
+      if (ttsEnabled) speakText(data.firstQuestion);
       startIntegrityMonitor();
-      startTotalTimer();
       resetQuestionTimer();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start interview");
@@ -691,14 +659,9 @@ export default function InterviewRuntimePage() {
     try {
       setBusy(true);
       const appliedCameraId = await requestPermissions(deviceId);
-      const nextCameraId = appliedCameraId || deviceId;
-      setSelectedCameraId(nextCameraId);
-      await emitProctoring("camera_switched", "INFO", {
-        requestedDeviceId: deviceId,
-        appliedCameraId,
-      });
+      setSelectedCameraId(appliedCameraId || deviceId);
+      await emitProctoring("camera_switched", "INFO", { deviceId });
     } catch (cameraError) {
-      console.error("Failed to switch camera:", cameraError);
       setError(cameraError instanceof Error ? cameraError.message : "Failed to switch camera");
     } finally {
       setBusy(false);
@@ -711,8 +674,9 @@ export default function InterviewRuntimePage() {
     return () => {
       cleanup();
       if (monitorRef.current) window.clearInterval(monitorRef.current);
-      stopAllTimers();
+      stopQuestionTimer();
       stopMediaStream();
+      window.speechSynthesis?.cancel();
       if (audioContextRef.current) {
         void audioContextRef.current.close();
         audioContextRef.current = null;
@@ -722,16 +686,16 @@ export default function InterviewRuntimePage() {
   }, []);
 
   useEffect(() => {
-    if (started) {
-      attachPreviewStream(streamRef.current);
-    }
+    if (started) attachPreviewStream(streamRef.current);
   }, [started]);
 
-  // ─── Timer colors ─────────────────────────────────────────────────────────────
-  const totalTimerColor =
-    totalTimeLeft < 5 * 60 ? "text-destructive" : totalTimeLeft < 10 * 60 ? "text-amber-500" : "text-foreground";
+  // ─── Timer color ──────────────────────────────────────────────────────────────
   const questionTimerColor =
-    questionTimeLeft < 30 ? "text-destructive" : questionTimeLeft < 60 ? "text-amber-500" : "text-foreground";
+    questionTimeLeft < 30
+      ? "text-destructive"
+      : questionTimeLeft < 60
+        ? "text-amber-500"
+        : "text-foreground";
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -750,9 +714,9 @@ export default function InterviewRuntimePage() {
               Clipboard permission status: <strong>{clipboardState}</strong>
             </p>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            {audioWarning ? <p className="text-xs text-amber-600">{audioWarning}</p> : null}
 
             {!started ? (
+              // ── Consent screen ────────────────────────────────────────────────
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -819,11 +783,14 @@ export default function InterviewRuntimePage() {
                       )}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Evaluation is being processed.
+                    // Evaluation still loading — show spinner but allow closing
+                    <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Processing evaluation…
                     </p>
                   )}
                 </div>
+                {/* Return button is NEVER disabled — always available once interview ends */}
                 <Button variant="outline" onClick={() => router.replace("/dashboard/ai-interview")}>
                   Return to Dashboard
                 </Button>
@@ -831,20 +798,26 @@ export default function InterviewRuntimePage() {
             ) : (
               // ── Active interview ──────────────────────────────────────────────
               <>
-                {/* Timers */}
+                {/* Per-question timer only */}
                 <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground text-xs">Per-question timer</span>
                   <span>
-                    Total:{" "}
-                    <span className={`font-mono font-semibold ${totalTimerColor}`}>
-                      {formatTime(totalTimeLeft)}
-                    </span>
-                  </span>
-                  <span>
-                    Question:{" "}
                     <span className={`font-mono font-semibold ${questionTimerColor}`}>
                       {formatTime(questionTimeLeft)}
                     </span>
                   </span>
+                  {/* TTS toggle */}
+                  <button
+                    className="text-xs text-muted-foreground underline"
+                    onClick={() => {
+                      setTtsEnabled((v) => {
+                        if (v) window.speechSynthesis?.cancel();
+                        return !v;
+                      });
+                    }}
+                  >
+                    {ttsEnabled ? "🔊 TTS on" : "🔇 TTS off"}
+                  </button>
                 </div>
 
                 {/* Current question */}
@@ -881,9 +854,7 @@ export default function InterviewRuntimePage() {
                       <select
                         className="rounded border bg-background px-2 py-1 text-xs text-foreground"
                         value={selectedCameraId}
-                        onChange={(e) => {
-                          void switchCamera(e.target.value);
-                        }}
+                        onChange={(e) => { void switchCamera(e.target.value); }}
                         disabled={busy}
                       >
                         {cameraDevices.map((camera) => (
@@ -901,22 +872,43 @@ export default function InterviewRuntimePage() {
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isRecording ? "Recording voice..." : "Type your answer..."}
+                    placeholder={
+                      isRecording
+                        ? "Listening… speak your answer"
+                        : "Type your answer (end with ? for a clarification)"
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void sendTurn();
                     }}
-                    disabled={busy || isRecording}
+                    disabled={busy}
                   />
-                  <Button onClick={sendTurn} disabled={busy || isRecording || !input.trim()}>
+                  <Button onClick={sendTurn} disabled={busy || !input.trim()}>
                     Send
                   </Button>
-                  <Button
-                    variant={isRecording ? "destructive" : "outline"}
-                    onClick={toggleVoiceCapture}
-                    disabled={busy && !isRecording}
-                  >
-                    {isRecording ? "⏹ Stop" : "🎤 Voice"}
-                  </Button>
+
+                  {/* Voice button — only shown if browser supports STT */}
+                  {sttSupported && (
+                    <>
+                      <Button
+                        variant={isRecording ? "destructive" : "outline"}
+                        onClick={toggleVoiceCapture}
+                        disabled={busy && !isRecording}
+                        title={isRecording ? "Stop recording" : "Start voice input (Chrome/Edge)"}
+                      >
+                        {isRecording ? "⏹ Stop" : "🎤 Voice"}
+                      </Button>
+                      {isRecording && (
+                        <Button
+                          variant="default"
+                          onClick={() => { stopSpeechRecognition(); void submitVoiceTurn(); }}
+                          disabled={busy || !sttTranscript}
+                        >
+                          Submit Voice
+                        </Button>
+                      )}
+                    </>
+                  )}
+
                   <Button
                     variant="destructive"
                     onClick={() => void terminateInterview("user_early_exit")}
@@ -925,9 +917,16 @@ export default function InterviewRuntimePage() {
                     End
                   </Button>
                 </div>
+
+                {isRecording && sttTranscript && (
+                  <p className="text-xs text-muted-foreground">
+                    Heard: <em>{sttTranscript}</em>
+                  </p>
+                )}
+
                 <p className="text-xs text-muted-foreground">
-                  Press <strong>End</strong> to finish the interview early and receive your
-                  evaluation.
+                  Questions ending with <strong>?</strong> are treated as clarifications — timer
+                  does not reset. Press <strong>End</strong> to finish early.
                 </p>
               </>
             )}
