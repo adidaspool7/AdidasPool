@@ -40,3 +40,19 @@ export function formatTime(seconds: number): string {
   const s = seconds % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
+
+/**
+ * Detect if a user message is a clarification question rather than an answer.
+ * Messages ending with "?" are treated as clarifications — the per-question timer
+ * is NOT reset on clarification turns.
+ */
+export function isClarificationText(text: string): boolean {
+  const t = text.trim();
+  return t.endsWith("?");
+}
+
+/**
+ * Fallback message shown in chat when browser STT (SpeechRecognition) is unavailable.
+ */
+export const STT_FALLBACK_MESSAGE =
+  "Speech recognition is not available in this browser. Please type your answers instead. For voice input, use Chrome or Edge.";

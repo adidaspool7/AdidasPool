@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@client/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@client/components/ui/card";
 import { Input } from "@client/components/ui/input";
-import { formatTime } from "@/lib/interview-utils";
+import { formatTime, isClarificationText, STT_FALLBACK_MESSAGE } from "@/lib/interview-utils";
 
 // ─── Timer constants ──────────────────────────────────────────────────────────
 // Total interview timer removed (Phase 2 — only per-question timer remains)
@@ -85,12 +85,6 @@ function isTrackTypeActive(stream: MediaStream | null, kind: "audio" | "video"):
   return tracks.some((track) => track.enabled && track.readyState === "live");
 }
 
-/** Detect if a user message is a clarification question rather than an answer. */
-function isClarificationText(text: string): boolean {
-  const t = text.trim();
-  return t.endsWith("?");
-}
-
 /** Speak text with the browser TTS API (Chrome/Edge). No-op on unsupported browsers. */
 function speakText(text: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -149,6 +143,7 @@ export default function InterviewRuntimePage() {
   const busyRef = useRef(false);
   const endedRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const sttTranscriptRef = useRef<string>("");   // stable ref for access across renders
 
   // ── Camera state
   const [cameraDevices, setCameraDevices] = useState<Array<{ deviceId: string; label: string }>>(
@@ -505,15 +500,24 @@ export default function InterviewRuntimePage() {
     }
   }
 
+  /** Append STT fallback guidance into chat when SpeechRecognition is unavailable. */
+  function appendSttFallback(lines: ChatLine[]): ChatLine[] {
+    if (!getBrowserSpeechRecognition()) {
+      return [...lines, { role: "assistant", content: `⚠️ ${STT_FALLBACK_MESSAGE}` }];
+    }
+    return lines;
+  }
+
   // ─── Browser STT (SpeechRecognition) ─────────────────────────────────────────
   function startSpeechRecognition() {
     const SR = getBrowserSpeechRecognition();
     if (!SR) {
-      setError("SpeechRecognition is not supported in this browser. Use Chrome or Edge.");
+      setChat((prev) => appendSttFallback(prev));
       return;
     }
 
     setSttTranscript("");
+    sttTranscriptRef.current = "";
     setIsRecording(true);
 
     const recognition = new SR();
@@ -521,15 +525,22 @@ export default function InterviewRuntimePage() {
     recognition.lang = "en-US";
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    recognition.continuous = true;  // keep listening until user presses stop
 
     recognition.onresult = (e: SpeechRecognitionEvent) => {
-      let transcript = "";
+      let finalText = "";
+      let interimText = "";
       for (let i = 0; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript;
+        const text = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalText += text;
+        } else {
+          interimText += text;
+        }
       }
-      setSttTranscript(transcript);
-      setInput(transcript); // Mirror into the text input for review
+      const combined = (finalText + interimText).trim();
+      setSttTranscript(combined);
+      sttTranscriptRef.current = combined;
     };
 
     recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
@@ -541,6 +552,8 @@ export default function InterviewRuntimePage() {
     };
 
     recognition.onend = () => {
+      // Recognition ended (browser-initiated or after stop()).
+      // Only auto-submit if the user explicitly pressed stop.
       setIsRecording(false);
       recognitionRef.current = null;
     };
@@ -549,30 +562,33 @@ export default function InterviewRuntimePage() {
     void emitProctoring("voice_capture_started", "INFO");
   }
 
-  function stopSpeechRecognition() {
+  /**
+   * Stop recording and immediately submit the accumulated STT transcript.
+   * This is the only way to end a voice turn — auto-submit on stop.
+   */
+  function stopAndSubmitVoice() {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
     setIsRecording(false);
+
+    const transcript = sttTranscriptRef.current.trim();
+    sttTranscriptRef.current = "";
+    setSttTranscript("");
+
+    if (transcript) {
+      void sendTurnWithText(transcript, { isClarification: isClarificationText(transcript) });
+    }
     void emitProctoring("voice_capture_stopped", "INFO");
   }
 
   function toggleVoiceCapture() {
     if (isRecording) {
-      stopSpeechRecognition();
+      stopAndSubmitVoice();
     } else {
       startSpeechRecognition();
     }
-  }
-
-  /** Submit the transcript collected by STT as a regular text turn. */
-  async function submitVoiceTurn() {
-    const transcript = sttTranscript.trim() || input.trim();
-    if (!transcript) return;
-    setSttTranscript("");
-    setInput("");
-    await sendTurnWithText(transcript, { isClarification: isClarificationText(transcript) });
   }
 
   // ─── Begin interview ──────────────────────────────────────────────────────────
@@ -643,7 +659,8 @@ export default function InterviewRuntimePage() {
       interviewIdRef.current = data.session.interviewId;
       aiSessionIdRef.current = data.session.aiSessionId;
       setQuestion(data.firstQuestion);
-      setChat([{ role: "assistant", content: data.firstQuestion }]);
+      const initialChat: ChatLine[] = [{ role: "assistant", content: data.firstQuestion }];
+      setChat(appendSttFallback(initialChat));
       if (ttsEnabled) speakText(data.firstQuestion);
       startIntegrityMonitor();
       resetQuestionTimer();
@@ -874,39 +891,29 @@ export default function InterviewRuntimePage() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={
                       isRecording
-                        ? "Listening… speak your answer"
+                        ? "Listening… press Stop & Send to submit"
                         : "Type your answer (end with ? for a clarification)"
                     }
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void sendTurn();
                     }}
-                    disabled={busy}
+                    disabled={busy || isRecording}
+                    readOnly={isRecording}
                   />
-                  <Button onClick={sendTurn} disabled={busy || !input.trim()}>
+                  <Button onClick={sendTurn} disabled={busy || isRecording || !input.trim()}>
                     Send
                   </Button>
 
-                  {/* Voice button — only shown if browser supports STT */}
+                  {/* Voice button — push-to-talk: press to start, press again to stop & auto-submit */}
                   {sttSupported && (
-                    <>
-                      <Button
-                        variant={isRecording ? "destructive" : "outline"}
-                        onClick={toggleVoiceCapture}
-                        disabled={busy && !isRecording}
-                        title={isRecording ? "Stop recording" : "Start voice input (Chrome/Edge)"}
-                      >
-                        {isRecording ? "⏹ Stop" : "🎤 Voice"}
-                      </Button>
-                      {isRecording && (
-                        <Button
-                          variant="default"
-                          onClick={() => { stopSpeechRecognition(); void submitVoiceTurn(); }}
-                          disabled={busy || !sttTranscript}
-                        >
-                          Submit Voice
-                        </Button>
-                      )}
-                    </>
+                    <Button
+                      variant={isRecording ? "destructive" : "outline"}
+                      onClick={toggleVoiceCapture}
+                      disabled={busy && !isRecording}
+                      title={isRecording ? "Stop recording & submit" : "Start voice input (Chrome/Edge)"}
+                    >
+                      {isRecording ? "⏹ Stop & Send" : "🎤 Voice"}
+                    </Button>
                   )}
 
                   <Button
@@ -918,9 +925,15 @@ export default function InterviewRuntimePage() {
                   </Button>
                 </div>
 
-                {isRecording && sttTranscript && (
-                  <p className="text-xs text-muted-foreground">
-                    Heard: <em>{sttTranscript}</em>
+                {isRecording && (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    🎙️ Recording… {sttTranscript ? <em>Heard: &ldquo;{sttTranscript}&rdquo;</em> : "speak your answer"}
+                  </p>
+                )}
+
+                {!sttSupported && (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ Voice input unavailable — type your answers instead.
                   </p>
                 )}
 

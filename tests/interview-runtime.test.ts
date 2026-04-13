@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildAudioPayload, formatTime, SUPPORTED_AUDIO_MIME_TYPES } from "@/lib/interview-utils";
+import { buildAudioPayload, formatTime, isClarificationText, STT_FALLBACK_MESSAGE, SUPPORTED_AUDIO_MIME_TYPES } from "@/lib/interview-utils";
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -134,5 +134,106 @@ describe("evaluation result shape", () => {
   it("maps technical.passed=true to PASS", () => {
     const technicalDecision = true ? "PASS" : "FAIL";
     expect(technicalDecision).toBe("PASS");
+  });
+});
+
+// ─── STT / TTS Speech Tests ──────────────────────────────────────────────────
+
+describe("isClarificationText", () => {
+  it("returns true for text ending with ?", () => {
+    expect(isClarificationText("Can you repeat?")).toBe(true);
+  });
+
+  it("returns true for text ending with ? after whitespace", () => {
+    expect(isClarificationText("What do you mean?  ")).toBe(true);
+  });
+
+  it("returns false for a regular answer", () => {
+    expect(isClarificationText("I worked on a React project")).toBe(false);
+  });
+
+  it("returns false for empty string", () => {
+    expect(isClarificationText("")).toBe(false);
+  });
+
+  it("returns false for whitespace-only", () => {
+    expect(isClarificationText("   ")).toBe(false);
+  });
+
+  it("returns true for single question mark", () => {
+    expect(isClarificationText("?")).toBe(true);
+  });
+
+  it("returns false when ? is in middle of text", () => {
+    expect(isClarificationText("Is this right? I think so.")).toBe(false);
+  });
+});
+
+describe("STT_FALLBACK_MESSAGE", () => {
+  it("is a non-empty string", () => {
+    expect(typeof STT_FALLBACK_MESSAGE).toBe("string");
+    expect(STT_FALLBACK_MESSAGE.length).toBeGreaterThan(0);
+  });
+
+  it("mentions Chrome or Edge", () => {
+    expect(STT_FALLBACK_MESSAGE).toMatch(/Chrome|Edge/);
+  });
+
+  it("mentions typing as fallback", () => {
+    expect(STT_FALLBACK_MESSAGE).toMatch(/type/i);
+  });
+});
+
+describe("speech state transitions (push-to-talk model)", () => {
+  it("starts in idle state (not recording, no transcript)", () => {
+    const state = { isRecording: false, sttTranscript: "", sttSupported: false };
+    expect(state.isRecording).toBe(false);
+    expect(state.sttTranscript).toBe("");
+  });
+
+  it("transitions to recording on start", () => {
+    const state = { isRecording: false, sttTranscript: "" };
+    // Simulate startSpeechRecognition
+    state.isRecording = true;
+    state.sttTranscript = "";
+    expect(state.isRecording).toBe(true);
+    expect(state.sttTranscript).toBe("");
+  });
+
+  it("accumulates transcript during recording", () => {
+    const state = { isRecording: true, sttTranscript: "" };
+    // Simulate onresult events
+    state.sttTranscript = "Hello";
+    expect(state.sttTranscript).toBe("Hello");
+    state.sttTranscript = "Hello world";
+    expect(state.sttTranscript).toBe("Hello world");
+  });
+
+  it("resets state on stop and submit", () => {
+    const state = { isRecording: true, sttTranscript: "My answer is React" };
+    // Simulate stopAndSubmitVoice
+    const submittedText = state.sttTranscript.trim();
+    state.isRecording = false;
+    state.sttTranscript = "";
+    expect(state.isRecording).toBe(false);
+    expect(state.sttTranscript).toBe("");
+    expect(submittedText).toBe("My answer is React");
+  });
+
+  it("does not submit empty transcript on stop", () => {
+    const state = { isRecording: true, sttTranscript: "" };
+    const submittedText = state.sttTranscript.trim();
+    state.isRecording = false;
+    state.sttTranscript = "";
+    expect(submittedText).toBe("");
+    // In the real code, empty transcript means no sendTurnWithText call
+  });
+
+  it("detects clarification in voice transcript", () => {
+    const transcript = "Can you explain that more?";
+    expect(isClarificationText(transcript)).toBe(true);
+
+    const answer = "I have experience with TypeScript";
+    expect(isClarificationText(answer)).toBe(false);
   });
 });

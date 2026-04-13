@@ -70,6 +70,16 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture docum
 - **Candidates' Analysis** — filterable candidate list with scoring (placeholder)
 - **Analytics** — recruitment funnels and metrics (placeholder)
 
+### AI Interview — Voice Input & Output (Web Speech API)
+
+The AI interview supports browser-native speech recognition (STT) and text-to-speech (TTS) via the [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API).
+
+- **Browser requirement:** Chrome or Edge (desktop). Other browsers fall back to typed input.
+- **Push-to-talk:** Press 🎤 **Voice** to start recording, press ⏹ **Stop & Send** to stop and auto-submit. The recognized text is non-editable and submitted instantly.
+- **TTS:** Assistant responses are spoken aloud automatically. Toggle with the 🔊/🔇 button.
+- **Chat parity:** Both user speech transcripts and assistant responses appear in the chat log for full reference.
+- **Fallback:** If speech recognition is unavailable, a guidance message appears in chat prompting typed input. The text input remains functional at all times.
+
 ### Platform
 - Role-based navigation (Candidate: 8 nav items / HR: 9 nav items)
 - AI-powered CV parsing (Groq Llama 3.3 70B primary, OpenAI GPT-4o fallback)
