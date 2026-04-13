@@ -285,7 +285,7 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     candidateId: string,
     relations: CandidateRelationsInput
   ) {
-    const ops: Promise<unknown>[] = [];
+    const ops: PromiseLike<unknown>[] = [];
 
     if (relations.experiences?.length) {
       ops.push(
