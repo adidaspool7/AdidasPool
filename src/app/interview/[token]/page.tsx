@@ -144,7 +144,6 @@ export default function InterviewRuntimePage() {
   const endedRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const sttTranscriptRef = useRef<string>("");   // mirrors sttTranscript state for async access
-  const userStoppedRef = useRef(false);           // tracks if stop was user-initiated
 
   // ── Camera state
   const [cameraDevices, setCameraDevices] = useState<Array<{ deviceId: string; label: string }>>(
@@ -511,7 +510,6 @@ export default function InterviewRuntimePage() {
 
     setSttTranscript("");
     sttTranscriptRef.current = "";
-    userStoppedRef.current = false;
     setIsRecording(true);
 
     const recognition = new SR();
@@ -561,7 +559,6 @@ export default function InterviewRuntimePage() {
    * This is the only way to end a voice turn — auto-submit on stop.
    */
   function stopAndSubmitVoice() {
-    userStoppedRef.current = true;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -886,7 +883,7 @@ export default function InterviewRuntimePage() {
                 {/* Input controls */}
                 <div className="flex gap-2">
                   <Input
-                    value={isRecording ? "" : input}
+                    value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={
                       isRecording
@@ -925,7 +922,7 @@ export default function InterviewRuntimePage() {
                 </div>
 
                 {isRecording && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
                     🎙️ Recording… {sttTranscript ? <><em>Heard: &ldquo;{sttTranscript}&rdquo;</em></> : "speak your answer"}
                   </p>
                 )}
