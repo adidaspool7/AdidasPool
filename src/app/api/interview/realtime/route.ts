@@ -7,6 +7,15 @@ import {
   verifyInterviewRuntimeToken,
 } from "@server/infrastructure/security/interview-token";
 
+type InterviewSessionPayload = {
+  id: string;
+  candidateId: string;
+  status: string;
+  signedTokenHash: string;
+  tokenExpiresAt: string;
+  targetSkill: string | null;
+};
+
 function getInterviewBackendUrl(): string {
   const url = process.env.INTERVIEW_BACKEND_URL;
   if (!url) {
@@ -44,6 +53,12 @@ async function callPython(path: string, payload: unknown) {
   return response.json();
 }
 
+function normalizeSkillString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -67,7 +82,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Interview not found" }, { status: 404 });
     }
 
-    const interview = camelizeKeys<any>(sessionRow as Record<string, unknown>);
+    const interview = camelizeKeys<InterviewSessionPayload>(
+      sessionRow as Record<string, unknown>
+    );
 
     if (interview.candidateId !== tokenPayload.candidateId) {
       return NextResponse.json({ error: "Interview not found" }, { status: 404 });
@@ -87,15 +104,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedSessionTargetSkill =
-      typeof interview.targetSkill === "string" && interview.targetSkill.trim()
-        ? interview.targetSkill.trim()
-        : null;
-    const normalizedRequestTargetSkill =
-      typeof parsed.data.candidate.target_skill === "string" &&
-      parsed.data.candidate.target_skill.trim()
-        ? parsed.data.candidate.target_skill.trim()
-        : null;
+    const normalizedSessionTargetSkill = normalizeSkillString(interview.targetSkill);
+    const normalizedRequestTargetSkill = normalizeSkillString(
+      parsed.data.candidate.target_skill
+    );
     const enforcedTargetSkill = normalizedSessionTargetSkill ?? normalizedRequestTargetSkill;
 
     const normalizedCandidateSkills = enforcedTargetSkill

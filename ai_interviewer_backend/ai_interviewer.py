@@ -53,7 +53,8 @@ def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
         filtered_skills = [
             skill
             for skill in candidate.skills
-            if skill.name.strip().lower() == normalized_focus
+            if (skill_name := skill.name.strip())
+            and skill_name.lower() == normalized_focus
         ]
         skills_block = "\n".join(
             [
@@ -72,10 +73,10 @@ def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
     off_topic_skills = (
         sorted(
             {
-                skill.name.strip()
+                skill_name
                 for skill in candidate.skills
-                if skill.name.strip()
-                and (not normalized_focus or skill.name.strip().lower() != normalized_focus)
+                if (skill_name := skill.name.strip())
+                and (not normalized_focus or skill_name.lower() != normalized_focus)
             }
         )
         if normalized_focus
