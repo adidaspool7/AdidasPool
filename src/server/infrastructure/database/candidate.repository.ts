@@ -1,14 +1,12 @@
 /**
- * Prisma Candidate Repository
+ * Supabase Candidate Repository
  *
  * ONION LAYER: Infrastructure
- * DEPENDENCIES: Prisma (external), domain ports (inward)
- *
- * Implements ICandidateRepository using Prisma ORM.
- * The domain and application layers never see Prisma directly.
+ * REPLACES: PrismaCandidateRepository
  */
 
-import { Prisma, PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
 import type {
   ICandidateRepository,
   CandidateFilters,
@@ -16,273 +14,336 @@ import type {
   PaginatedResult,
 } from "@server/domain/ports/repositories";
 
-export class PrismaCandidateRepository implements ICandidateRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+const CANDIDATE_LIST_SELECT = `
+  *,
+  languages:candidate_languages(*),
+  tags:candidate_tags(*),
+  assessments(id),
+  notes:candidate_notes(id)
+` as const;
 
+const CANDIDATE_FULL_SELECT = `
+  *,
+  experiences(*),
+  education(*),
+  languages:candidate_languages(*),
+  skills(*),
+  tags:candidate_tags(*),
+  notes:candidate_notes(*),
+  assessments(*, result:assessment_results(*), template:assessment_templates(*)),
+  improvementTracks:improvement_tracks(*, progress:improvement_progress(*)),
+  jobMatches:job_matches(*, job:jobs(*))
+` as const;
+
+export class SupabaseCandidateRepository implements ICandidateRepository {
   async findMany(filters: CandidateFilters): Promise<PaginatedResult<any>> {
-    const where: Record<string, unknown> = {};
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
 
+    let query = db
+      .from("candidates")
+      .select(CANDIDATE_LIST_SELECT, { count: "exact" });
+
+    // Search filter
     if (filters.search) {
-      where.OR = [
-        { firstName: { contains: filters.search, mode: "insensitive" } },
-        { lastName: { contains: filters.search, mode: "insensitive" } },
-        { email: { contains: filters.search, mode: "insensitive" } },
-      ];
+      const s = filters.search.replace(/'/g, "''");
+      query = query.or(
+        `first_name.ilike.%${s}%,last_name.ilike.%${s}%,email.ilike.%${s}%`
+      );
     }
-    if (filters.status) where.status = filters.status;
+
+    // Status
+    if (filters.status) query = query.eq("status", filters.status);
+
+    // Country
     if (filters.country)
-      where.country = { contains: filters.country, mode: "insensitive" };
+      query = query.ilike("country", `%${filters.country}%`);
+
+    // Location search
     if (filters.locationSearch) {
-      where.AND = [
-        ...(Array.isArray(where.AND) ? (where.AND as Record<string, unknown>[]) : []),
-        {
-          OR: [
-            { location: { contains: filters.locationSearch, mode: "insensitive" } },
-            { country: { contains: filters.locationSearch, mode: "insensitive" } },
-          ],
-        },
-      ];
+      const l = filters.locationSearch.replace(/'/g, "''");
+      query = query.or(`location.ilike.%${l}%,country.ilike.%${l}%`);
     }
+
+    // Source type
     if (filters.sourceType) {
-      where.sourceType = filters.sourceType;
+      query = query.eq("source_type", filters.sourceType);
     } else {
-      where.sourceType = { not: "PLATFORM" };
+      query = query.neq("source_type", "PLATFORM");
     }
-    if (filters.minScore || filters.maxScore) {
-      where.overallCvScore = {
-        ...(filters.minScore && { gte: filters.minScore }),
-        ...(filters.maxScore && { lte: filters.maxScore }),
+
+    // Score range
+    if (filters.minScore != null)
+      query = query.gte("overall_cv_score", filters.minScore);
+    if (filters.maxScore != null)
+      query = query.lte("overall_cv_score", filters.maxScore);
+
+    // Business area
+    if (filters.businessArea)
+      query = query.eq("primary_business_area", filters.businessArea);
+
+    // Needs review
+    if (filters.needsReview !== undefined)
+      query = query.eq("needs_review", filters.needsReview);
+
+    // Sort
+    const sortCol = toSnakeCase(filters.sortBy ?? "createdAt");
+    query = query
+      .order(sortCol, { ascending: filters.sortOrder === "asc" })
+      .range(from, to);
+
+    const { data, error, count } = await query;
+    assertNoError(error, "candidate.findMany");
+
+    const rows = (data ?? []).map((row: Record<string, unknown>) => {
+      const c = camelizeKeys<any>(row);
+      // Compute _count from embedded arrays
+      c._count = {
+        assessments: Array.isArray(c.assessments) ? c.assessments.length : 0,
+        notes: Array.isArray(c.notes) ? c.notes.length : 0,
       };
-    }
-    if (filters.businessArea) {
-      where.primaryBusinessArea = filters.businessArea;
-    }
-    if (filters.needsReview !== undefined) {
-      where.needsReview = filters.needsReview;
-    }
+      return c;
+    });
 
-    const [data, total] = await Promise.all([
-      this.prisma.candidate.findMany({
-        where,
-        include: {
-          languages: true,
-          tags: true,
-          _count: { select: { assessments: true, notes: true } },
-        },
-        orderBy: { [filters.sortBy || "createdAt"]: filters.sortOrder },
-        skip: (filters.page - 1) * filters.pageSize,
-        take: filters.pageSize,
-      }),
-      this.prisma.candidate.count({ where }),
-    ]);
-
+    const total = count ?? 0;
     return {
-      data,
+      data: rows,
       pagination: {
-        page: filters.page,
-        pageSize: filters.pageSize,
+        page,
+        pageSize,
         total,
-        totalPages: Math.ceil(total / filters.pageSize),
+        totalPages: Math.ceil(total / pageSize),
       },
     };
   }
 
   async findById(id: string) {
-    return this.prisma.candidate.findUnique({
-      where: { id },
-      include: {
-        experiences: { orderBy: { startDate: "desc" } },
-        education: { orderBy: { endDate: "desc" } },
-        languages: true,
-        skills: true,
-        tags: true,
-        notes: { orderBy: { createdAt: "desc" } },
-        assessments: {
-          include: { result: true, template: true },
-          orderBy: { createdAt: "desc" },
-        },
-        improvementTracks: {
-          include: { progress: { orderBy: { day: "asc" } } },
-        },
-        jobMatches: {
-          include: { job: true },
-          orderBy: { matchScore: "desc" },
-        },
-      },
-    });
+    const { data, error } = await db
+      .from("candidates")
+      .select(CANDIDATE_FULL_SELECT)
+      .eq("id", id)
+      .single();
+    assertNoError(error, "candidate.findById");
+    if (!data) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
-  async findByIdWithSelect(id: string, select: Prisma.CandidateSelect) {
-    return this.prisma.candidate.findUnique({
-      where: { id },
-      select,
-    });
+  // Kept for backward compat — select is treated as a field list hint
+  async findByIdWithSelect(id: string, _select: Record<string, boolean>) {
+    return this.findById(id);
   }
 
   async update(id: string, data: Record<string, unknown>) {
-    return this.prisma.candidate.update({ where: { id }, data });
+    const { data: row, error } = await db
+      .from("candidates")
+      .update(snakeifyKeys(data))
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "candidate.update");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
-  /** FIXED: select now uses Prisma.CandidateSelect */
   async updateWithSelect(
     id: string,
     data: Record<string, unknown>,
-    select: Prisma.CandidateSelect
+    _select: Record<string, boolean>
   ) {
-    return this.prisma.candidate.update({
-      where: { id },
-      data,
-      select,
-    });
+    return this.update(id, data);
   }
 
-  /** FIXED: select now uses Prisma.CandidateSelect */
-  async findFirstByCreation(select?: Prisma.CandidateSelect) {
-    return this.prisma.candidate.findFirst({
-      orderBy: { createdAt: "asc" },
-      ...(select ? { select } : {}),
-    });
+  async findByUserId(userId: string) {
+    const { data, error } = await db
+      .from("candidates")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
-  /** FIXED: select now uses Prisma.CandidateSelect */
-  async createDefault(data: Record<string, unknown>, select?: Prisma.CandidateSelect) {
-    return this.prisma.candidate.create({
-      data: data as any,
-      ...(select ? { select } : {}),
-    });
+  async findFirstByCreation(_select?: Record<string, boolean>) {
+    const { data, error } = await db
+      .from("candidates")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
+  }
+
+  async createDefault(
+    data: Record<string, unknown>,
+    _select?: Record<string, boolean>
+  ) {
+    const payload = { id: generateId(), ...snakeifyKeys(data) };
+    const { data: row, error } = await db
+      .from("candidates")
+      .insert(payload)
+      .select()
+      .single();
+    assertNoError(error, "candidate.createDefault");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async addNote(candidateId: string, author: string, content: string) {
-    return this.prisma.candidateNote.create({
-      data: { candidateId, author, content },
-    });
+    const { data, error } = await db
+      .from("candidate_notes")
+      .insert({ id: generateId(), candidate_id: candidateId, author, content })
+      .select()
+      .single();
+    assertNoError(error, "candidate.addNote");
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async updateStatus(candidateId: string, status: string) {
-    await this.prisma.candidate.update({
-      where: { id: candidateId },
-      data: { status: status as any },
-    });
+    const { error } = await db
+      .from("candidates")
+      .update({ status })
+      .eq("id", candidateId);
+    assertNoError(error, "candidate.updateStatus");
   }
 
   async findForMatching() {
-    return this.prisma.candidate.findMany({
-      where: {
-        status: { not: "NEW" },
-        isDuplicate: false,
-      },
-      include: {
-        languages: true,
-        education: true,
-      },
-    });
+    const { data, error } = await db
+      .from("candidates")
+      .select(`*, languages:candidate_languages(*), education(*)`)
+      .neq("status", "NEW")
+      .eq("is_duplicate", false);
+    assertNoError(error, "candidate.findForMatching");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findForNotifications() {
-    return this.prisma.candidate.findMany({
-      where: { isDuplicate: false },
-      select: {
-        id: true,
-        country: true,
-        education: { select: { fieldOfStudy: true } },
-      },
-    });
+    const { data, error } = await db
+      .from("candidates")
+      .select(`id, country, education(field_of_study)`)
+      .eq("is_duplicate", false);
+    assertNoError(error, "candidate.findForNotifications");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findForExport() {
-    return this.prisma.candidate.findMany({
-      include: {
-        languages: true,
-        tags: true,
-      },
-      orderBy: { overallCvScore: "desc" },
-    });
+    const { data, error } = await db
+      .from("candidates")
+      .select(`*, languages:candidate_languages(*), tags:candidate_tags(*)`)
+      .order("overall_cv_score", { ascending: false });
+    assertNoError(error, "candidate.findForExport");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findForRescore() {
-    return this.prisma.candidate.findMany({
-      select: {
-        id: true,
-        yearsOfExperience: true,
-        location: true,
-        country: true,
-        education: { select: { level: true }, orderBy: { startDate: "desc" } },
-        languages: { select: { language: true, selfDeclaredLevel: true } },
-      },
-    });
+    const { data, error } = await db
+      .from("candidates")
+      .select(`
+        id, years_of_experience, location, country,
+        education(level),
+        languages:candidate_languages(language, self_declared_level)
+      `);
+    assertNoError(error, "candidate.findForRescore");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async createWithRelations(
     data: Record<string, unknown>,
     relations: CandidateRelationsInput
   ) {
-    return this.prisma.candidate.create({
-      data: {
-        ...(data as any),
-        experiences: {
-          create: relations.experiences,
-        },
-        education: {
-          create: relations.education.map((edu) => ({
-            ...edu,
-            level: edu.level as any,
-          })),
-        },
-        languages: {
-          create: relations.languages.map((lang) => ({
-            ...lang,
-            selfDeclaredLevel: lang.selfDeclaredLevel as any,
-          })),
-        },
-        skills: {
-          create: relations.skills,
-        },
-      },
-      include: {
-        experiences: true,
-        education: true,
-        languages: true,
-        skills: true,
-      },
-    });
+    const candidateId = generateId();
+    const payload = { id: candidateId, ...snakeifyKeys(data) };
+
+    const { data: row, error } = await db
+      .from("candidates")
+      .insert(payload)
+      .select()
+      .single();
+    assertNoError(error, "candidate.createWithRelations");
+
+    await this._insertRelations(candidateId, relations);
+
+    return this.findById(candidateId);
   }
 
   async replaceRelatedRecords(
     candidateId: string,
     relations: CandidateRelationsInput
   ) {
-    await this.prisma.$transaction([
-      this.prisma.experience.deleteMany({ where: { candidateId } }),
-      this.prisma.education.deleteMany({ where: { candidateId } }),
-      this.prisma.candidateLanguage.deleteMany({ where: { candidateId } }),
-      this.prisma.skill.deleteMany({ where: { candidateId } }),
-
-      this.prisma.experience.createMany({
-        data: relations.experiences.map((exp) => ({ ...exp, candidateId })),
-      }),
-      this.prisma.education.createMany({
-        data: relations.education.map((edu) => ({
-          ...edu,
-          candidateId,
-          level: edu.level as any,
-        })),
-      }),
-      this.prisma.candidateLanguage.createMany({
-        data: relations.languages.map((lang) => ({
-          ...lang,
-          candidateId,
-          selfDeclaredLevel: lang.selfDeclaredLevel as any,
-        })),
-      }),
-      this.prisma.skill.createMany({
-        data: relations.skills.map((skill) => ({ ...skill, candidateId })),
-      }),
+    // Delete existing relations
+    await Promise.all([
+      db.from("experiences").delete().eq("candidate_id", candidateId),
+      db.from("education").delete().eq("candidate_id", candidateId),
+      db.from("candidate_languages").delete().eq("candidate_id", candidateId),
+      db.from("skills").delete().eq("candidate_id", candidateId),
     ]);
+
+    await this._insertRelations(candidateId, relations);
+  }
+
+  private async _insertRelations(
+    candidateId: string,
+    relations: CandidateRelationsInput
+  ) {
+    const ops: Promise<unknown>[] = [];
+
+    if (relations.experiences?.length) {
+      ops.push(
+        db.from("experiences").insert(
+          relations.experiences.map((e) => ({
+            id: generateId(),
+            candidate_id: candidateId,
+            ...snakeifyKeys(e as Record<string, unknown>),
+          }))
+        )
+      );
+    }
+
+    if (relations.education?.length) {
+      ops.push(
+        db.from("education").insert(
+          relations.education.map((e) => ({
+            id: generateId(),
+            candidate_id: candidateId,
+            ...snakeifyKeys(e as Record<string, unknown>),
+          }))
+        )
+      );
+    }
+
+    if (relations.languages?.length) {
+      ops.push(
+        db.from("candidate_languages").insert(
+          relations.languages.map((l) => ({
+            id: generateId(),
+            candidate_id: candidateId,
+            ...snakeifyKeys(l as Record<string, unknown>),
+          }))
+        )
+      );
+    }
+
+    if (relations.skills?.length) {
+      ops.push(
+        db.from("skills").insert(
+          relations.skills.map((s) => ({
+            id: generateId(),
+            candidate_id: candidateId,
+            ...snakeifyKeys(s as Record<string, unknown>),
+          }))
+        )
+      );
+    }
+
+    await Promise.all(ops);
   }
 
   async delete(id: string) {
-    await this.prisma.candidate.delete({
-      where: { id },
-    });
+    const { error } = await db.from("candidates").delete().eq("id", id);
+    assertNoError(error, "candidate.delete");
   }
+}
+
+function toSnakeCase(s: string): string {
+  return s.replace(/([A-Z])/g, (c) => `_${c.toLowerCase()}`);
 }

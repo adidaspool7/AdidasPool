@@ -9,8 +9,6 @@
  * This is the Dependency Inversion Principle in action.
  */
 
-import { Prisma } from "@prisma/client";
-
 // ============================================
 // SHARED TYPES
 // ============================================
@@ -50,24 +48,22 @@ export interface CandidateFilters {
 export interface ICandidateRepository {
   findMany(filters: CandidateFilters): Promise<PaginatedResult<any>>;
   findById(id: string): Promise<any | null>;
-  findByIdWithSelect(id: string, select: Prisma.CandidateSelect): Promise<any | null>;
+  findByIdWithSelect(id: string, select: Record<string, unknown>): Promise<any | null>;
+  findByUserId(userId: string): Promise<any | null>;
 
-  /** FIXED: Prisma select type */
-  findFirstByCreation(select?: Prisma.CandidateSelect): Promise<any | null>;
+  findFirstByCreation(select?: Record<string, unknown>): Promise<any | null>;
 
-  /** FIXED: Prisma select type */
   createDefault(
     data: Record<string, unknown>,
-    select?: Prisma.CandidateSelect
+    select?: Record<string, unknown>
   ): Promise<any>;
 
   update(id: string, data: Record<string, unknown>): Promise<any>;
 
-  /** FIXED: Prisma select type */
   updateWithSelect(
     id: string,
     data: Record<string, unknown>,
-    select: Prisma.CandidateSelect
+    select: Record<string, unknown>
   ): Promise<any>;
 
   addNote(candidateId: string, author: string, content: string): Promise<any>;

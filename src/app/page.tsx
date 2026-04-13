@@ -1,19 +1,11 @@
-"use client";
+import Link from "next/link";
+import { Users, Briefcase, BarChart3 } from "lucide-react";
 
-import { useRouter } from "next/navigation";
-import { Button } from "@client/components/ui/button";
-import { useRole } from "@client/components/providers/role-provider";
-import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck } from "lucide-react";
-
+/**
+ * Public landing page.
+ * Authenticated users are redirected to /dashboard by middleware.
+ */
 export default function HomePage() {
-  const router = useRouter();
-  const { setRole } = useRole();
-
-  const handleRoleSelect = (role: "candidate" | "hr") => {
-    setRole(role);
-    router.push("/dashboard");
-  };
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-muted">
       <div className="mx-auto max-w-3xl text-center space-y-8 px-4">
@@ -32,30 +24,14 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Role Selection */}
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            Select your role to continue
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Button
-              size="lg"
-              variant="outline"
-              className="gap-3 h-14 px-8 text-base"
-              onClick={() => handleRoleSelect("candidate")}
-            >
-              <UserCircle className="h-5 w-5" />
-              I&apos;m a Candidate
-            </Button>
-            <Button
-              size="lg"
-              className="gap-3 h-14 px-8 text-base"
-              onClick={() => handleRoleSelect("hr")}
-            >
-              <ShieldCheck className="h-5 w-5" />
-              I&apos;m HR
-            </Button>
-          </div>
+        {/* Sign-in CTA */}
+        <div className="flex justify-center">
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-8 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Sign in to get started
+          </Link>
         </div>
 
         {/* Feature highlights */}
@@ -78,7 +54,7 @@ export default function HomePage() {
             <BarChart3 className="h-8 w-8 text-primary" />
             <h3 className="font-semibold">Analytics</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Recruitment funnel, language proficiency reports & scoring
+              Recruitment funnel, language proficiency reports &amp; scoring
             </p>
           </div>
         </div>

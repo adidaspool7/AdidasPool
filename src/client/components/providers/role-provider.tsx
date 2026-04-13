@@ -5,9 +5,11 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 // ============================================
 // ROLE TYPES
@@ -20,45 +22,99 @@ interface RoleContextType {
   setRole: (role: UserRole) => void;
   clearRole: () => void;
   isLoading: boolean;
+  userEmail: string | null;
+  userName: string | null;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-const STORAGE_KEY = "ti_platform_role";
-
 // ============================================
 // ROLE PROVIDER
-// Persists the selected role in localStorage.
-// Will be replaced by proper RBAC auth later.
+// Sources role from Supabase user_metadata.role.
+// setRole → supabase.auth.updateUser({ data: { role } })
+// clearRole → supabase.auth.signOut()
 // ============================================
 
 export function RoleProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<UserRole | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Hydrate from localStorage on mount
+  // Hydrate from Supabase session on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "candidate" || stored === "hr") {
-      setRoleState(stored);
+    const supabase = createClient();
+
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const rawRole = user.user_metadata?.role;
+        if (rawRole === "candidate" || rawRole === "hr") {
+          setRoleState(rawRole);
+        }
+        setUserEmail(user.email ?? null);
+        setUserName(
+          user.user_metadata?.full_name ??
+          user.user_metadata?.name ??
+          user.email ??
+          null
+        );
+      }
+      setIsLoading(false);
     }
-    setIsLoading(false);
+
+    loadUser();
+
+    // Listen for auth state changes (sign-in, sign-out, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const rawRole = session.user.user_metadata?.role;
+        setRoleState(
+          rawRole === "candidate" || rawRole === "hr" ? rawRole : null
+        );
+        setUserEmail(session.user.email ?? null);
+        setUserName(
+          session.user.user_metadata?.full_name ??
+          session.user.user_metadata?.name ??
+          session.user.email ??
+          null
+        );
+      } else {
+        setRoleState(null);
+        setUserEmail(null);
+        setUserName(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const setRole = (newRole: UserRole) => {
-    localStorage.setItem(STORAGE_KEY, newRole);
-    setRoleState(newRole);
-  };
+  const setRole = useCallback(
+    async (newRole: UserRole) => {
+      const supabase = createClient();
+      await supabase.auth.updateUser({ data: { role: newRole } });
+      setRoleState(newRole);
+    },
+    []
+  );
 
-  const clearRole = () => {
-    localStorage.removeItem(STORAGE_KEY);
+  const clearRole = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     setRoleState(null);
-    router.push("/");
-  };
+    router.push("/auth/login");
+  }, [router]);
 
   return (
-    <RoleContext.Provider value={{ role, setRole, clearRole, isLoading }}>
+    <RoleContext.Provider
+      value={{ role, setRole, clearRole, isLoading, userEmail, userName }}
+    >
       {children}
     </RoleContext.Provider>
   );

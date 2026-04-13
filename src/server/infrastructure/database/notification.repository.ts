@@ -1,193 +1,194 @@
 /**
- * Notification Repository (Prisma)
+ * Supabase Notification Repository
  *
  * ONION LAYER: Infrastructure
- * IMPLEMENTS: INotificationRepository (domain port)
+ * REPLACES: PrismaNotificationRepository
  */
 
-import type { PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
 import type {
   INotificationRepository,
   NotificationFilters,
   CreateNotificationData,
 } from "@server/domain/ports/repositories";
 
-const NOTIFICATION_INCLUDE = {
-  job: {
-    select: {
-      id: true,
-      title: true,
-      department: true,
-      location: true,
-      country: true,
-      type: true,
-    },
-  },
-  candidate: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-    },
-  },
-} as const;
+const NOTIFICATION_SELECT = `
+  *,
+  job:jobs(id, title, department, location, country, type),
+  candidate:candidates(id, first_name, last_name, email)
+` as const;
 
-export class PrismaNotificationRepository implements INotificationRepository {
-  constructor(private readonly prisma: PrismaClient) {}
-
-  // ── Scoped queries ──────────────────────────────────────
-
+export class SupabaseNotificationRepository implements INotificationRepository {
   async findForCandidate(candidateId: string, filters?: NotificationFilters) {
-    const where: Record<string, unknown> = {
-      candidateId,
-      OR: [
-        { targetRole: "CANDIDATE" },
-        { targetRole: null },
-      ],
-    };
-    if (filters?.unread) where.read = false;
-    if (filters?.type) where.type = filters.type;
-    if (filters?.archived !== undefined) where.archived = filters.archived;
-    else where.archived = false; // default: hide archived
+    let query = db
+      .from("notifications")
+      .select(NOTIFICATION_SELECT)
+      .eq("candidate_id", candidateId)
+      .or("target_role.eq.CANDIDATE,target_role.is.null");
 
-    return this.prisma.notification.findMany({
-      where: where as any,
-      include: NOTIFICATION_INCLUDE,
-      orderBy: { createdAt: "desc" },
-      take: filters?.limit ?? 100,
-      skip: filters?.offset ?? 0,
-    });
+    if (filters?.unread) query = query.eq("read", false);
+    if (filters?.type) query = query.eq("type", filters.type);
+    query = query.eq(
+      "archived",
+      filters?.archived !== undefined ? filters.archived : false
+    );
+
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .range(filters?.offset ?? 0, (filters?.offset ?? 0) + (filters?.limit ?? 100) - 1);
+    assertNoError(error, "notification.findForCandidate");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findForHR(filters?: NotificationFilters) {
-    const where: Record<string, unknown> = {
-      OR: [
-        { targetRole: "HR" },
-        { targetRole: null },
-      ],
-    };
-    if (filters?.unread) where.read = false;
-    if (filters?.type) where.type = filters.type;
-    if (filters?.archived !== undefined) where.archived = filters.archived;
-    else where.archived = false; // default: hide archived
+    let query = db
+      .from("notifications")
+      .select(NOTIFICATION_SELECT)
+      .or("target_role.eq.HR,target_role.is.null");
 
-    return this.prisma.notification.findMany({
-      where: where as any,
-      include: NOTIFICATION_INCLUDE,
-      orderBy: { createdAt: "desc" },
-      take: filters?.limit ?? 100,
-      skip: filters?.offset ?? 0,
-    });
+    if (filters?.unread) query = query.eq("read", false);
+    if (filters?.type) query = query.eq("type", filters.type);
+    query = query.eq(
+      "archived",
+      filters?.archived !== undefined ? filters.archived : false
+    );
+
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .range(filters?.offset ?? 0, (filters?.offset ?? 0) + (filters?.limit ?? 100) - 1);
+    assertNoError(error, "notification.findForHR");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async countUnread(candidateId?: string, targetRole?: string) {
-    const where: Record<string, unknown> = { read: false };
-    if (candidateId) where.candidateId = candidateId;
-    if (targetRole) {
-      where.OR = [
-        { targetRole },
-        { targetRole: null },
-      ];
-    }
-    return this.prisma.notification.count({ where: where as any });
+    let query = db
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("read", false);
+
+    if (candidateId) query = query.eq("candidate_id", candidateId);
+    if (targetRole)
+      query = query.or(`target_role.eq.${targetRole},target_role.is.null`);
+
+    const { count, error } = await query;
+    assertNoError(error, "notification.countUnread");
+    return count ?? 0;
   }
 
-  // ── Legacy (backward compat) ────────────────────────────
-
   async findAll() {
-    return this.prisma.notification.findMany({
-      include: NOTIFICATION_INCLUDE,
-      orderBy: { createdAt: "desc" },
-    });
+    const { data, error } = await db
+      .from("notifications")
+      .select(NOTIFICATION_SELECT)
+      .order("created_at", { ascending: false });
+    assertNoError(error, "notification.findAll");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findUnread() {
-    return this.prisma.notification.findMany({
-      where: { read: false },
-      include: NOTIFICATION_INCLUDE,
-      orderBy: { createdAt: "desc" },
-    });
+    const { data, error } = await db
+      .from("notifications")
+      .select(NOTIFICATION_SELECT)
+      .eq("read", false)
+      .order("created_at", { ascending: false });
+    assertNoError(error, "notification.findUnread");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
-  // ── Mutations ───────────────────────────────────────────
-
   async create(data: CreateNotificationData) {
-    return this.prisma.notification.create({
-      data: {
-        type: data.type as any,
+    const { data: row, error } = await db
+      .from("notifications")
+      .insert({
+        id: generateId(),
+        type: data.type,
         message: data.message,
-        targetRole: data.targetRole ?? null,
-        jobId: data.jobId,
-        candidateId: data.candidateId,
-        applicationId: data.applicationId,
-        campaignId: data.campaignId ?? null,
-      },
-    });
+        target_role: data.targetRole ?? null,
+        job_id: data.jobId ?? null,
+        candidate_id: data.candidateId ?? null,
+        application_id: data.applicationId ?? null,
+        campaign_id: data.campaignId ?? null,
+      })
+      .select()
+      .single();
+    assertNoError(error, "notification.create");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async createMany(data: CreateNotificationData[]) {
-    const result = await this.prisma.notification.createMany({
-      data: data.map((d) => ({
-        type: d.type as any,
+    const { error, count } = await db.from("notifications").insert(
+      data.map((d) => ({
+        id: generateId(),
+        type: d.type,
         message: d.message,
-        targetRole: d.targetRole ?? null,
-        jobId: d.jobId,
-        candidateId: d.candidateId,
-        applicationId: d.applicationId,
-        campaignId: d.campaignId ?? null,
-      })),
-    });
-    return result.count;
+        target_role: d.targetRole ?? null,
+        job_id: d.jobId ?? null,
+        candidate_id: d.candidateId ?? null,
+        application_id: d.applicationId ?? null,
+        campaign_id: d.campaignId ?? null,
+      }))
+    );
+    assertNoError(error, "notification.createMany");
+    return data.length;
   }
 
   async markAsRead(id: string) {
-    return this.prisma.notification.update({
-      where: { id },
-      data: { read: true },
-    });
+    const { data, error } = await db
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "notification.markAsRead");
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async markAllAsRead(candidateId?: string, targetRole?: string) {
-    const where: Record<string, unknown> = { read: false };
-    if (candidateId) where.candidateId = candidateId;
-    if (targetRole) {
-      where.OR = [
-        { targetRole },
-        { targetRole: null },
-      ];
-    }
-    await this.prisma.notification.updateMany({
-      where: where as any,
-      data: { read: true },
-    });
+    let query = db
+      .from("notifications")
+      .update({ read: true })
+      .eq("read", false);
+    if (candidateId) query = query.eq("candidate_id", candidateId);
+    if (targetRole)
+      query = query.or(`target_role.eq.${targetRole},target_role.is.null`);
+    const { error } = await query;
+    assertNoError(error, "notification.markAllAsRead");
   }
 
   async archiveNotification(id: string) {
-    return this.prisma.notification.update({
-      where: { id },
-      data: { archived: true, read: true },
-    });
+    const { data, error } = await db
+      .from("notifications")
+      .update({ archived: true, read: true })
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "notification.archive");
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async archiveMany(ids: string[]) {
-    const result = await this.prisma.notification.updateMany({
-      where: { id: { in: ids } },
-      data: { archived: true, read: true },
-    });
-    return result.count;
+    const { error } = await db
+      .from("notifications")
+      .update({ archived: true, read: true })
+      .in("id", ids);
+    assertNoError(error, "notification.archiveMany");
+    return ids.length;
   }
 
   async deleteNotification(id: string) {
-    await this.prisma.notification.delete({ where: { id } });
+    const { error } = await db.from("notifications").delete().eq("id", id);
+    assertNoError(error, "notification.delete");
   }
 
   // ── Preferences ─────────────────────────────────────────
 
   async getPreferences(candidateId: string) {
-    return this.prisma.notificationPreference.findUnique({
-      where: { candidateId },
-    });
+    const { data, error } = await db
+      .from("notification_preferences")
+      .select("*")
+      .eq("candidate_id", candidateId)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async upsertPreferences(
@@ -200,44 +201,92 @@ export class PrismaNotificationRepository implements INotificationRepository {
       promotionalNotifications?: boolean;
     }
   ) {
-    return this.prisma.notificationPreference.upsert({
-      where: { candidateId },
-      create: { candidateId, ...prefs },
-      update: prefs,
-    });
+    const existing = await this.getPreferences(candidateId);
+    const payload = {
+      candidate_id: candidateId,
+      ...snakeifyKeys(prefs as Record<string, unknown>),
+    };
+
+    if (existing) {
+      const { data, error } = await db
+        .from("notification_preferences")
+        .update(payload)
+        .eq("candidate_id", candidateId)
+        .select()
+        .single();
+      assertNoError(error, "notification.upsertPreferences.update");
+      return camelizeKeys<any>(data as Record<string, unknown>);
+    }
+
+    const { data, error } = await db
+      .from("notification_preferences")
+      .insert({ id: generateId(), ...payload })
+      .select()
+      .single();
+    assertNoError(error, "notification.upsertPreferences.insert");
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   // ── Campaigns ───────────────────────────────────────────
 
   async createCampaign(data: any) {
-    return this.prisma.promoCampaign.create({ data });
+    const { data: row, error } = await db
+      .from("promo_campaigns")
+      .insert({ id: generateId(), ...snakeifyKeys(data) })
+      .select()
+      .single();
+    assertNoError(error, "notification.createCampaign");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async findCampaigns() {
-    return this.prisma.promoCampaign.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const { data, error } = await db
+      .from("promo_campaigns")
+      .select("*")
+      .order("created_at", { ascending: false });
+    assertNoError(error, "notification.findCampaigns");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async findCampaignById(id: string) {
-    return this.prisma.promoCampaign.findUnique({ where: { id } });
+    const { data, error } = await db
+      .from("promo_campaigns")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async updateCampaign(id: string, data: any) {
-    return this.prisma.promoCampaign.update({ where: { id }, data });
+    const { data: row, error } = await db
+      .from("promo_campaigns")
+      .update(snakeifyKeys(data))
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "notification.updateCampaign");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async deleteCampaign(id: string) {
-    // Delete associated notification rows first, then the campaign
-    await this.prisma.notification.deleteMany({ where: { campaignId: id } });
-    await this.prisma.promoCampaign.delete({ where: { id } });
+    await db.from("notifications").delete().eq("campaign_id", id);
+    const { error } = await db.from("promo_campaigns").delete().eq("id", id);
+    assertNoError(error, "notification.deleteCampaign");
   }
 
   async getCampaignReadStats(campaignId: string) {
-    const [total, read] = await Promise.all([
-      this.prisma.notification.count({ where: { campaignId } }),
-      this.prisma.notification.count({ where: { campaignId, read: true } }),
+    const [{ count: total }, { count: read }] = await Promise.all([
+      db
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("campaign_id", campaignId),
+      db
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("campaign_id", campaignId)
+        .eq("read", true),
     ]);
-    return { total, read };
+    return { total: total ?? 0, read: read ?? 0 };
   }
 }

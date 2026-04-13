@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@client/lib/utils";
 import { useRole, type UserRole } from "@client/components/providers/role-provider";
+import { Avatar, AvatarFallback } from "@client/components/ui/avatar";
 import {
   Sheet,
   SheetContent,
@@ -104,13 +105,19 @@ const hrNavigationSections: NavSection[] = [
 // SIDEBAR COMPONENT
 // ============================================
 
-function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate }: {
+function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, userName, userEmail }: {
   role: UserRole;
   roleLabel: string;
   pathname: string;
   clearRole: () => void;
   onNavigate?: () => void;
+  userName: string | null;
+  userEmail: string | null;
 }) {
+  const initials = userName
+    ? userName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+    : "?";
+
   return (
     <>
       {/* Logo / Brand */}
@@ -124,16 +131,22 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate }: {
         </div>
       </div>
 
-      {/* Role badge */}
-      <div className="px-4 pt-3 pb-1">
-        <span className={cn(
-          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-          role === "hr"
-            ? "bg-primary/10 text-primary"
-            : "bg-emerald-500/10 text-emerald-600"
-        )}>
-          {roleLabel}
-        </span>
+      {/* User + Role badge */}
+      <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+        <Avatar className="h-7 w-7">
+          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <p className="text-xs font-medium truncate">{userName ?? userEmail ?? "—"}</p>
+          <span className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            role === "hr"
+              ? "bg-primary/10 text-primary"
+              : "bg-emerald-500/10 text-emerald-600"
+          )}>
+            {roleLabel}
+          </span>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -179,7 +192,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate }: {
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <LogOut className="h-4 w-4" />
-          Switch Role
+          Sign out
         </button>
         <p className="text-xs text-muted-foreground px-3">
           Talent Intelligence v0.1
@@ -192,12 +205,12 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate }: {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, clearRole, isLoading } = useRole();
+  const { role, clearRole, isLoading, userName, userEmail } = useRole();
 
-  // Redirect to landing if no role selected (after hydration)
+  // Redirect to login if not authenticated (after hydration)
   useEffect(() => {
     if (!isLoading && !role) {
-      router.push("/");
+      router.push("/auth/login");
     }
   }, [isLoading, role, router]);
 
@@ -209,7 +222,14 @@ export function Sidebar() {
 
   return (
     <aside className="hidden md:flex h-screen w-64 flex-col border-r bg-card">
-      <SidebarContent role={role} roleLabel={roleLabel} pathname={pathname} clearRole={clearRole} />
+      <SidebarContent
+        role={role}
+        roleLabel={roleLabel}
+        pathname={pathname}
+        clearRole={clearRole}
+        userName={userName}
+        userEmail={userEmail}
+      />
     </aside>
   );
 }
@@ -217,12 +237,12 @@ export function Sidebar() {
 export function MobileSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, clearRole, isLoading } = useRole();
+  const { role, clearRole, isLoading, userName, userEmail } = useRole();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !role) {
-      router.push("/");
+      router.push("/auth/login");
     }
   }, [isLoading, role, router]);
 
@@ -249,6 +269,8 @@ export function MobileSidebar() {
               pathname={pathname}
               clearRole={clearRole}
               onNavigate={() => setOpen(false)}
+              userName={userName}
+              userEmail={userEmail}
             />
           </div>
         </SheetContent>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@server/infrastructure/database/prisma-client";
+import db from "@server/infrastructure/database/supabase-client";
+import { camelizeKeys, generateId } from "@server/infrastructure/database/db-utils";
 import {
   hashInterviewToken,
   verifyInterviewRuntimeToken,
@@ -7,11 +8,7 @@ import {
 
 function getInterviewBackendUrl(): string {
   const url = process.env.INTERVIEW_BACKEND_URL;
-  if (!url) {
-    throw new Error(
-      "INTERVIEW_BACKEND_URL is not configured. Set it to your deployed interview backend base URL."
-    );
-  }
+  if (!url) throw new Error("INTERVIEW_BACKEND_URL is not configured.");
   return url.replace(/\/+$/, "");
 }
 
@@ -30,18 +27,13 @@ type EvaluatorResult = {
   technical: { passed: boolean };
   integrity: { status: "CLEAR" | "REVIEW" | "FAIL" };
   final: boolean;
-  rationale: {
-    technical: string;
-    integrity: string;
-    final: string;
-  };
+  rationale: { technical: string; integrity: string; final: string };
   raw?: unknown;
 };
 
 async function callPython(path: string, payload: unknown) {
   const baseUrl = getInterviewBackendUrl();
   const targetUrl = `${baseUrl}${path}`;
-
   let response: Response;
   try {
     response = await fetch(targetUrl, {
@@ -54,14 +46,10 @@ async function callPython(path: string, payload: unknown) {
     const message = error instanceof Error ? error.message : "Unknown network error";
     throw new Error(`Interview backend unreachable at ${targetUrl}: ${message}`);
   }
-
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(
-      `Interview backend call failed (${response.status}) at ${targetUrl}: ${text || "No response body"}`
-    );
+    throw new Error(`Interview backend call failed (${response.status}): ${text}`);
   }
-
   return response.json();
 }
 
@@ -97,23 +85,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const interview = await prisma.interviewSession.findUnique({
-      where: { id: body.interviewId },
-      select: {
-        id: true,
-        candidateId: true,
-        status: true,
-        tokenExpiresAt: true,
-        signedTokenHash: true,
-      },
-    });
-    if (!interview || interview.id !== tokenPayload.interviewId) {
+    const { data: sessionRow, error: sessionError } = await db
+      .from("interview_sessions")
+      .select("id, candidate_id, status, token_expires_at, signed_token_hash")
+      .eq("id", body.interviewId)
+      .single();
+
+    if (sessionError || !sessionRow) {
+      return NextResponse.json({ error: "Interview not found" }, { status: 404 });
+    }
+
+    const interview = camelizeKeys<any>(sessionRow as Record<string, unknown>);
+
+    if (interview.id !== tokenPayload.interviewId) {
       return NextResponse.json({ error: "Interview not found" }, { status: 404 });
     }
     if (interview.candidateId !== tokenPayload.candidateId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (interview.tokenExpiresAt.getTime() < Date.now()) {
+    if (new Date(interview.tokenExpiresAt).getTime() < Date.now()) {
       return NextResponse.json({ error: "Token expired" }, { status: 401 });
     }
     if (interview.signedTokenHash !== hashInterviewToken(token)) {
@@ -126,66 +116,68 @@ export async function POST(request: NextRequest) {
       user_audio_base64: body.userAudioBase64,
     });
 
-    const sequenceBase = await prisma.interviewTranscriptTurn.count({
-      where: { interviewId: interview.id },
-    });
-    const turnEntries = [
-      {
-        interviewId: interview.id,
-        role: "user",
-        rawText: (turnResult.transcript_user as string) || body.userText || "",
-        normalizedText: (turnResult.transcript_user as string) || body.userText || "",
-        sequence: sequenceBase + 1,
-      },
-      {
-        interviewId: interview.id,
-        role: "assistant",
-        rawText: (turnResult.assistant_reply as string) || "",
-        normalizedText: (turnResult.assistant_reply as string) || "",
-        sequence: sequenceBase + 2,
-      },
-    ];
+    // Get current sequence count
+    const { count: sequenceBase } = await db
+      .from("interview_transcript_turns")
+      .select("*", { count: "exact", head: true })
+      .eq("interview_id", interview.id);
 
-    await prisma.interviewTranscriptTurn.createMany({ data: turnEntries });
+    const base = sequenceBase ?? 0;
+
+    await db.from("interview_transcript_turns").insert([
+      {
+        id: generateId(),
+        interview_id: interview.id,
+        role: "user",
+        raw_text: (turnResult.transcript_user as string) || body.userText || "",
+        normalized_text: (turnResult.transcript_user as string) || body.userText || "",
+        sequence: base + 1,
+      },
+      {
+        id: generateId(),
+        interview_id: interview.id,
+        role: "assistant",
+        raw_text: (turnResult.assistant_reply as string) || "",
+        normalized_text: (turnResult.assistant_reply as string) || "",
+        sequence: base + 2,
+      },
+    ]);
 
     let evaluation: EvaluatorResult = DEFAULT_EVALUATION;
-    if (turnResult.should_end === true) {
-      const rows = await prisma.interviewTranscriptTurn.findMany({
-        where: { interviewId: interview.id },
-        orderBy: { sequence: "asc" },
-      });
 
-      const transcript = rows.map((r) => ({
+    if (turnResult.should_end === true) {
+      const { data: rows } = await db
+        .from("interview_transcript_turns")
+        .select("role, normalized_text, raw_text")
+        .eq("interview_id", interview.id)
+        .order("sequence", { ascending: true });
+
+      const transcript = (rows ?? []).map((r: any) => ({
         role: r.role === "assistant" ? "assistant" : "user",
-        content: r.normalizedText || r.rawText,
+        content: (r.normalized_text || r.raw_text) as string,
       }));
 
-      let evaluatorCandidate: {
-        candidate_id: string;
-        full_name?: string;
-        target_skill?: string;
-        skills?: Array<{ name: string; category?: string | null }>;
-        projects?: Array<{
-          title?: string | null;
-          description: string;
-          technologies: string[];
-        }>;
-      } = {
+      let evaluatorCandidate: Record<string, unknown> = {
         candidate_id: interview.candidateId,
       };
 
       try {
-        const candidate = await prisma.candidate.findUnique({
-          where: { id: interview.candidateId },
-          include: { skills: true, experiences: true },
-        });
+        const { data: candidateRow } = await db
+          .from("candidates")
+          .select("id, first_name, last_name, skills(*), experiences(*)")
+          .eq("id", interview.candidateId)
+          .single();
 
-        if (candidate) {
+        if (candidateRow) {
+          const c = camelizeKeys<any>(candidateRow as Record<string, unknown>);
           evaluatorCandidate = {
-            candidate_id: candidate.id,
-            full_name: `${candidate.firstName} ${candidate.lastName}`,
-            skills: candidate.skills.map((s) => ({ name: s.name, category: s.category })),
-            projects: candidate.experiences.slice(0, 5).map((e) => ({
+            candidate_id: c.id,
+            full_name: `${c.firstName} ${c.lastName}`,
+            skills: (c.skills ?? []).map((s: any) => ({
+              name: s.name,
+              category: s.category,
+            })),
+            projects: (c.experiences ?? []).slice(0, 5).map((e: any) => ({
               title: e.jobTitle,
               description: e.description || e.jobTitle || "No project details",
               technologies: [],
@@ -193,7 +185,7 @@ export async function POST(request: NextRequest) {
           };
         }
       } catch {
-        // keep fallback minimal candidate payload
+        // keep fallback minimal payload
       }
 
       try {
@@ -209,18 +201,15 @@ export async function POST(request: NextRequest) {
       const technicalDecision = evaluation.technical.passed ? "PASS" : "FAIL";
       const integrityStatus = evaluation.integrity.status || "REVIEW";
 
-      await prisma.interviewSession.update({
-        where: { id: interview.id },
-        data: {
-          status: "EVALUATED",
-          endedAt: new Date(),
-          evaluatedAt: new Date(),
-          technicalDecision,
-          integrityDecision: integrityStatus,
-          finalDecision,
-          evaluationRationale: evaluation.rationale ?? {},
-        },
-      });
+      await db.from("interview_sessions").update({
+        status: "EVALUATED",
+        ended_at: new Date().toISOString(),
+        evaluated_at: new Date().toISOString(),
+        technical_decision: technicalDecision,
+        integrity_decision: integrityStatus,
+        final_decision: finalDecision,
+        evaluation_rationale: evaluation.rationale ?? {},
+      }).eq("id", interview.id);
     }
 
     return NextResponse.json({

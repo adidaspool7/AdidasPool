@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@server/infrastructure/database/prisma-client";
+import db from "@server/infrastructure/database/supabase-client";
+import { camelizeKeys, generateId } from "@server/infrastructure/database/db-utils";
 import { StartInterviewRealtimeSchema } from "@server/application/dtos";
 import {
   hashInterviewToken,
@@ -55,24 +56,26 @@ export async function POST(request: NextRequest) {
     }
 
     const tokenPayload = verifyInterviewRuntimeToken(token);
-    const interview = await prisma.interviewSession.findUnique({
-      where: { id: tokenPayload.interviewId },
-      select: {
-        id: true,
-        candidateId: true,
-        status: true,
-        signedTokenHash: true,
-        tokenExpiresAt: true,
-      },
-    });
 
-    if (!interview || interview.candidateId !== tokenPayload.candidateId) {
+    const { data: sessionRow, error: sessionError } = await db
+      .from("interview_sessions")
+      .select("id, candidate_id, status, signed_token_hash, token_expires_at")
+      .eq("id", tokenPayload.interviewId)
+      .single();
+
+    if (sessionError || !sessionRow) {
+      return NextResponse.json({ error: "Interview not found" }, { status: 404 });
+    }
+
+    const interview = camelizeKeys<any>(sessionRow as Record<string, unknown>);
+
+    if (interview.candidateId !== tokenPayload.candidateId) {
       return NextResponse.json({ error: "Interview not found" }, { status: 404 });
     }
     if (interview.signedTokenHash !== hashInterviewToken(token)) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-    if (interview.tokenExpiresAt.getTime() < Date.now()) {
+    if (new Date(interview.tokenExpiresAt).getTime() < Date.now()) {
       return NextResponse.json({ error: "Token expired" }, { status: 401 });
     }
 
@@ -88,26 +91,19 @@ export async function POST(request: NextRequest) {
       candidate: parsed.data.candidate,
     });
 
-    const transcriptPayload = [
-      {
-        interviewId: interview.id,
+    // Update session status + insert first transcript turn
+    await Promise.all([
+      db
+        .from("interview_sessions")
+        .update({ status: "RUNNING", started_at: new Date().toISOString() })
+        .eq("id", interview.id),
+      db.from("interview_transcript_turns").insert({
+        id: generateId(),
+        interview_id: interview.id,
         role: "assistant",
-        rawText: startResult.first_question as string,
-        normalizedText: startResult.first_question as string,
+        raw_text: startResult.first_question as string,
+        normalized_text: startResult.first_question as string,
         sequence: 1,
-      },
-    ];
-
-    await prisma.$transaction([
-      prisma.interviewSession.update({
-        where: { id: interview.id },
-        data: {
-          status: "RUNNING",
-          startedAt: new Date(),
-        },
-      }),
-      prisma.interviewTranscriptTurn.createMany({
-        data: transcriptPayload,
       }),
     ]);
 

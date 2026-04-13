@@ -1,68 +1,64 @@
 /**
- * Prisma Deduplication Repository
+ * Supabase Deduplication Repository
  *
  * ONION LAYER: Infrastructure
- * DEPENDENCIES: Prisma (external), domain ports (inward)
- *
- * Implements IDeduplicationRepository using Prisma ORM.
- * Deduplication RULES are domain logic, but the DB queries
- * to find duplicates are infrastructure concerns.
+ * REPLACES: PrismaDeduplicationRepository
  */
 
-import { PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { assertNoError } from "./db-utils";
 import type {
   IDeduplicationRepository,
   DeduplicationResult,
 } from "@server/domain/ports/repositories";
 
-export class PrismaDeduplicationRepository
+export class SupabaseDeduplicationRepository
   implements IDeduplicationRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
-
   async checkForDuplicate(candidate: {
     email?: string | null;
     firstName: string;
     lastName: string;
     location?: string | null;
   }): Promise<DeduplicationResult> {
-    // 1. Exact email match (highest confidence)
+    // 1. Exact email match
     if (candidate.email) {
-      const emailMatch = await this.prisma.candidate.findUnique({
-        where: { email: candidate.email },
-        select: { id: true },
-      });
+      const { data, error } = await db
+        .from("candidates")
+        .select("id")
+        .eq("email", candidate.email)
+        .limit(1)
+        .single();
 
-      if (emailMatch) {
+      if (!error && data) {
         return {
           isDuplicate: true,
-          duplicateOf: emailMatch.id,
+          duplicateOf: (data as any).id as string,
           matchType: "email",
           confidence: 100,
         };
       }
     }
 
-    // 2. Name + location match (fuzzy)
-    const nameMatches = await this.prisma.candidate.findMany({
-      where: {
-        firstName: { equals: candidate.firstName, mode: "insensitive" },
-        lastName: { equals: candidate.lastName, mode: "insensitive" },
-      },
-      select: { id: true, location: true },
-    });
+    // 2. Name match (case-insensitive)
+    const { data: nameMatches, error } = await db
+      .from("candidates")
+      .select("id, location")
+      .ilike("first_name", candidate.firstName)
+      .ilike("last_name", candidate.lastName);
+    assertNoError(error, "dedup.checkForDuplicate");
 
-    if (nameMatches.length > 0) {
-      for (const match of nameMatches) {
+    if (nameMatches && nameMatches.length > 0) {
+      for (const match of nameMatches as any[]) {
         if (
           candidate.location &&
           match.location &&
           this.normalizeLocation(candidate.location) ===
-            this.normalizeLocation(match.location)
+            this.normalizeLocation(match.location as string)
         ) {
           return {
             isDuplicate: true,
-            duplicateOf: match.id,
+            duplicateOf: match.id as string,
             matchType: "name_location",
             confidence: 85,
           };
@@ -72,7 +68,7 @@ export class PrismaDeduplicationRepository
       if (nameMatches.length === 1) {
         return {
           isDuplicate: false,
-          duplicateOf: nameMatches[0].id,
+          duplicateOf: (nameMatches[0] as any).id as string,
           matchType: "name_location",
           confidence: 50,
         };

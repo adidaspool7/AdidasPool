@@ -1,57 +1,51 @@
 /**
- * Prisma Assessment Repository
+ * Supabase Assessment Repository
  *
  * ONION LAYER: Infrastructure
- * DEPENDENCIES: Prisma (external), domain ports (inward)
- *
- * Implements IAssessmentRepository using Prisma ORM.
+ * REPLACES: PrismaAssessmentRepository
  */
 
-import { PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
 import type { IAssessmentRepository } from "@server/domain/ports/repositories";
 
-export class PrismaAssessmentRepository implements IAssessmentRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+const ASSESSMENT_SELECT = `
+  *,
+  candidate:candidates(id, first_name, last_name, email),
+  job:jobs(id, title),
+  template:assessment_templates(id, name),
+  result:assessment_results(*)
+` as const;
 
+export class SupabaseAssessmentRepository implements IAssessmentRepository {
   async findMany(filters: { status?: string; candidateId?: string }) {
-    const where: Record<string, unknown> = {};
-    if (filters.status) where.status = filters.status;
-    if (filters.candidateId) where.candidateId = filters.candidateId;
+    let query = db.from("assessments").select(ASSESSMENT_SELECT);
 
-    return this.prisma.assessment.findMany({
-      where,
-      include: {
-        candidate: {
-          select: { firstName: true, lastName: true, email: true },
-        },
-        job: { select: { title: true } },
-        template: { select: { name: true } },
-        result: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    if (filters.status) query = query.eq("status", filters.status);
+    if (filters.candidateId) query = query.eq("candidate_id", filters.candidateId);
+
+    const { data, error } = await query.order("created_at", { ascending: false });
+    assertNoError(error, "assessment.findMany");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async create(data: Record<string, unknown>) {
-    return this.prisma.assessment.create({
-      data: data as any,
-      include: {
-        candidate: {
-          select: { firstName: true, lastName: true, email: true },
-        },
-      },
-    });
+    const { data: row, error } = await db
+      .from("assessments")
+      .insert({ id: generateId(), ...snakeifyKeys(data) })
+      .select(ASSESSMENT_SELECT)
+      .single();
+    assertNoError(error, "assessment.create");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async findByToken(token: string) {
-    return this.prisma.assessment.findUnique({
-      where: { magicToken: token },
-      include: {
-        candidate: true,
-        job: true,
-        template: true,
-        result: true,
-      },
-    });
+    const { data, error } = await db
+      .from("assessments")
+      .select(ASSESSMENT_SELECT)
+      .eq("magic_token", token)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 }

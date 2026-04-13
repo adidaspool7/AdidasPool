@@ -4,7 +4,8 @@
  */
 
 import { NextResponse } from "next/server";
-import prisma from "@server/infrastructure/database/prisma-client";
+import db from "@server/infrastructure/database/supabase-client";
+import { camelizeKeys } from "@server/infrastructure/database/db-utils";
 import { profileUseCases } from "@server/application";
 
 export const dynamic = "force-dynamic";
@@ -16,29 +17,36 @@ export async function GET() {
       return NextResponse.json({ results: [] });
     }
 
-    const sessions = await prisma.interviewSession.findMany({
-      where: {
-        candidateId: candidate.id,
-        status: "EVALUATED",
-      },
-      orderBy: { evaluatedAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        createdAt: true,
-        startedAt: true,
-        endedAt: true,
-        evaluatedAt: true,
-        targetSkill: true,
-        finalDecision: true,
-        technicalDecision: true,
-        integrityDecision: true,
-        evaluationRationale: true,
-        terminationReason: true,
-      },
-    });
+    const { data, error } = await db
+      .from("interview_sessions")
+      .select(`
+        id,
+        created_at,
+        started_at,
+        ended_at,
+        evaluated_at,
+        target_skill,
+        final_decision,
+        technical_decision,
+        integrity_decision,
+        evaluation_rationale,
+        termination_reason
+      `)
+      .eq("candidate_id", candidate.id)
+      .eq("status", "EVALUATED")
+      .order("evaluated_at", { ascending: false })
+      .limit(10);
 
-    return NextResponse.json({ results: sessions });
+    if (error) {
+      console.error("Error fetching interview results:", error);
+      return NextResponse.json({ results: [] });
+    }
+
+    const results = (data ?? []).map((r: Record<string, unknown>) =>
+      camelizeKeys<any>(r)
+    );
+
+    return NextResponse.json({ results });
   } catch (error) {
     console.error("Error fetching interview results:", error);
     return NextResponse.json(

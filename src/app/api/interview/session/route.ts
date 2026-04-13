@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { StartInterviewRuntimeSchema } from "@server/application/dtos";
-import prisma from "@server/infrastructure/database/prisma-client";
+import db from "@server/infrastructure/database/supabase-client";
+import { camelizeKeys } from "@server/infrastructure/database/db-utils";
 import {
   createInterviewRuntimeToken,
   hashInterviewToken,
@@ -17,18 +18,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const candidate = await prisma.candidate.findUnique({
-      where: { id: parsed.data.candidateId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
+    const { data: candidateRow, error: candidateError } = await db
+      .from("candidates")
+      .select("id, first_name, last_name")
+      .eq("id", parsed.data.candidateId)
+      .single();
 
-    if (!candidate) {
+    if (candidateError || !candidateRow) {
       return NextResponse.json({ error: "Candidate not found" }, { status: 404 });
     }
+
+    const candidate = camelizeKeys<any>(candidateRow as Record<string, unknown>);
 
     const interviewId = randomUUID();
     const { token, expiresAt } = createInterviewRuntimeToken({
@@ -36,20 +36,25 @@ export async function POST(request: NextRequest) {
       candidateId: candidate.id,
     });
 
-    const interview = await prisma.interviewSession.create({
-      data: {
-        id: interviewId,
-        candidateId: candidate.id,
-        targetSkill: parsed.data.targetSkill,
-        status: "CREATED",
-        signedTokenHash: hashInterviewToken(token),
-        tokenExpiresAt: expiresAt,
-      },
-      select: { id: true, candidateId: true },
+    const { error: insertError } = await db.from("interview_sessions").insert({
+      id: interviewId,
+      candidate_id: candidate.id,
+      target_skill: parsed.data.targetSkill ?? null,
+      status: "CREATED",
+      signed_token_hash: hashInterviewToken(token),
+      token_expires_at: expiresAt.toISOString(),
     });
 
+    if (insertError) {
+      console.error("Error creating interview session:", insertError);
+      return NextResponse.json(
+        { error: "Failed to create interview session" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
-      interviewId: interview.id,
+      interviewId,
       token,
       expiresAt: expiresAt.toISOString(),
       candidateName: `${candidate.firstName} ${candidate.lastName}`,

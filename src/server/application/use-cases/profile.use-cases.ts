@@ -5,16 +5,15 @@
  * DEPENDENCIES: Domain ports (inward only)
  *
  * Handles candidate profile retrieval and updates (the /api/me endpoint).
- * Replaces direct Prisma usage in the API route.
+ * Resolves the current candidate via Supabase Auth user_id.
  */
 
 import type { ICandidateRepository } from "@server/domain/ports/repositories";
 import type { UpdateProfileInput } from "@server/application/dtos";
 import { NotFoundError } from "@server/application/use-cases/candidate.use-cases";
-import { Prisma } from "@prisma/client";
 import type { IStorageService } from "@server/domain/ports/services";
 
-const PROFILE_SELECT: Prisma.CandidateSelect = {
+const PROFILE_SELECT = {
   id: true,
   firstName: true,
   lastName: true,
@@ -34,14 +33,9 @@ const PROFILE_SELECT: Prisma.CandidateSelect = {
   motivationLetterUrl: true,
   motivationLetterText: true,
   learningAgreementUrl: true,
-
   skills: {
-    select: {
-      name: true,
-      category: true,
-    },
+    select: { name: true, category: true },
   },
-
   experiences: {
     select: {
       startDate: true,
@@ -49,9 +43,7 @@ const PROFILE_SELECT: Prisma.CandidateSelect = {
       jobTitle: true,
       description: true,
     },
-    orderBy: {
-      startDate: "desc",
-    },
+    orderBy: { startDate: "desc" },
   },
 };
 
@@ -63,28 +55,12 @@ export class ProfileUseCases {
 
   /**
    * Get the current candidate profile used by candidate-facing pages.
-   * Auto-creates a demo PLATFORM profile if none exists.
+   * Resolves by authenticated user_id. Auto-creates a PLATFORM profile
+   * if the user is authenticated but has no candidate record yet.
    */
   async getCurrentProfile() {
-    let candidate = await this.resolveCurrentCandidate({
-      id: true,
-    });
-
-    if (!candidate) {
-      candidate = await this.candidateRepo.createDefault(
-        {
-          firstName: "Demo",
-          lastName: "Candidate",
-          email: "demo.candidate@example.com",
-          status: "NEW",
-          sourceType: "PLATFORM",
-        },
-        {
-          id: true,
-        }
-      );
-    }
-
+    const candidate = await this.resolveCurrentCandidate();
+    if (!candidate) return null;
     return this.candidateRepo.findByIdWithSelect(candidate.id, PROFILE_SELECT);
   }
 
@@ -92,9 +68,7 @@ export class ProfileUseCases {
    * Update the current candidate's profile fields.
    */
   async updateProfile(input: UpdateProfileInput) {
-    const existing = await this.resolveCurrentCandidate({
-      id: true,
-    });
+    const existing = await this.resolveCurrentCandidate();
 
     if (!existing) {
       throw new NotFoundError("No candidate profile found");
@@ -119,10 +93,7 @@ export class ProfileUseCases {
   }
 
   async deleteCurrentCv() {
-    const existing = await this.resolveCurrentCandidate({
-      id: true,
-      rawCvUrl: true,
-    });
+    const existing = await this.resolveCurrentCandidate();
 
     if (!existing) {
       throw new NotFoundError("No candidate profile found");
@@ -138,37 +109,26 @@ export class ProfileUseCases {
 
     return this.candidateRepo.updateWithSelect(
       existing.id,
-      {
-        rawCvUrl: null,
-        rawCvText: null,
-        parsedData: Prisma.JsonNull,
-      },
+      { rawCvUrl: null, rawCvText: null, parsedData: null },
       PROFILE_SELECT
     );
   }
 
   async deleteCurrentProfile() {
-    const existing = await this.resolveCurrentCandidate({
-      id: true,
-      rawCvUrl: true,
-      motivationLetterUrl: true,
-      learningAgreementUrl: true,
-      applications: {
-        select: {
-          learningAgreementUrl: true,
-        },
-      },
-    });
+    const existing = await this.resolveCurrentCandidate();
 
     if (!existing) {
       throw new NotFoundError("No candidate profile found");
     }
 
+    // Fetch full record for file URLs
+    const full = await this.candidateRepo.findById(existing.id);
+
     const urls = [
-      existing.rawCvUrl,
-      existing.motivationLetterUrl,
-      existing.learningAgreementUrl,
-      ...(existing.applications ?? []).map(
+      full?.rawCvUrl,
+      full?.motivationLetterUrl,
+      full?.learningAgreementUrl,
+      ...(full?.applications ?? []).map(
         (application: { learningAgreementUrl?: string | null }) =>
           application.learningAgreementUrl ?? null
       ),
@@ -191,35 +151,40 @@ export class ProfileUseCases {
   }
 
   /**
-   * Resolve the current candidate record used by the candidate-facing portal.
-   * Prefers a PLATFORM source candidate when one exists, otherwise falls back
-   * to the oldest candidate for backwards compatibility with existing data.
+   * Resolve the candidate record for the currently authenticated user.
+   *
+   * Priority:
+   *   1. Candidate with matching user_id (authenticated user owns this record)
+   *   2. Auto-create a new PLATFORM candidate linked to the authenticated user
+   *
+   * Returns null if there is no authenticated session.
    */
-  private async resolveCurrentCandidate(select: Prisma.CandidateSelect) {
-    const oldest = await this.candidateRepo.findFirstByCreation({
-      id: true,
-      sourceType: true,
-    });
+  private async resolveCurrentCandidate() {
+    // Dynamically import to avoid server/client boundary issues
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
 
-    if (!oldest) return null;
-    if (oldest.sourceType === "PLATFORM") {
-      return this.candidateRepo.findByIdWithSelect(oldest.id, select);
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
 
-    const platformCandidates = await this.candidateRepo.findMany({
+    // Look up by user_id first
+    const existing = await this.candidateRepo.findByUserId(user.id);
+    if (existing) return existing;
+
+    // Auto-create a PLATFORM candidate linked to this auth user
+    const name = (user.user_metadata?.full_name as string | undefined)
+      ?? (user.user_metadata?.name as string | undefined)
+      ?? "";
+    const [firstName = "New", ...rest] = name.split(" ");
+    const lastName = rest.join(" ") || "Candidate";
+
+    return this.candidateRepo.createDefault({
+      firstName,
+      lastName,
+      email: user.email ?? "",
+      status: "NEW",
       sourceType: "PLATFORM",
-      page: 1,
-      pageSize: 1,
-      sortBy: "createdAt",
-      sortOrder: "asc",
+      userId: user.id,
     });
-    if (platformCandidates.data.length === 0) {
-      return this.candidateRepo.findByIdWithSelect(oldest.id, select);
-    }
-
-    return this.candidateRepo.findByIdWithSelect(
-      platformCandidates.data[0].id,
-      select
-    );
   }
 }

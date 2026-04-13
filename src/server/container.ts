@@ -3,72 +3,82 @@
  *
  * ONION LAYER: Composition Root (outermost — wires everything together)
  *
- * This is the ONLY place where infrastructure implementations are
- * bound to domain port interfaces. All other layers depend on
- * abstractions (ports), not concrete implementations.
- *
- * Dependency flow:
- *   Presentation (API routes) → Application (use cases) → Domain (ports)
- *                                                              ↑
- *                                              Infrastructure (implements ports)
+ * All Prisma repositories have been replaced with Supabase equivalents.
+ * The domain ports (interfaces) are unchanged — only the implementations changed.
  */
 
 // Infrastructure implementations
-import prisma from "@server/infrastructure/database/prisma-client";
-import { PrismaCandidateRepository } from "@server/infrastructure/database/candidate.repository";
-import { PrismaJobRepository } from "@server/infrastructure/database/job.repository";
-import { PrismaAssessmentRepository } from "@server/infrastructure/database/assessment.repository";
-import { PrismaDeduplicationRepository } from "@server/infrastructure/database/dedup.repository";
-import { PrismaJobApplicationRepository } from "@server/infrastructure/database/application.repository";
-import { PrismaNotificationRepository } from "@server/infrastructure/database/notification.repository";
-import { PrismaParsingJobRepository } from "@server/infrastructure/database/parsing-job.repository";
-import { PrismaScoringWeightsRepository } from "@server/infrastructure/database/scoring-weights.repository";
-import { PrismaScoringPresetRepository } from "@server/infrastructure/database/scoring-preset.repository";
-import { PrismaAnalyticsRepository } from "@server/infrastructure/database/analytics.repository";
+import { SupabaseCandidateRepository } from "@server/infrastructure/database/candidate.repository";
+import { SupabaseJobRepository } from "@server/infrastructure/database/job.repository";
+import { SupabaseAssessmentRepository } from "@server/infrastructure/database/assessment.repository";
+import { SupabaseDeduplicationRepository } from "@server/infrastructure/database/dedup.repository";
+import { SupabaseJobApplicationRepository } from "@server/infrastructure/database/application.repository";
+import { SupabaseNotificationRepository } from "@server/infrastructure/database/notification.repository";
+import { SupabaseParsingJobRepository } from "@server/infrastructure/database/parsing-job.repository";
+import { SupabaseScoringWeightsRepository } from "@server/infrastructure/database/scoring-weights.repository";
+import { SupabaseScoringPresetRepository } from "@server/infrastructure/database/scoring-preset.repository";
+import { SupabaseAnalyticsRepository } from "@server/infrastructure/database/analytics.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
 import { AdidasJobScraperService } from "@server/infrastructure/scraping/adidas-job-scraper.service";
 import { TextExtractionService } from "@server/infrastructure/extraction/text-extraction.service";
-import { VercelBlobStorageService } from "@server/infrastructure/storage/vercel-blob-storage.service";
+import { SupabaseStorageService } from "@server/infrastructure/storage/supabase-storage.service";
 import { LocalStorageService } from "@server/infrastructure/storage/local-storage.service";
 
-// Domain port types (for type safety)
-import type { ICandidateRepository, IJobRepository, IAssessmentRepository, IDeduplicationRepository, IJobApplicationRepository, INotificationRepository, IParsingJobRepository, IScoringWeightsRepository, IScoringPresetRepository, IAnalyticsRepository } from "@server/domain/ports/repositories";
-import type { ICvParserService, IEmailService, IJobScraperService, IStorageService, ITextExtractionService } from "@server/domain/ports/services";
+// Domain port types
+import type {
+  ICandidateRepository,
+  IJobRepository,
+  IAssessmentRepository,
+  IDeduplicationRepository,
+  IJobApplicationRepository,
+  INotificationRepository,
+  IParsingJobRepository,
+  IScoringWeightsRepository,
+  IScoringPresetRepository,
+  IAnalyticsRepository,
+} from "@server/domain/ports/repositories";
+import type {
+  ICvParserService,
+  IEmailService,
+  IJobScraperService,
+  IStorageService,
+  ITextExtractionService,
+} from "@server/domain/ports/services";
 
 // ============================================
 // REPOSITORY INSTANCES
 // ============================================
 
 export const candidateRepository: ICandidateRepository =
-  new PrismaCandidateRepository(prisma);
+  new SupabaseCandidateRepository();
 
 export const jobRepository: IJobRepository =
-  new PrismaJobRepository(prisma);
+  new SupabaseJobRepository();
 
 export const assessmentRepository: IAssessmentRepository =
-  new PrismaAssessmentRepository(prisma);
+  new SupabaseAssessmentRepository();
 
 export const deduplicationRepository: IDeduplicationRepository =
-  new PrismaDeduplicationRepository(prisma);
+  new SupabaseDeduplicationRepository();
 
 export const jobApplicationRepository: IJobApplicationRepository =
-  new PrismaJobApplicationRepository(prisma);
+  new SupabaseJobApplicationRepository();
 
 export const notificationRepository: INotificationRepository =
-  new PrismaNotificationRepository(prisma);
+  new SupabaseNotificationRepository();
 
 export const parsingJobRepository: IParsingJobRepository =
-  new PrismaParsingJobRepository(prisma);
+  new SupabaseParsingJobRepository();
 
 export const scoringWeightsRepository: IScoringWeightsRepository =
-  new PrismaScoringWeightsRepository(prisma);
+  new SupabaseScoringWeightsRepository();
 
 export const scoringPresetRepository: IScoringPresetRepository =
-  new PrismaScoringPresetRepository(prisma);
+  new SupabaseScoringPresetRepository();
 
 export const analyticsRepository: IAnalyticsRepository =
-  new PrismaAnalyticsRepository(prisma);
+  new SupabaseAnalyticsRepository();
 
 // ============================================
 // SERVICE INSTANCES
@@ -84,8 +94,8 @@ export const jobScraperService: IJobScraperService =
   new AdidasJobScraperService();
 
 export const storageService: IStorageService =
-  process.env.BLOB_READ_WRITE_TOKEN
-    ? new VercelBlobStorageService()
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? new SupabaseStorageService()
     : new LocalStorageService();
 
 export const textExtractionService: ITextExtractionService =

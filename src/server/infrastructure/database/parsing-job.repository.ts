@@ -1,93 +1,132 @@
 /**
- * Prisma Parsing Job Repository
+ * Supabase Parsing Job Repository
  *
  * ONION LAYER: Infrastructure
- * IMPLEMENTS: IParsingJobRepository (domain port)
- *
- * Tracks bulk CV upload jobs — creation, progress, error logging.
+ * REPLACES: PrismaParsingJobRepository
  */
 
-import type { PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { camelizeKeys, generateId, assertNoError } from "./db-utils";
 import type {
   IParsingJobRepository,
   ParsingJobErrorEntry,
 } from "@server/domain/ports/repositories";
 
-export class PrismaParsingJobRepository implements IParsingJobRepository {
-  constructor(private readonly prisma: PrismaClient) {}
-
+export class SupabaseParsingJobRepository implements IParsingJobRepository {
   async create(data: {
     totalFiles: number;
     uploadedBy?: string;
     fileName?: string;
   }) {
-    return this.prisma.parsingJob.create({
-      data: {
-        totalFiles: data.totalFiles,
-        uploadedBy: data.uploadedBy ?? null,
-        fileName: data.fileName ?? null,
+    const { data: row, error } = await db
+      .from("parsing_jobs")
+      .insert({
+        id: generateId(),
+        total_files: data.totalFiles,
+        uploaded_by: data.uploadedBy ?? null,
+        file_name: data.fileName ?? null,
         status: "QUEUED",
-        parsedFiles: 0,
-        failedFiles: 0,
-        errorLog: [],
-      },
-    });
+        parsed_files: 0,
+        failed_files: 0,
+        error_log: [],
+      })
+      .select()
+      .single();
+    assertNoError(error, "parsingJob.create");
+    return camelizeKeys<any>(row as Record<string, unknown>);
   }
 
   async findById(id: string) {
-    return this.prisma.parsingJob.findUnique({ where: { id } });
+    const { data, error } = await db
+      .from("parsing_jobs")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async findRecent(limit = 20) {
-    return this.prisma.parsingJob.findMany({
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+    const { data, error } = await db
+      .from("parsing_jobs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    assertNoError(error, "parsingJob.findRecent");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async updateStatus(id: string, status: string) {
-    await this.prisma.parsingJob.update({
-      where: { id },
-      data: { status: status as any },
-    });
+    const { error } = await db
+      .from("parsing_jobs")
+      .update({ status })
+      .eq("id", id);
+    assertNoError(error, "parsingJob.updateStatus");
   }
 
   async incrementParsed(id: string) {
-    await this.prisma.parsingJob.update({
-      where: { id },
-      data: { parsedFiles: { increment: 1 } },
-    });
+    // Supabase doesn't have atomic increment in the JS client.
+    // Fetch current value, increment, update.
+    const { data } = await db
+      .from("parsing_jobs")
+      .select("parsed_files")
+      .eq("id", id)
+      .single();
+    const current = (data as any)?.parsed_files ?? 0;
+    const { error } = await db
+      .from("parsing_jobs")
+      .update({ parsed_files: current + 1 })
+      .eq("id", id);
+    assertNoError(error, "parsingJob.incrementParsed");
   }
 
   async incrementFailed(id: string) {
-    await this.prisma.parsingJob.update({
-      where: { id },
-      data: { failedFiles: { increment: 1 } },
-    });
+    const { data } = await db
+      .from("parsing_jobs")
+      .select("failed_files")
+      .eq("id", id)
+      .single();
+    const current = (data as any)?.failed_files ?? 0;
+    const { error } = await db
+      .from("parsing_jobs")
+      .update({ failed_files: current + 1 })
+      .eq("id", id);
+    assertNoError(error, "parsingJob.incrementFailed");
   }
 
   async appendError(id: string, entry: ParsingJobErrorEntry) {
-    // Read current error log, append new entry, write back
-    const job = await this.prisma.parsingJob.findUnique({ where: { id } });
-    const currentErrors = (job?.errorLog as unknown as ParsingJobErrorEntry[]) ?? [];
-    await this.prisma.parsingJob.update({
-      where: { id },
-      data: { errorLog: [...currentErrors, entry] as any },
-    });
+    const { data } = await db
+      .from("parsing_jobs")
+      .select("error_log")
+      .eq("id", id)
+      .single();
+    const current = ((data as any)?.error_log as ParsingJobErrorEntry[]) ?? [];
+    const { error } = await db
+      .from("parsing_jobs")
+      .update({ error_log: [...current, entry] })
+      .eq("id", id);
+    assertNoError(error, "parsingJob.appendError");
   }
 
   async recoverStaleJobs(staleMinutes = 10): Promise<number> {
-    const cutoff = new Date(Date.now() - staleMinutes * 60 * 1000);
-    const result = await this.prisma.parsingJob.updateMany({
-      where: {
-        status: "PROCESSING",
-        updatedAt: { lt: cutoff },
-      },
-      data: { status: "FAILED" },
-    });
-    if (result.count > 0) {
-      console.log(`[ParsingJob] Recovered ${result.count} stale PROCESSING job(s) → FAILED`);
+    const cutoff = new Date(
+      Date.now() - staleMinutes * 60 * 1000
+    ).toISOString();
+
+    const { data, error } = await db
+      .from("parsing_jobs")
+      .update({ status: "FAILED" })
+      .eq("status", "PROCESSING")
+      .lt("updated_at", cutoff)
+      .select("id");
+    assertNoError(error, "parsingJob.recoverStaleJobs");
+
+    const count = (data ?? []).length;
+    if (count > 0) {
+      console.log(
+        `[ParsingJob] Recovered ${count} stale PROCESSING job(s) → FAILED`
+      );
     }
-    return result.count;
+    return count;
   }
 }

@@ -1,13 +1,12 @@
 /**
- * Prisma Scoring Weights Repository
+ * Supabase Scoring Weights Repository
  *
  * ONION LAYER: Infrastructure
- *
- * Single-row config table for HR-adjustable scoring weights.
- * Returns default weights if no row exists yet.
+ * REPLACES: PrismaScoringWeightsRepository
  */
 
-import { PrismaClient } from "@prisma/client";
+import db from "./supabase-client";
+import { camelizeKeys, assertNoError } from "./db-utils";
 import type {
   IScoringWeightsRepository,
   ScoringWeightsData,
@@ -16,17 +15,17 @@ import { CV_SCORING_WEIGHTS } from "@server/domain/value-objects";
 
 const DEFAULT_ID = "default";
 
-export class PrismaScoringWeightsRepository
+export class SupabaseScoringWeightsRepository
   implements IScoringWeightsRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
-
   async get(): Promise<ScoringWeightsData> {
-    const row = await this.prisma.scoringWeights.findUnique({
-      where: { id: DEFAULT_ID },
-    });
+    const { data, error } = await db
+      .from("scoring_weights")
+      .select("*")
+      .eq("id", DEFAULT_ID)
+      .single();
 
-    if (!row) {
+    if (error || !data) {
       return {
         experience: CV_SCORING_WEIGHTS.experience,
         yearsOfExperience: CV_SCORING_WEIGHTS.yearsOfExperience,
@@ -39,14 +38,15 @@ export class PrismaScoringWeightsRepository
       };
     }
 
+    const row = camelizeKeys<any>(data as Record<string, unknown>);
     return {
       experience: row.experience,
       yearsOfExperience: row.yearsOfExperience,
       educationLevel: row.educationLevel,
       locationMatch: row.locationMatch,
       language: row.language,
-      presetName: row.presetName,
-      updatedBy: row.updatedBy,
+      presetName: row.presetName ?? null,
+      updatedBy: row.updatedBy ?? null,
       updatedAt: row.updatedAt,
     };
   }
@@ -60,24 +60,55 @@ export class PrismaScoringWeightsRepository
     presetName?: string | null;
     updatedBy?: string | null;
   }): Promise<ScoringWeightsData> {
-    const row = await this.prisma.scoringWeights.upsert({
-      where: { id: DEFAULT_ID },
-      create: {
-        id: DEFAULT_ID,
-        ...weights,
-      },
-      update: weights,
-    });
+    const payload = {
+      id: DEFAULT_ID,
+      experience: weights.experience,
+      years_of_experience: weights.yearsOfExperience,
+      education_level: weights.educationLevel,
+      location_match: weights.locationMatch,
+      language: weights.language,
+      preset_name: weights.presetName ?? null,
+      updated_by: weights.updatedBy ?? null,
+    };
 
+    // Try update first, then insert
+    const { data: existing } = await db
+      .from("scoring_weights")
+      .select("id")
+      .eq("id", DEFAULT_ID)
+      .single();
+
+    let row: Record<string, unknown>;
+
+    if (existing) {
+      const { data, error } = await db
+        .from("scoring_weights")
+        .update(payload)
+        .eq("id", DEFAULT_ID)
+        .select()
+        .single();
+      assertNoError(error, "scoringWeights.upsert.update");
+      row = data as Record<string, unknown>;
+    } else {
+      const { data, error } = await db
+        .from("scoring_weights")
+        .insert(payload)
+        .select()
+        .single();
+      assertNoError(error, "scoringWeights.upsert.insert");
+      row = data as Record<string, unknown>;
+    }
+
+    const r = camelizeKeys<any>(row);
     return {
-      experience: row.experience,
-      yearsOfExperience: row.yearsOfExperience,
-      educationLevel: row.educationLevel,
-      locationMatch: row.locationMatch,
-      language: row.language,
-      presetName: row.presetName,
-      updatedBy: row.updatedBy,
-      updatedAt: row.updatedAt,
+      experience: r.experience,
+      yearsOfExperience: r.yearsOfExperience,
+      educationLevel: r.educationLevel,
+      locationMatch: r.locationMatch,
+      language: r.language,
+      presetName: r.presetName ?? null,
+      updatedBy: r.updatedBy ?? null,
+      updatedAt: r.updatedAt,
     };
   }
 }
