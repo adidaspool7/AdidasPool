@@ -97,7 +97,7 @@
 | # | Task | Status |
 |---|---|---|
 | M.1 | Set `INTERVIEW_BACKEND_URL` in Vercel env vars | ⬜ |
-| M.2 | Create `talent-pool` bucket in Supabase Storage dashboard | ⬜ |
+| M.2 | Create `talent-pool` bucket in Supabase Storage dashboard | ✅ | Auto-created by `ensureBucket()` on first upload |
 | M.3 | Configure Google OAuth consent screen in Google Cloud Console | ⬜ |
 | M.4 | Add `https://adidas-pool.vercel.app` to Supabase Auth URL allowlist | ✅ |
 | M.5 | Confirm HTTPS + browser permissions for camera/mic in production | ⬜ |
