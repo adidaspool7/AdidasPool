@@ -8,15 +8,20 @@
  * Replaces the Prisma client singleton.
  */
 
-import { createClient } from "@supabase/supabase-js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+// Typed as SupabaseClient<any> so all .from() calls accept arbitrary table
+// names and row shapes without generated database types.
 const globalForSupabase = globalThis as unknown as {
-  supabaseAdmin: ReturnType<typeof createClient> | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: SupabaseClient<any> | undefined;
 };
 
-const supabaseAdmin =
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabaseAdmin: SupabaseClient<any> =
   globalForSupabase.supabaseAdmin ??
-  createClient(
+  createClient<any>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
