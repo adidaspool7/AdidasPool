@@ -108,7 +108,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     await supabase.auth.signOut();
     setRoleState(null);
-    router.push("/auth/login");
+    router.push("/");
   }, [router]);
 
   return (

@@ -48,12 +48,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // 2. Redirect logged-in users away from login/landing pages
-  if ((pathname === "/auth/login" || pathname === "/") && user) {
+  // 2. Redirect /auth/login to landing page (login flow is now on /)
+  if (pathname === "/auth/login") {
+    if (user) return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // 3. Redirect logged-in users from landing to dashboard
+  if (pathname === "/" && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // 3. First-time login — no role set yet
+  // 4. First-time login — no role set yet
   if (
     user &&
     pathname.startsWith("/dashboard") &&
@@ -61,11 +67,6 @@ export async function middleware(request: NextRequest) {
     pathname !== "/auth/select-role"
   ) {
     return NextResponse.redirect(new URL("/auth/select-role", request.url));
-  }
-
-  // 4. Redirect root to dashboard if already authenticated
-  if (pathname === "/" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;
