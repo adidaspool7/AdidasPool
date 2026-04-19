@@ -1,36 +1,52 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/server";
 
 /**
  * OAuth callback handler.
- * Supabase redirects here after Google sign-in with a `code` param.
- * Exchanges the code for a session, then:
- *   - Sets the role from the `role` query param (passed from landing page)
- *   - Redirects to /dashboard
- *   - Falls back to /auth/select-role if no role param is present
  *
- * IMPORTANT: We explicitly track every cookie Supabase sets and forward
- * them on the redirect response. Using only `cookies()` from next/headers
- * does NOT reliably include those cookies on NextResponse.redirect().
+ * Uses an IN-MEMORY cookie map (same pattern as middleware) instead of
+ * cookies() from next/headers. This guarantees that getAll() always
+ * returns fresh data after setAll(), so getUser() sees the tokens
+ * that exchangeCodeForSession just stored.
+ *
+ * Role is set in app_metadata via the admin client (service role key).
+ * app_metadata is immutable from the client — users cannot change their role.
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const role = searchParams.get("role") as "candidate" | "hr" | null;
   const next = searchParams.get("next") ?? "/dashboard";
+
+  // On Vercel the origin from URL may differ from what the browser sees.
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
+  const origin = forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin;
 
   if (!code) {
     return NextResponse.redirect(`${origin}/auth/error`);
   }
 
-  const cookieStore = await cookies();
+  // ---- In-memory cookie store (mirrors the middleware pattern) ----
+  const cookieMap = new Map<string, string>();
 
-  // Collect every cookie Supabase sets so we can forward them on the redirect
-  const pendingCookies: {
+  // Seed from request cookies
+  const rawCookies = request.headers.get("cookie") ?? "";
+  rawCookies.split(";").forEach((c) => {
+    const idx = c.indexOf("=");
+    if (idx > 0) {
+      cookieMap.set(c.slice(0, idx).trim(), c.slice(idx + 1).trim());
+    }
+  });
+
+  // Track every cookie Supabase sets (with options) for the response
+  const responseCookies: {
     name: string;
     value: string;
-    options?: Record<string, unknown>;
+    options: Record<string, unknown>;
   }[] = [];
 
   const supabase = createServerClient(
@@ -39,28 +55,39 @@ export async function GET(request: Request) {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return Array.from(cookieMap.entries()).map(([name, value]) => ({
+            name,
+            value,
+          }));
         },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options?: Record<string, unknown>;
+          }[]
+        ) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            try {
-              cookieStore.set(name, value, options as Parameters<typeof cookieStore.set>[2]);
-            } catch {
-              // May throw if called from a read-only context
-            }
-            pendingCookies.push({ name, value, options: options as Record<string, unknown> });
+            cookieMap.set(name, value); // keep in-memory map up-to-date
+            responseCookies.push({
+              name,
+              value,
+              options: (options as Record<string, unknown>) ?? {},
+            });
           });
         },
       },
     }
   );
 
+  // Exchange the OAuth code for a session (stores tokens via setAll)
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     return NextResponse.redirect(`${origin}/auth/error`);
   }
 
+  // getUser makes a server call — it can now read the fresh tokens
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -68,22 +95,36 @@ export async function GET(request: Request) {
   let redirectUrl = `${origin}${next}`;
 
   if (user) {
-    const existingRole = user.user_metadata?.role;
+    // app_metadata is the source of truth for roles (server-only, permanent)
+    const appRole = user.app_metadata?.role;
 
-    if (existingRole === "candidate" || existingRole === "hr") {
-      // Role already set — keep it (roles are permanent)
-    } else if (role && (role === "candidate" || role === "hr")) {
-      // First login — set role from URL param
-      await supabase.auth.updateUser({ data: { role } });
-    } else if (!existingRole) {
-      // No role param and no role in metadata → fallback
-      redirectUrl = `${origin}/auth/select-role`;
+    if (appRole === "candidate" || appRole === "hr") {
+      // Role already set — keep it
+    } else {
+      // Determine the role: URL param → legacy user_metadata → fallback
+      const newRole =
+        role && (role === "candidate" || role === "hr")
+          ? role
+          : user.user_metadata?.role === "candidate" ||
+              user.user_metadata?.role === "hr"
+            ? (user.user_metadata.role as "candidate" | "hr")
+            : null;
+
+      if (newRole) {
+        // Set in app_metadata via admin client (immutable from client)
+        const admin = createAdminClient();
+        await admin.auth.admin.updateUserById(user.id, {
+          app_metadata: { role: newRole },
+        });
+      } else {
+        redirectUrl = `${origin}/auth/select-role`;
+      }
     }
   }
 
-  // Build redirect and explicitly forward ALL Supabase session cookies
+  // Build redirect and forward ALL session cookies
   const response = NextResponse.redirect(redirectUrl);
-  pendingCookies.forEach(({ name, value, options }) => {
+  responseCookies.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });
 

@@ -1,33 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { UserCircle, ShieldCheck } from "lucide-react";
 
 export default function SelectRolePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const handleRoleSelect = async (role: "candidate" | "hr") => {
     setLoading(true);
     setError(null);
-    const supabase = createClient();
 
-    const { error } = await supabase.auth.updateUser({
-      data: { role },
+    const res = await fetch("/api/me/role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
     });
 
-    if (error) {
-      setError(error.message);
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Failed to set role");
       setLoading(false);
       return;
     }
 
     // Force a hard navigation so the middleware re-evaluates with updated metadata.
-    router.push("/dashboard");
-    router.refresh();
+    window.location.href = "/dashboard";
   };
 
   return (

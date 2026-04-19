@@ -29,8 +29,8 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 // ============================================
 // ROLE PROVIDER
-// Sources role from Supabase user_metadata.role.
-// setRole → supabase.auth.updateUser({ data: { role } })
+// Sources role from Supabase app_metadata.role (server-set, immutable from client).
+// Falls back to user_metadata.role for backwards compatibility.
 // clearRole → supabase.auth.signOut()
 // ============================================
 
@@ -50,7 +50,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const rawRole = user.user_metadata?.role;
+        const rawRole = user.app_metadata?.role ?? user.user_metadata?.role;
         if (rawRole === "candidate" || rawRole === "hr") {
           setRoleState(rawRole);
         }
@@ -72,7 +72,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const rawRole = session.user.user_metadata?.role;
+        const rawRole =
+          session.user.app_metadata?.role ?? session.user.user_metadata?.role;
         setRoleState(
           rawRole === "candidate" || rawRole === "hr" ? rawRole : null
         );
@@ -95,9 +96,14 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   const setRole = useCallback(
     async (newRole: UserRole) => {
-      const supabase = createClient();
-      await supabase.auth.updateUser({ data: { role: newRole } });
-      setRoleState(newRole);
+      const res = await fetch("/api/me/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (res.ok) {
+        setRoleState(newRole);
+      }
     },
     []
   );

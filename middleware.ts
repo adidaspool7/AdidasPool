@@ -72,11 +72,11 @@ export async function middleware(request: NextRequest) {
     return redirect(new URL("/dashboard", request.url));
   }
 
-  // 4. First-time login — no role set yet
+  // 4. First-time login — no role set yet (app_metadata is source of truth)
   if (
     user &&
     pathname.startsWith("/dashboard") &&
-    !user.user_metadata?.role &&
+    !user.app_metadata?.role &&
     pathname !== "/auth/select-role"
   ) {
     return redirect(new URL("/auth/select-role", request.url));
