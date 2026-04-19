@@ -267,7 +267,7 @@ function CandidateDashboard() {
         </div>
 
         <Link
-          href="https://porto-guide-bot.vercel.app/"
+          href="https://onboarding-aibot.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
           className="shrink-0"

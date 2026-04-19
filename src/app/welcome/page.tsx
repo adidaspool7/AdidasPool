@@ -46,14 +46,17 @@ function ChatbotIcon() {
       <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow-lg backdrop-blur-sm opacity-0 translate-y-[-4px] transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none">
         Your personal Porto assistant
       </div>
-      <button
+      <a
+        href="https://onboarding-aibot.vercel.app"
+        target="_blank"
+        rel="noopener noreferrer"
         className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-md transition-all hover:bg-white/30 hover:scale-110"
         aria-label="Chat assistant"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-      </button>
+      </a>
     </div>
   );
 }
