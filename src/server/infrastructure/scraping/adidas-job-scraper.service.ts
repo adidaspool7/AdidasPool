@@ -21,8 +21,12 @@ const BASE_URL = "https://jobs.adidas-group.com";
 const SEARCH_URL = `${BASE_URL}/search/`;
 const RESULTS_PER_PAGE = 50;
 
+// Step by 40 instead of 50 to create a 10-row overlap between pages.
+// This catches jobs that shift between pages during scraping (pagination drift).
+const PAGE_STEP = 40;
+
 // Delay between page fetches to be respectful to the server
-const FETCH_DELAY_MS = 1500;
+const FETCH_DELAY_MS = 1000;
 
 /**
  * Extract a 2-letter country code from a location string like "Miami, FL, US"
@@ -97,63 +101,90 @@ export class AdidasJobScraperService implements IJobScraperService {
    *
    * How it works:
    * 1. Fetch the first search results page to determine total count
-   * 2. Iterate through paginated pages (50 per page)
-   * 3. For each page, parse HTML table rows to extract job data
+   * 2. Iterate through paginated pages with overlapping rows (step 40, page 50)
+   *    to catch items that shift between pages during scraping
+   * 3. If any jobs were missed, do a verification pass with ascending sort
    * 4. Return de-duplicated array of ScrapedJob objects
    */
   async scrapeJobs(maxPages: number = 0): Promise<ScrapedJob[]> {
     const allJobs: ScrapedJob[] = [];
     const seenIds = new Set<string>();
 
-    let currentPage = 0;
-    let totalResults = 0;
+    // --- Pass 1: descending sort with overlapping pagination ---
+    const totalResults = await this.scrapeWithSort(
+      "desc",
+      maxPages,
+      allJobs,
+      seenIds
+    );
 
+    // --- Pass 2: if we're still short, re-scrape with ascending sort ---
+    if (allJobs.length < totalResults && maxPages === 0) {
+      console.log(
+        `[JobScraper] Pass 1 got ${allJobs.length}/${totalResults}. Running verification pass (asc sort)...`
+      );
+      await this.scrapeWithSort("asc", 0, allJobs, seenIds);
+    }
+
+    console.log(
+      `[JobScraper] Scraping complete. ${allJobs.length} unique jobs found (server reported ${totalResults}).`
+    );
+    return allJobs;
+  }
+
+  /**
+   * Scrape all pages for a given sort direction, adding unique jobs to the
+   * shared allJobs array. Returns the totalResults reported by the server.
+   */
+  private async scrapeWithSort(
+    sortDirection: "asc" | "desc",
+    maxPages: number,
+    allJobs: ScrapedJob[],
+    seenIds: Set<string>
+  ): Promise<number> {
     // Fetch first page to get total count
-    const firstPageResult = await this.fetchPage(0);
-    totalResults = firstPageResult.totalResults;
+    const firstPageResult = await this.fetchPage(0, sortDirection);
+    const totalResults = firstPageResult.totalResults;
     this.addUniqueJobs(allJobs, seenIds, firstPageResult.jobs);
-    currentPage++;
 
-    const totalPages = Math.ceil(totalResults / RESULTS_PER_PAGE);
+    const totalPages = Math.ceil(totalResults / PAGE_STEP);
     const pagesToScrape =
       maxPages > 0 ? Math.min(maxPages, totalPages) : totalPages;
 
     console.log(
-      `[JobScraper] Found ${totalResults} jobs across ${totalPages} pages. Scraping ${pagesToScrape} pages.`
+      `[JobScraper] [${sortDirection}] Found ${totalResults} jobs, ~${pagesToScrape} pages (step ${PAGE_STEP}, overlap ${RESULTS_PER_PAGE - PAGE_STEP}).`
     );
 
-    // Fetch remaining pages
-    while (currentPage < pagesToScrape) {
+    let currentStep = 1;
+    while (currentStep < pagesToScrape) {
       await sleep(FETCH_DELAY_MS);
-      const startRow = currentPage * RESULTS_PER_PAGE;
+      const startRow = currentStep * PAGE_STEP;
       try {
-        const pageResult = await this.fetchPage(startRow);
+        const pageResult = await this.fetchPage(startRow, sortDirection);
         this.addUniqueJobs(allJobs, seenIds, pageResult.jobs);
         console.log(
-          `[JobScraper] Page ${currentPage + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total: ${allJobs.length})`
+          `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total unique: ${allJobs.length})`
         );
       } catch (err) {
         console.error(
-          `[JobScraper] Error fetching page ${currentPage + 1}:`,
+          `[JobScraper] [${sortDirection}] Error fetching page ${currentStep + 1}:`,
           err
         );
       }
-      currentPage++;
+      currentStep++;
     }
 
-    console.log(
-      `[JobScraper] Scraping complete. ${allJobs.length} unique jobs found.`
-    );
-    return allJobs;
+    return totalResults;
   }
 
   /**
    * Fetch and parse a single page of search results.
    */
   private async fetchPage(
-    startRow: number
+    startRow: number,
+    sortDirection: "asc" | "desc" = "desc"
   ): Promise<{ jobs: ScrapedJob[]; totalResults: number }> {
-    const url = `${SEARCH_URL}?q=&sortColumn=referencedate&sortDirection=desc&startrow=${startRow}`;
+    const url = `${SEARCH_URL}?q=&sortColumn=referencedate&sortDirection=${sortDirection}&startrow=${startRow}`;
 
     const response = await fetch(url, {
       headers: {
