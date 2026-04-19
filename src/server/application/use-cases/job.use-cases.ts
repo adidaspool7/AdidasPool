@@ -294,37 +294,19 @@ export class JobUseCases {
     const startTime = Date.now();
     const scrapedJobs = await this.jobScraperService.scrapeJobs(maxPages);
 
-    let created = 0;
-    let updated = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    for (const scrapedJob of scrapedJobs) {
-      try {
-        const result = await this.jobRepo.upsertByExternalId(
-          scrapedJob.externalId,
-          {
-            title: scrapedJob.title,
-            department: scrapedJob.department,
-            location: scrapedJob.location,
-            country: scrapedJob.country,
-            sourceUrl: scrapedJob.sourceUrl,
-            description: scrapedJob.description || null,
-          }
-        );
-
-        if (result.created) {
-          created++;
-        } else {
-          updated++;
-        }
-      } catch (err) {
-        failed++;
-        errors.push(
-          `Failed to upsert "${scrapedJob.title}": ${err instanceof Error ? err.message : String(err)}`
-        );
-      }
-    }
+    // Bulk upsert all scraped jobs in batched HTTP calls instead of 1-by-1.
+    // Supabase .upsert() with onConflict:"external_id" handles create/update.
+    const { created, updated } = await this.jobRepo.bulkUpsertByExternalId(
+      scrapedJobs.map((j) => ({
+        externalId: j.externalId,
+        title: j.title,
+        department: j.department,
+        location: j.location,
+        country: j.country,
+        sourceUrl: j.sourceUrl,
+        description: j.description ?? null,
+      }))
+    );
 
     const durationMs = Date.now() - startTime;
 
@@ -333,8 +315,8 @@ export class JobUseCases {
       scraped: scrapedJobs.length,
       created,
       updated,
-      failed,
-      errors: errors.slice(0, 10), // Limit error log
+      failed: 0,
+      errors: [],
       durationMs,
       timestamp: new Date().toISOString(),
     };

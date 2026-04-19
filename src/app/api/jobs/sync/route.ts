@@ -21,10 +21,28 @@ import { generateId, camelizeKeys } from "@server/infrastructure/database/db-uti
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes max for scraping
 
+/** Auto-expire sync jobs stuck in "running" for more than 5 minutes */
+async function expireStuckSyncs() {
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  await db
+    .from("sync_jobs")
+    .update({
+      status: "failed",
+      result: { error: "Timed out — sync took too long and was terminated by the server" },
+      completed_at: new Date().toISOString(),
+    })
+    .eq("type", "jobs")
+    .eq("status", "running")
+    .lt("started_at", fiveMinAgo);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const maxPages = typeof body.maxPages === "number" ? body.maxPages : 0;
+
+    // Auto-expire any stuck syncs before checking
+    await expireStuckSyncs();
 
     // Check if a sync is already running
     const { data: running } = await db
@@ -92,6 +110,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  // Auto-expire stuck syncs so the UI isn't permanently stuck on "syncing..."
+  await expireStuckSyncs();
+
   const { data: latest } = await db
     .from("sync_jobs")
     .select("*")

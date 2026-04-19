@@ -161,6 +161,61 @@ export class SupabaseJobRepository implements IJobRepository {
     return { job, created: true };
   }
 
+  async bulkUpsertByExternalId(
+    jobs: {
+      externalId: string;
+      title: string;
+      department: string | null;
+      location: string | null;
+      country: string | null;
+      sourceUrl: string;
+      description?: string | null;
+    }[]
+  ): Promise<{ created: number; updated: number }> {
+    if (jobs.length === 0) return { created: 0, updated: 0 };
+
+    // Get existing external IDs in one query to count created vs updated
+    const externalIds = jobs.map((j) => j.externalId);
+    const { data: existing } = await db
+      .from("jobs")
+      .select("external_id")
+      .in("external_id", externalIds);
+    const existingSet = new Set(
+      (existing ?? []).map((r: { external_id: string }) => r.external_id)
+    );
+
+    // Build rows for upsert
+    const rows = jobs.map((j) => ({
+      id: generateId(),
+      external_id: j.externalId,
+      title: j.title,
+      department: j.department,
+      location: j.location,
+      country: j.country,
+      source_url: j.sourceUrl,
+      description: j.description ?? null,
+      status: "OPEN",
+    }));
+
+    // Upsert in chunks (Supabase has payload limits)
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { error } = await db
+        .from("jobs")
+        .upsert(chunk, {
+          onConflict: "external_id",
+          ignoreDuplicates: false,
+        });
+      assertNoError(error, `job.bulkUpsert (chunk ${Math.floor(i / CHUNK_SIZE) + 1})`);
+    }
+
+    const created = jobs.filter((j) => !existingSet.has(j.externalId)).length;
+    const updated = jobs.length - created;
+
+    return { created, updated };
+  }
+
   async upsertMatch(
     jobId: string,
     candidateId: string,

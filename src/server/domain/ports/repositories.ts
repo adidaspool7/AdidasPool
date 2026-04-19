@@ -139,6 +139,17 @@ export interface IJobRepository {
     externalId: string,
     data: Record<string, unknown>
   ): Promise<{ job: any; created: boolean }>;
+  bulkUpsertByExternalId(
+    jobs: {
+      externalId: string;
+      title: string;
+      department: string | null;
+      location: string | null;
+      country: string | null;
+      sourceUrl: string;
+      description?: string | null;
+    }[]
+  ): Promise<{ created: number; updated: number }>;
   upsertMatch(
     jobId: string,
     candidateId: string,
