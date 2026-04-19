@@ -174,15 +174,21 @@ export class SupabaseJobRepository implements IJobRepository {
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
 
-    // Get existing external IDs in one query to count created vs updated
+    // Get existing external IDs in chunked queries to avoid PostgREST row limits.
+    // Supabase .in() + default select returns max ~1000 rows, so we query in batches.
     const externalIds = jobs.map((j) => j.externalId);
-    const { data: existing } = await db
-      .from("jobs")
-      .select("external_id")
-      .in("external_id", externalIds);
-    const existingSet = new Set(
-      (existing ?? []).map((r: { external_id: string }) => r.external_id)
-    );
+    const existingSet = new Set<string>();
+    const ID_QUERY_CHUNK = 500;
+    for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
+      const idChunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
+      const { data: existing } = await db
+        .from("jobs")
+        .select("external_id")
+        .in("external_id", idChunk);
+      for (const r of existing ?? []) {
+        existingSet.add((r as { external_id: string }).external_id);
+      }
+    }
 
     // Build rows for upsert
     const rows = jobs.map((j) => ({
