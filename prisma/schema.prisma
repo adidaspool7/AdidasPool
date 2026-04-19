@@ -1,0 +1,799 @@
+// Talent Intelligence & Communication Verification Platform
+// Database Schema - PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ============================================
+// CANDIDATE & TALENT POOL
+// ============================================
+
+model Candidate {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Basic info (extracted from CV)
+  firstName   String
+  lastName    String
+  email       String?  @unique
+  phone       String?
+  location    String?
+  country     String?
+  linkedinUrl String?
+
+  // Personal / profile info (self-declared by candidate)
+  dateOfBirth       DateTime?
+  nationality       String?
+  willingToRelocate Boolean?        // Willing to relocate to Porto
+  availability      String?         // e.g. "Immediately", "1 month", "2 months", "3+ months"
+  workModel         WorkModel?      // Remote, Hybrid, On-site
+  bio               String?         // Short self-description / summary
+
+  // CV data
+  rawCvUrl    String?  // Vercel Blob URL to original CV file
+  rawCvText   String?  // Raw extracted text from CV
+  parsedData  Json?    // Full structured JSON from LLM extraction
+
+  // Motivation letter
+  motivationLetterUrl  String?  // Vercel Blob URL to uploaded motivation letter
+  motivationLetterText String?  // Extracted / edited motivation letter text
+
+  // Learning agreement (Erasmus standalone upload)
+  learningAgreementUrl String?  // Vercel Blob URL to uploaded learning agreement
+
+  // Scoring (component scores stored individually; overall is computed with adjustable weights)
+  overallCvScore    Float?   // Composite CV score (deterministic formula)
+  experienceScore   Float?   // Experience relevance score (0-100)
+  educationScore    Float?   // Education level score (0-100)
+  locationScore     Float?   // Location match score (0-100)
+  languageScore     Float?   // Language proficiency score (0-100)
+  yearsOfExperience Float?   // Estimated total years of experience
+
+  // Business area classification (set by LLM during CV parse)
+  primaryBusinessArea     String?     // Best-fit department from FIELDS_OF_WORK
+  secondaryBusinessAreas  String[]    @default([])
+  candidateCustomArea     String?     // Free-text area if outside the 16 departments
+
+  // Parsing quality
+  parsingConfidence Json?       // Per-field confidence scores from LLM
+  needsReview       Boolean?                  // null = no state, true = needs review, false = reviewed
+
+  // Status & classification
+  status     CandidateStatus @default(NEW)
+  sourceType CandidateSource @default(EXTERNAL)
+  isDuplicate Boolean        @default(false)
+  duplicateOf String?        // Reference to original candidate ID
+
+  // Relations
+  experiences      Experience[]
+  education        Education[]
+  languages        CandidateLanguage[]
+  skills           Skill[]
+  tags             CandidateTag[]
+  notes            CandidateNote[]
+  assessments      Assessment[]
+  interviewSessions InterviewSession[]
+  improvementTracks ImprovementTrack[]
+  jobMatches       JobMatch[]
+  applications     JobApplication[]
+  notifications    Notification[]
+  notificationPreference NotificationPreference?
+
+  @@index([email])
+  @@index([status])
+  @@index([overallCvScore])
+  @@index([country])
+  @@index([primaryBusinessArea])
+}
+
+enum CandidateStatus {
+  NEW
+  PARSED
+  SCREENED
+  INVITED
+  ASSESSED
+  SHORTLISTED
+  BORDERLINE
+  ON_IMPROVEMENT_TRACK
+  REJECTED
+  HIRED
+}
+
+enum CandidateSource {
+  EXTERNAL
+  INTERNAL
+  PLATFORM  // Self-registered via candidate portal (/api/me)
+}
+
+enum WorkModel {
+  REMOTE
+  HYBRID
+  ON_SITE
+}
+
+model Experience {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  jobTitle    String
+  company     String?
+  location    String?
+  startDate   String?   // Stored as string since CV dates vary in format
+  endDate     String?
+  isCurrent   Boolean   @default(false)
+  description String?
+
+  // AI classification
+  isRelevant      Boolean? // Classified as relevant to target roles
+  relevanceScore  Float?   // 0-100 relevance score
+  relevanceReason String?  // Why it was classified this way
+
+  @@index([candidateId])
+}
+
+model Education {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  institution String?
+  degree      String?
+  fieldOfStudy String?
+  startDate   String?
+  endDate     String?
+  level       EducationLevel?
+
+  @@index([candidateId])
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  BACHELOR
+  MASTER
+  PHD
+  VOCATIONAL
+  OTHER
+}
+
+model CandidateLanguage {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  language       String      // e.g., "English", "German", "Portuguese"
+  selfDeclaredLevel CEFRLevel? // What the candidate claims on their CV
+  assessedLevel    CEFRLevel?  // What the assessment determined
+
+  @@unique([candidateId, language])
+  @@index([candidateId])
+}
+
+enum CEFRLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  name     String
+  category String?  // e.g., "Technical", "Soft Skill", "Tool"
+
+  @@index([candidateId])
+}
+
+model CandidateTag {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  tag       String
+  createdAt DateTime @default(now())
+
+  @@unique([candidateId, tag])
+  @@index([candidateId])
+}
+
+model CandidateNote {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  author    String    // Recruiter name (no auth = just a string)
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([candidateId])
+}
+
+// ============================================
+// JOBS & MATCHING
+// ============================================
+
+model Job {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  department  String?
+  location    String?
+  country     String?
+
+  // Job type (regular job vs internship)
+  type        JobType @default(FULL_TIME)
+
+  // Internship-specific fields
+  startDate     DateTime?    // Internship start date
+  endDate       DateTime?    // Internship end date
+  stipend       String?      // e.g. "€800/month" (free-text, not every internship has one)
+  mentorName    String?      // Assigned mentor
+  mentorEmail   String?
+  isErasmus     Boolean      @default(false)  // Erasmus internship flag
+  internshipStatus InternshipStatus? // Draft, Active, Inactive, Finished
+
+  // External source (scraped from adidas careers portal)
+  externalId  String?  @unique  // Unique ID from external career site
+  sourceUrl   String?           // Link to the original job posting
+
+  // Requirements
+  requiredLanguage      String?     // e.g., "German"
+  requiredLanguageLevel CEFRLevel?  // Minimum CEFR level
+  requiredExperienceType String?    // e.g., "customer service"
+  minYearsExperience    Int?
+  requiredEducationLevel EducationLevel?
+
+  status    JobStatus @default(OPEN)
+
+  // Relations
+  assessments   Assessment[]
+  matches       JobMatch[]
+  templates     AssessmentTemplate[]
+  applications  JobApplication[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([externalId])
+  @@index([type])
+}
+
+// ============================================
+// JOB APPLICATION (candidate applies to a job)
+// ============================================
+
+model JobApplication {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  status      ApplicationStatus @default(SUBMITTED)
+  notes       String?
+  learningAgreementUrl String?  // Erasmus learning agreement (uploaded by candidate)
+
+  @@unique([jobId, candidateId])
+  @@index([jobId])
+  @@index([candidateId])
+  @@index([status])
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INVITED
+  ASSESSED
+  SHORTLISTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  INTERNSHIP
+  CONTRACT
+}
+
+enum InternshipStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  FINISHED
+}
+
+model JobMatch {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  matchScore  Float    // Overall match percentage
+  breakdown   Json?    // Detailed match breakdown per criterion
+
+  createdAt   DateTime @default(now())
+
+  @@unique([jobId, candidateId])
+  @@index([jobId])
+  @@index([candidateId])
+  @@index([matchScore])
+}
+
+// ============================================
+// LANGUAGE ASSESSMENT
+// ============================================
+
+model Assessment {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobId       String?
+  job         Job?      @relation(fields: [jobId], references: [id])
+  templateId  String?
+  template    AssessmentTemplate? @relation(fields: [templateId], references: [id])
+
+  // Magic link access (no auth needed)
+  magicToken  String   @unique @default(cuid())
+  expiresAt   DateTime
+  accessedAt  DateTime? // When candidate first opened the link
+
+  // Assessment type & status
+  type        AssessmentType
+  status      AssessmentStatus @default(PENDING)
+  language    String           // Language being assessed
+
+  // Relations
+  result      AssessmentResult?
+
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([magicToken])
+  @@index([status])
+}
+
+enum AssessmentType {
+  LISTENING_WRITTEN    // Listen to audio, write response
+  SPEAKING             // Record spoken response (STT evaluated)
+  READING_ALOUD        // Read text aloud (STT + fluency)
+  COMBINED             // Multiple sections
+}
+
+enum AssessmentStatus {
+  PENDING       // Created, waiting for candidate
+  IN_PROGRESS   // Candidate has started
+  SUBMITTED     // Candidate finished, awaiting scoring
+  SCORED        // AI scoring complete
+  REVIEWED      // HR reviewed the results
+  EXPIRED       // Magic link expired
+}
+
+enum InterviewSessionStatus {
+  CREATED
+  RUNNING
+  ENDED
+  EVALUATED
+}
+
+enum ProctoringSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum InterviewDecision {
+  PASS
+  FAIL
+}
+
+enum IntegrityDecision {
+  CLEAR
+  REVIEW
+  FAIL
+}
+
+model AssessmentResult {
+  id           String   @id @default(cuid())
+  assessmentId String   @unique
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  // Sub-scores (0-100 each)
+  grammarScore          Float?
+  vocabularyScore       Float?
+  clarityScore          Float?
+  fluencyScore          Float?
+  customerHandlingScore Float?
+
+  // Aggregate
+  overallScore    Float?      // Weighted composite
+  cefrEstimation  CEFRLevel?  // Estimated CEFR level
+  isBorderline    Boolean     @default(false)
+
+  // Content
+  audioUrl        String?     // Vercel Blob URL to recorded audio
+  transcript      String?     // STT transcript
+  candidateText   String?     // Written response text
+  feedbackSummary String?     // AI-generated feedback
+
+  // Raw AI response for transparency
+  rawAiResponse   Json?
+}
+
+model InterviewSession {
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  startedAt            DateTime?
+  endedAt              DateTime?
+  evaluatedAt          DateTime?
+
+  candidateId          String
+  candidate            Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  status               InterviewSessionStatus @default(CREATED)
+  targetSkill          String?
+  signedTokenHash      String
+  tokenExpiresAt       DateTime
+  consentAcceptedAt    DateTime?
+
+  technicalDecision    InterviewDecision?
+  integrityDecision    IntegrityDecision?
+  finalDecision        InterviewDecision?
+  evaluationRationale  Json?
+
+  // Termination tracking
+  terminationReason    String?   // e.g. "user_early_exit", "question_timeout", "backend_ended"
+
+  proctoringEvents     InterviewProctoringEvent[]
+  transcriptTurns      InterviewTranscriptTurn[]
+
+  @@index([candidateId])
+  @@index([status])
+  @@index([tokenExpiresAt])
+}
+
+model InterviewTranscriptTurn {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+
+  interviewId   String
+  interview     InterviewSession @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  role          String
+  rawText       String
+  normalizedText String?
+  sequence      Int
+  turnType      String?   // "core_answer" | "clarification" | "system"
+
+  @@index([interviewId, sequence])
+}
+
+model InterviewProctoringEvent {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+
+  interviewId   String
+  interview     InterviewSession @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  eventType     String
+  severity      ProctoringSeverity
+  details       Json?
+  occurredAt    DateTime
+
+  @@index([interviewId, occurredAt])
+  @@index([severity])
+}
+
+model AssessmentTemplate {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String
+  description String?
+  language    String        // Target language
+  cefrLevel   CEFRLevel     // Target difficulty level
+  type        AssessmentType
+
+  // Configuration
+  instructions    String?   // Instructions shown to candidate
+  listeningAudioUrl String? // Audio file for listening tasks
+  readingText     String?   // Text for reading aloud tasks
+  promptText      String?   // Writing/speaking prompt
+  durationMinutes Int       @default(30)
+
+  // Scoring weights (must sum to 100)
+  grammarWeight          Int @default(20)
+  vocabularyWeight       Int @default(20)
+  clarityWeight          Int @default(20)
+  fluencyWeight          Int @default(20)
+  customerHandlingWeight Int @default(20)
+
+  // Relations
+  jobId       String?
+  job         Job?         @relation(fields: [jobId], references: [id])
+  assessments Assessment[]
+
+  @@index([language, cefrLevel])
+}
+
+// ============================================
+// IMPROVEMENT TRACK
+// ============================================
+
+model ImprovementTrack {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  language    String
+  targetLevel CEFRLevel
+  status      TrackStatus @default(ENROLLED)
+
+  startDate   DateTime    @default(now())
+  endDate     DateTime    // 2 weeks from start
+
+  // Progress
+  progress    ImprovementProgress[]
+
+  // Reassessment
+  reassessmentId String? // Link to new assessment after track completion
+
+  @@index([candidateId])
+  @@index([status])
+}
+
+enum TrackStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  REASSESSMENT_PENDING
+  REASSESSED
+  DROPPED
+}
+
+model ImprovementProgress {
+  id      String   @id @default(cuid())
+  trackId String
+  track   ImprovementTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  day         Int       // Day 1-14
+  title       String    // Lesson title
+  content     String?   // Lesson content/link
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?
+
+  @@unique([trackId, day])
+  @@index([trackId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  type    NotificationType
+  message String
+  read    Boolean @default(false)
+  archived Boolean @default(false)
+
+  // Audience scoping: "CANDIDATE" | "HR" | null (global)
+  targetRole  String?
+
+  // Related entities
+  jobId       String?
+  job         Job?       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationId String?
+  campaignId    String?   // links to PromoCampaign if type=PROMOTIONAL
+
+  @@index([candidateId])
+  @@index([targetRole])
+  @@index([read])
+  @@index([archived])
+  @@index([createdAt])
+  @@index([type])
+}
+
+enum NotificationType {
+  // System — candidate-facing
+  JOB_POSTED
+  INTERNSHIP_POSTED
+  JOB_STATE_CHANGED
+  APPLICATION_RECEIVED        // confirmation to candidate
+  APPLICATION_STATUS_CHANGED
+  APPLICATION_WITHDRAWN
+  ASSESSMENT_INVITE
+  ASSESSMENT_COMPLETED
+
+  // System — HR-facing
+  HR_APPLICATION_RECEIVED
+  HR_APPLICATION_WITHDRAWN
+  HR_ASSESSMENT_COMPLETED
+  HR_CV_UPLOADED
+
+  // Promotional
+  PROMOTIONAL
+
+  // Legacy (kept for backward compat)
+  CV_UPLOADED
+  STATUS_CHANGE
+}
+
+// ============================================
+// NOTIFICATION PREFERENCES (per candidate)
+// ============================================
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  candidateId String   @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  // System notification filters
+  jobNotifications        Boolean @default(true)
+  internshipNotifications Boolean @default(true)
+  onlyMyCountry           Boolean @default(false)
+  fieldFilters            String[]  // department/field strings; empty = all
+
+  // Promotional
+  promotionalNotifications Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// PROMOTIONAL CAMPAIGNS (HR → candidates)
+// ============================================
+
+model PromoCampaign {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title     String
+  body      String       // Markdown or plain text
+  imageUrl  String?      // Optional image (Vercel Blob URL)
+  linkUrl   String?      // Optional CTA / survey link
+  isPinned  Boolean      @default(false)
+
+  // Targeting
+  targetAll       Boolean  @default(true)
+  targetCountries String[] // empty = all countries
+  targetFields    String[] // empty = all fields
+  targetEducation String[] // education level filters
+  targetEmails    String[] // individual email targeting
+
+  // Scheduling
+  scheduledAt    DateTime?
+
+  // Status
+  status         CampaignStatus @default(DRAFT)
+  sentAt         DateTime?
+  sentBy         String?        // HR user identifier
+  recipientCount Int?
+
+  @@index([status])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENT
+  TERMINATED
+  ARCHIVED
+}
+
+// ============================================
+// CV PARSING PIPELINE
+// ============================================
+
+model ParsingJob {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status       ParsingJobStatus @default(QUEUED)
+  totalFiles   Int              @default(0)
+  parsedFiles  Int              @default(0)
+  failedFiles  Int              @default(0)
+  errorLog     Json?            // Array of error messages
+
+  // Metadata
+  uploadedBy   String?          // Recruiter name
+  fileName     String?          // Original upload filename (e.g., "batch_march.zip")
+
+  @@index([status])
+}
+
+enum ParsingJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// HR SCORING WEIGHTS (single-row config table)
+// ============================================
+
+model ScoringWeights {
+  id        String   @id @default("default")
+  updatedAt DateTime @updatedAt
+
+  experience        Float @default(0.25)
+  yearsOfExperience Float @default(0.10)
+  educationLevel    Float @default(0.15)
+  locationMatch     Float @default(0.15)
+  language          Float @default(0.35)
+
+  // Preset tracking
+  presetName        String? // e.g., "Language-Heavy", "Balanced", "Experience-First"
+  updatedBy         String? // HR user who last modified
+}
+
+// ============================================
+// SCORING PRESETS (HR-saved custom profiles)
+// ============================================
+
+model ScoringPreset {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  name              String
+  experience        Float
+  yearsOfExperience Float
+  educationLevel    Float
+  locationMatch     Float
+  language          Float
+}
+
+// ============================================
+// SYNC JOBS (background job tracking)
+// ============================================
+
+model SyncJob {
+  id          String   @id @default(cuid())
+  type        String   // e.g. "jobs"
+  status      String   // running | completed | failed
+  result      Json?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+}
