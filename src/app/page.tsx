@@ -22,6 +22,7 @@ export default function HomePage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?role=${role}`,
+        queryParams: { prompt: "select_account" },
       },
     });
 

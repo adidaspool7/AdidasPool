@@ -50,6 +50,7 @@ export interface ICandidateRepository {
   findById(id: string): Promise<any | null>;
   findByIdWithSelect(id: string, select: Record<string, unknown>): Promise<any | null>;
   findByUserId(userId: string): Promise<any | null>;
+  findByEmail(email: string): Promise<any | null>;
 
   findFirstByCreation(select?: Record<string, unknown>): Promise<any | null>;
 

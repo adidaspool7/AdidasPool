@@ -59,6 +59,9 @@ import {
   Check,
   Save,
   Trash2,
+  SendHorizonal,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 
@@ -81,6 +84,8 @@ interface Candidate {
   needsReview: boolean | null;
   sourceType: string;
   createdAt: string;
+  activatedAt: string | null;
+  invitationSent: boolean;
   languages: { language: string; selfDeclaredLevel: string | null }[];
   _count?: { assessments: number; notes: number };
   rerankedScore?: number | null;
@@ -444,6 +449,26 @@ export default function CandidatesPage() {
     }
   }
 
+  async function markInvitationSent(e: React.MouseEvent, candidateId: string) {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationSent: true }),
+      });
+      if (res.ok) {
+        setCandidates((prev) =>
+          prev.map((c) =>
+            c.id === candidateId ? { ...c, invitationSent: true } : c
+          )
+        );
+      }
+    } catch {
+      /* silent */
+    }
+  }
+
   // ── Scoring weights modal logic ────────────────────────────────
 
   const totalPct = Math.round(
@@ -680,6 +705,7 @@ export default function CandidatesPage() {
                 <SortableHeader field="overallCvScore">Overall</SortableHeader>
                 <TableHead>Score Breakdown</TableHead>
                 <TableHead>Languages</TableHead>
+                <TableHead>Activation</TableHead>
                 <SortableHeader field="createdAt">Added</SortableHeader>
               </TableRow>
             </TableHeader>
@@ -687,7 +713,7 @@ export default function CandidatesPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -697,7 +723,7 @@ export default function CandidatesPage() {
               ) : candidates.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center py-12 text-muted-foreground"
                   >
                     <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -830,6 +856,31 @@ export default function CandidatesPage() {
                           </Badge>
                         ))}
                       </div>
+                    </TableCell>
+
+                    {/* Activation status */}
+                    <TableCell>
+                      {c.activatedAt ? (
+                        <Badge variant="default" className="text-xs gap-1">
+                          <UserCheck className="h-3 w-3" />
+                          Active
+                        </Badge>
+                      ) : c.invitationSent ? (
+                        <Badge variant="outline" className="text-xs gap-1 text-amber-600 border-amber-300">
+                          <SendHorizonal className="h-3 w-3" />
+                          Invited
+                        </Badge>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => markInvitationSent(e, c.id)}
+                        >
+                          <UserX className="h-3 w-3" />
+                          Not activated
+                        </Button>
+                      )}
                     </TableCell>
 
                     {/* Added date */}

@@ -164,6 +164,18 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
+  async findByEmail(email: string) {
+    const { data, error } = await db
+      .from("candidates")
+      .select("*")
+      .eq("email", email)
+      .is("user_id", null)
+      .limit(1)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
+  }
+
   async findFirstByCreation(_select?: Record<string, boolean>) {
     const { data, error } = await db
       .from("candidates")

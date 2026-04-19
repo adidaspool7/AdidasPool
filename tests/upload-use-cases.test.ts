@@ -116,13 +116,22 @@ function createMockCandidateRepo(): ICandidateRepository {
   return {
     findMany: vi.fn(),
     findById: vi.fn(),
+    findByIdWithSelect: vi.fn(),
+    findByUserId: vi.fn().mockResolvedValue(null),
+    findByEmail: vi.fn().mockResolvedValue(null),
+    findFirstByCreation: vi.fn().mockResolvedValue(null),
+    createDefault: vi.fn().mockResolvedValue({ id: "new-candidate-id" }),
     update: vi.fn().mockResolvedValue({ id: "existing-id" }),
+    updateWithSelect: vi.fn().mockResolvedValue({ id: "existing-id" }),
     addNote: vi.fn(),
     updateStatus: vi.fn(),
     findForMatching: vi.fn(),
+    findForNotifications: vi.fn().mockResolvedValue([]),
     findForExport: vi.fn(),
+    findForRescore: vi.fn().mockResolvedValue([]),
     createWithRelations: vi.fn().mockResolvedValue({ id: "new-candidate-id" }),
     replaceRelatedRecords: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
   };
 }
 

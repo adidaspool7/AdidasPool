@@ -30,6 +30,7 @@ const PROFILE_SELECT = {
   bio: true,
   sourceType: true,
   createdAt: true,
+  activatedAt: true,
   motivationLetterUrl: true,
   motivationLetterText: true,
   learningAgreementUrl: true,
@@ -155,8 +156,10 @@ export class ProfileUseCases {
    *
    * Priority:
    *   1. Candidate with matching user_id (authenticated user owns this record)
-   *   2. Auto-create a new PLATFORM candidate linked to the authenticated user
+   *   2. Candidate with matching email but no user_id (HR-uploaded, claim it)
+   *   3. Auto-create a new PLATFORM candidate linked to the authenticated user
    *
+   * Steps 1 & 2 also ensure activatedAt is set on first login.
    * Returns null if there is no authenticated session.
    */
   private async resolveCurrentCandidate() {
@@ -167,11 +170,34 @@ export class ProfileUseCases {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Look up by user_id first
+    // 1. Look up by user_id first (already linked)
     const existing = await this.candidateRepo.findByUserId(user.id);
-    if (existing) return existing;
+    if (existing) {
+      // Ensure activatedAt is set (first login activation)
+      if (!existing.activatedAt) {
+        await this.candidateRepo.update(existing.id, { activatedAt: new Date().toISOString() });
+        existing.activatedAt = new Date().toISOString();
+      }
+      return existing;
+    }
 
-    // Auto-create a PLATFORM candidate linked to this auth user
+    // 2. Check for an HR-uploaded candidate with the same email but no user_id
+    //    This merges the HR-created profile with the real authenticated user.
+    if (user.email) {
+      const emailMatch = await this.candidateRepo.findByEmail(user.email);
+      if (emailMatch) {
+        // Claim the HR-uploaded record: link user_id, set activated
+        await this.candidateRepo.update(emailMatch.id, {
+          userId: user.id,
+          activatedAt: new Date().toISOString(),
+        });
+        emailMatch.userId = user.id;
+        emailMatch.activatedAt = new Date().toISOString();
+        return emailMatch;
+      }
+    }
+
+    // 3. Auto-create a new PLATFORM candidate linked to this auth user
     const name = (user.user_metadata?.full_name as string | undefined)
       ?? (user.user_metadata?.name as string | undefined)
       ?? "";
@@ -185,6 +211,7 @@ export class ProfileUseCases {
       status: "NEW",
       sourceType: "PLATFORM",
       userId: user.id,
+      activatedAt: new Date().toISOString(),
     });
   }
 }

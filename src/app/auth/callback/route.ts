@@ -25,14 +25,21 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        // Set or update role from URL param (landing page flow)
+        const existingRole = user.user_metadata?.role;
+
+        // User already has a role → keep it (roles are permanent)
+        if (existingRole === "candidate" || existingRole === "hr") {
+          return NextResponse.redirect(`${origin}${next}`);
+        }
+
+        // First login — set role from URL param
         if (role && (role === "candidate" || role === "hr")) {
           await supabase.auth.updateUser({ data: { role } });
           return NextResponse.redirect(`${origin}${next}`);
         }
 
         // No role param and no role in metadata → fallback to select-role
-        if (!user.user_metadata?.role) {
+        if (!existingRole) {
           return NextResponse.redirect(`${origin}/auth/select-role`);
         }
       }

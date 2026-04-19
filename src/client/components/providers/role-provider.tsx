@@ -8,7 +8,6 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 // ============================================
@@ -40,7 +39,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   // Hydrate from Supabase session on mount
   useEffect(() => {
@@ -108,8 +106,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     await supabase.auth.signOut();
     setRoleState(null);
-    router.push("/");
-  }, [router]);
+    setUserEmail(null);
+    setUserName(null);
+    // Hard navigation to clear all stale cookies / middleware cache
+    window.location.href = "/";
+  }, []);
 
   return (
     <RoleContext.Provider

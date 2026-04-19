@@ -313,6 +313,7 @@ export const UpdateCandidateSchema = z
     motivationLetterText: z.string().optional().nullable(),
     learningAgreementUrl: z.string().optional().nullable(),
     needsReview: z.boolean().nullable().optional(),
+    invitationSent: z.boolean().optional(),
   })
   .strict();
 
