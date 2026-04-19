@@ -123,6 +123,10 @@ export async function GET(request: Request) {
         await admin.auth.admin.updateUserById(user.id, {
           app_metadata: { role: newRole },
         });
+
+        // The JWT from exchangeCodeForSession was minted BEFORE the role
+        // was set. Refresh the session so the new JWT includes the role.
+        await supabase.auth.refreshSession();
       } else {
         // No role anywhere — send back to landing page to pick one
         redirectUrl = `${origin}/`;
