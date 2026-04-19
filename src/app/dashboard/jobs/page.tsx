@@ -722,6 +722,36 @@ export default function JobsPage() {
     }
   }, []);
 
+  const handleSyncCompleted = useCallback(
+    async (result: SyncResult) => {
+      setSyncing(false);
+      setSyncResult(result);
+      if (result.success) {
+        setSearchQuery("");
+        setSearchInput("");
+        setDepartmentFilter("");
+        await fetchJobs(1);
+      }
+    },
+    [fetchJobs]
+  );
+
+  const handleSyncFailed = useCallback(
+    (result: { error?: string } | null) => {
+      setSyncing(false);
+      setSyncResult({
+        success: false,
+        scraped: 0,
+        created: 0,
+        updated: 0,
+        failed: 0,
+        durationMs: 0,
+        error: result?.error || "Sync failed",
+      });
+    },
+    []
+  );
+
   const pollSyncStatus = useCallback(
     (syncId: string) => {
       stopSyncPolling();
@@ -734,56 +764,50 @@ export default function JobsPage() {
 
           if (data.status === "completed") {
             stopSyncPolling();
-            setSyncing(false);
-            const result = data.result as SyncResult;
-            setSyncResult(result);
-            if (result.success) {
-              setSearchQuery("");
-              setSearchInput("");
-              setDepartmentFilter("");
-              await fetchJobs(1);
-            }
+            localStorage.removeItem("activeSyncId");
+            await handleSyncCompleted(data.result as SyncResult);
           } else if (data.status === "failed") {
             stopSyncPolling();
-            setSyncing(false);
-            const result = data.result as { error?: string } | null;
-            setSyncResult({
-              success: false,
-              scraped: 0,
-              created: 0,
-              updated: 0,
-              failed: 0,
-              durationMs: 0,
-              error: result?.error || "Sync failed",
-            });
+            localStorage.removeItem("activeSyncId");
+            handleSyncFailed(data.result as { error?: string } | null);
           }
         } catch {
           // Network error during poll — keep trying
         }
       }, 3000);
     },
-    [stopSyncPolling, fetchJobs]
+    [stopSyncPolling, handleSyncCompleted, handleSyncFailed]
   );
 
   // Cleanup polling on unmount
   useEffect(() => stopSyncPolling, [stopSyncPolling]);
 
-  // On mount, check if a sync is already running
+  // On mount, check if a sync is running or just finished while we were away
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/jobs/sync");
         if (!res.ok) return;
         const data = await res.json();
+        const storedSyncId = localStorage.getItem("activeSyncId");
+
         if (data.status === "running") {
           setSyncing(true);
+          localStorage.setItem("activeSyncId", data.syncId);
           pollSyncStatus(data.syncId);
+        } else if (data.status === "completed" && storedSyncId === data.syncId) {
+          // Sync finished while we were on another page — show the result
+          localStorage.removeItem("activeSyncId");
+          await handleSyncCompleted(data.result as SyncResult);
+        } else if (data.status === "failed" && storedSyncId === data.syncId) {
+          localStorage.removeItem("activeSyncId");
+          handleSyncFailed(data.result as { error?: string } | null);
         }
       } catch {
         // Ignore
       }
     })();
-  }, [pollSyncStatus]);
+  }, [pollSyncStatus, handleSyncCompleted, handleSyncFailed]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -796,6 +820,7 @@ export default function JobsPage() {
       });
       const data = await res.json();
       if (data.status === "started" || data.status === "already_running") {
+        localStorage.setItem("activeSyncId", data.syncId);
         pollSyncStatus(data.syncId);
       } else {
         // Unexpected response
