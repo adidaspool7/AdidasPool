@@ -783,7 +783,11 @@ export default function JobsPage() {
   useEffect(() => stopSyncPolling, [stopSyncPolling]);
 
   // On mount, check if a sync is running or just finished while we were away
+  const mountCheckedRef = useRef(false);
   useEffect(() => {
+    if (mountCheckedRef.current) return;
+    mountCheckedRef.current = true;
+
     (async () => {
       try {
         const res = await fetch("/api/jobs/sync");
@@ -795,19 +799,41 @@ export default function JobsPage() {
           setSyncing(true);
           localStorage.setItem("activeSyncId", data.syncId);
           pollSyncStatus(data.syncId);
-        } else if (data.status === "completed" && storedSyncId === data.syncId) {
+        } else if (
+          storedSyncId &&
+          storedSyncId === data.syncId &&
+          data.status === "completed"
+        ) {
           // Sync finished while we were on another page — show the result
           localStorage.removeItem("activeSyncId");
-          await handleSyncCompleted(data.result as SyncResult);
-        } else if (data.status === "failed" && storedSyncId === data.syncId) {
+          setSyncing(false);
+          setSyncResult(data.result as SyncResult);
+          if ((data.result as SyncResult)?.success) {
+            fetchJobs(1);
+          }
+        } else if (
+          storedSyncId &&
+          storedSyncId === data.syncId &&
+          data.status === "failed"
+        ) {
           localStorage.removeItem("activeSyncId");
-          handleSyncFailed(data.result as { error?: string } | null);
+          setSyncing(false);
+          setSyncResult({
+            success: false,
+            scraped: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            durationMs: 0,
+            error: (data.result as { error?: string })?.error || "Sync failed",
+          });
         }
       } catch {
         // Ignore
       }
     })();
-  }, [pollSyncStatus, handleSyncCompleted, handleSyncFailed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
