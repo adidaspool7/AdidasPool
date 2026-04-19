@@ -190,3 +190,41 @@
   font-size: 0.75em;
   vertical-align: super;
 }
+
+/* ── Welcome / Hero page animations ── */
+@keyframes welcome-flag-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes welcome-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-flag-scroll {
+  animation: welcome-flag-scroll 30s linear infinite;
+}
+
+.animate-fade-in {
+  animation: welcome-fade-in 0.4s ease-out;
+}
+
+/* Hide the welcome page scrollbar but keep it scrollable */
+.welcome-page {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE / Edge */
+}
+.welcome-page::-webkit-scrollbar {
+  display: none;                  /* Chrome / Safari */
+}
