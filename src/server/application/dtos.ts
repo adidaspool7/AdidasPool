@@ -18,8 +18,8 @@ import { FIELDS_OF_WORK } from "@client/lib/constants";
 // ============================================
 
 export const CvExtractionSchema = z.object({
-  firstName: z.string(),
-  lastName: z.string(),
+  firstName: z.string().nullable().transform((v) => v?.trim() || "Unknown"),
+  lastName: z.string().nullable().transform((v) => v?.trim() || "Unknown"),
   email: z
     .string()
     .optional()

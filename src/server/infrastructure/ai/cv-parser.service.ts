@@ -111,7 +111,8 @@ Official departments for businessAreaClassification (pick from this list when po
 
 Rules:
 - Extract ALL information present in the CV — do NOT skip any section
-- If a field is not found, use null
+- firstName and lastName are REQUIRED — NEVER return null for these. If you cannot clearly identify the name, use your best guess from context (email address, headers, signatures). Only use "Unknown" as a last resort.
+- For all other fields, if not found, use null
 - For languages, map to CEFR levels if possible (native/fluent = C2, advanced = C1, intermediate = B1-B2, basic = A1-A2)
 - For education entries:
   - Include formal degrees (HIGH_SCHOOL, BACHELOR, MASTER, PHD)

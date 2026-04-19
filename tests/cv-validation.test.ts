@@ -85,16 +85,39 @@ describe("CvExtractionSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should reject when firstName is missing", () => {
+  it("should fallback to 'Unknown' when firstName is missing", () => {
     const { firstName, ...noFirst } = validPayload;
     const result = CvExtractionSchema.safeParse(noFirst);
+    // firstName is required in the schema shape — omitting it entirely still fails
     expect(result.success).toBe(false);
   });
 
-  it("should reject when lastName is missing", () => {
+  it("should fallback to 'Unknown' when lastName is missing", () => {
     const { lastName, ...noLast } = validPayload;
     const result = CvExtractionSchema.safeParse(noLast);
     expect(result.success).toBe(false);
+  });
+
+  it("should fallback to 'Unknown' when firstName is null", () => {
+    const result = CvExtractionSchema.safeParse({
+      ...validPayload,
+      firstName: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.firstName).toBe("Unknown");
+    }
+  });
+
+  it("should fallback to 'Unknown' when lastName is null", () => {
+    const result = CvExtractionSchema.safeParse({
+      ...validPayload,
+      lastName: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.lastName).toBe("Unknown");
+    }
   });
 
   it("should sanitize invalid email to null", () => {
@@ -166,7 +189,7 @@ describe("CvExtractionSchema", () => {
     }
   });
 
-  it("should reject non-string firstName (catches LLM hallucination)", () => {
+  it("should reject non-string non-null firstName (catches LLM hallucination)", () => {
     const result = CvExtractionSchema.safeParse({
       ...validPayload,
       firstName: 42,
