@@ -6,10 +6,14 @@ import { NextResponse, type NextRequest } from "next/server";
  *
  * Responsibilities:
  * 1. Refresh the Supabase session on every request (keeps JWT alive).
- * 2. Protect /dashboard/* — redirect unauthenticated users to /auth/login.
+ * 2. Protect /dashboard/* — redirect unauthenticated users to landing.
  * 3. Redirect authenticated users away from /auth/login to /dashboard.
  * 4. Redirect authenticated users without a role to /auth/select-role.
  * 5. Redirect / to /dashboard if authenticated.
+ *
+ * IMPORTANT: Every redirect copies cookies from supabaseResponse so that
+ * token refreshes are not lost when the middleware returns a redirect
+ * instead of the normal NextResponse.next().
  */
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -43,20 +47,29 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  /** Helper: create a redirect that carries all Supabase session cookies */
+  function redirect(url: URL) {
+    const r = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      r.cookies.set(c.name, c.value);
+    });
+    return r;
+  }
+
   // 1. Protect /dashboard — redirect to landing if not authenticated
   if (pathname.startsWith("/dashboard") && !user) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return redirect(new URL("/", request.url));
   }
 
   // 2. Redirect /auth/login to landing page (login flow is now on /)
   if (pathname === "/auth/login") {
-    if (user) return NextResponse.redirect(new URL("/dashboard", request.url));
-    return NextResponse.redirect(new URL("/", request.url));
+    if (user) return redirect(new URL("/dashboard", request.url));
+    return redirect(new URL("/", request.url));
   }
 
   // 3. Redirect logged-in users from landing to dashboard
   if (pathname === "/" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return redirect(new URL("/dashboard", request.url));
   }
 
   // 4. First-time login — no role set yet
@@ -66,7 +79,7 @@ export async function middleware(request: NextRequest) {
     !user.user_metadata?.role &&
     pathname !== "/auth/select-role"
   ) {
-    return NextResponse.redirect(new URL("/auth/select-role", request.url));
+    return redirect(new URL("/auth/select-role", request.url));
   }
 
   return supabaseResponse;
