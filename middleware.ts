@@ -67,19 +67,19 @@ export async function middleware(request: NextRequest) {
     return redirect(new URL("/", request.url));
   }
 
-  // 3. Redirect logged-in users from landing to dashboard
-  if (pathname === "/" && user) {
+  // 3. Redirect logged-in users WITH a role from landing to dashboard
+  // (users without a role stay on landing to pick one via OAuth)
+  if (pathname === "/" && user && user.app_metadata?.role) {
     return redirect(new URL("/dashboard", request.url));
   }
 
-  // 4. First-time login — no role set yet (app_metadata is source of truth)
+  // 4. First-time login — no role set yet → send back to landing to pick one
   if (
     user &&
     pathname.startsWith("/dashboard") &&
-    !user.app_metadata?.role &&
-    pathname !== "/auth/select-role"
+    !user.app_metadata?.role
   ) {
-    return redirect(new URL("/auth/select-role", request.url));
+    return redirect(new URL("/", request.url));
   }
 
   return supabaseResponse;

@@ -16,6 +16,11 @@ export default function HomePage() {
   const handleSignIn = async (role: "candidate" | "hr") => {
     setLoading(role);
     setError(null);
+
+    // Store role in a cookie so the callback can read it even if
+    // Supabase strips query params from the redirect URL.
+    document.cookie = `pending_role=${role};path=/;max-age=600;samesite=lax`;
+
     const supabase = createClient();
 
     const { error } = await supabase.auth.signInWithOAuth({

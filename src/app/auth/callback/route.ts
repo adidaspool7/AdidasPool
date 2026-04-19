@@ -16,8 +16,15 @@ import { createAdminClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const role = searchParams.get("role") as "candidate" | "hr" | null;
   const next = searchParams.get("next") ?? "/dashboard";
+
+  // Role source priority: URL param → pending_role cookie
+  let role = searchParams.get("role") as "candidate" | "hr" | null;
+  if (role !== "candidate" && role !== "hr") {
+    const cookieHeader = request.headers.get("cookie") ?? "";
+    const match = cookieHeader.match(/(?:^|;\s*)pending_role=(candidate|hr)/);
+    role = match ? (match[1] as "candidate" | "hr") : null;
+  }
 
   // On Vercel the origin from URL may differ from what the browser sees.
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -117,7 +124,8 @@ export async function GET(request: Request) {
           app_metadata: { role: newRole },
         });
       } else {
-        redirectUrl = `${origin}/auth/select-role`;
+        // No role anywhere — send back to landing page to pick one
+        redirectUrl = `${origin}/`;
       }
     }
   }
@@ -127,6 +135,9 @@ export async function GET(request: Request) {
   responseCookies.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });
+
+  // Clear the pending_role cookie — it's served its purpose
+  response.cookies.set("pending_role", "", { path: "/", maxAge: 0 });
 
   return response;
 }
