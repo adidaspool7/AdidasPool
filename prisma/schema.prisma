@@ -66,6 +66,9 @@ model Candidate {
   parsingConfidence Json?       // Per-field confidence scores from LLM
   needsReview       Boolean?                  // null = no state, true = needs review, false = reviewed
 
+  // Shortlisted flag (independent of pipeline status)
+  shortlisted Boolean @default(false)
+
   // Status & classification
   status     CandidateStatus @default(NEW)
   sourceType CandidateSource @default(EXTERNAL)
@@ -105,6 +108,7 @@ enum CandidateStatus {
   ON_IMPROVEMENT_TRACK
   REJECTED
   HIRED
+  OFFER_SENT
 }
 
 enum CandidateSource {
@@ -300,12 +304,21 @@ model JobApplication {
 
 enum ApplicationStatus {
   SUBMITTED
+  RECEIVED
+  IN_REVIEW
+  ASSESSMENT_READY
+  INTERVIEWING
+  ADVANCED
+  FINAL_STAGE
+  OFFER_SENT
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  // Legacy (kept for backwards compatibility)
   UNDER_REVIEW
   INVITED
   ASSESSED
   SHORTLISTED
-  REJECTED
-  WITHDRAWN
 }
 
 enum JobStatus {

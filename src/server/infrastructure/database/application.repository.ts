@@ -16,7 +16,7 @@ const APPLICATION_WITH_JOB = `*, job:jobs(${JOB_SELECT_FIELDS})` as const;
 const APPLICATION_WITH_BOTH = `
   *,
   job:jobs(id, title, type, department, location, country, status, source_url, external_id),
-  candidate:candidates(id, first_name, last_name, email)
+  candidate:candidates(id, first_name, last_name, email, shortlisted)
 ` as const;
 
 export class SupabaseJobApplicationRepository

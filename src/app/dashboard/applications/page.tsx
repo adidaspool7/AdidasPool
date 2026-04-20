@@ -24,6 +24,11 @@ import {
   FileSearch,
   SendHorizonal,
   CalendarDays,
+  Phone,
+  ArrowRight,
+  Trophy,
+  Award,
+  ThumbsUp,
 } from "lucide-react";
 
 // ============================================
@@ -69,6 +74,57 @@ const statusConfig: Record<
     variant: "outline",
     icon: SendHorizonal,
   },
+  RECEIVED: {
+    label: "Received",
+    variant: "outline",
+    icon: SendHorizonal,
+  },
+  IN_REVIEW: {
+    label: "Under Review",
+    variant: "default",
+    icon: FileSearch,
+  },
+  ASSESSMENT_READY: {
+    label: "Assessment",
+    variant: "secondary",
+    icon: CheckCircle2,
+  },
+  INTERVIEWING: {
+    label: "Interviewing",
+    variant: "default",
+    icon: Phone,
+  },
+  ADVANCED: {
+    label: "Advanced",
+    variant: "default",
+    icon: ArrowRight,
+  },
+  FINAL_STAGE: {
+    label: "Final Stage",
+    variant: "default",
+    icon: Trophy,
+  },
+  OFFER_SENT: {
+    label: "Offer Sent",
+    variant: "outline",
+    icon: Award,
+  },
+  ACCEPTED: {
+    label: "Accepted",
+    variant: "default",
+    icon: ThumbsUp,
+  },
+  REJECTED: {
+    label: "Rejected",
+    variant: "destructive",
+    icon: XCircle,
+  },
+  WITHDRAWN: {
+    label: "Withdrawn",
+    variant: "secondary",
+    icon: XCircle,
+  },
+  // Legacy
   UNDER_REVIEW: {
     label: "Under Review",
     variant: "default",
@@ -88,16 +144,6 @@ const statusConfig: Record<
     label: "Shortlisted",
     variant: "default",
     icon: CheckCircle2,
-  },
-  REJECTED: {
-    label: "Rejected",
-    variant: "destructive",
-    icon: XCircle,
-  },
-  WITHDRAWN: {
-    label: "Withdrawn",
-    variant: "secondary",
-    icon: XCircle,
   },
 };
 

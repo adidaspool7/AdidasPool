@@ -60,11 +60,9 @@ const STATUS_LABELS: Record<string, string> = {
   NEW: "New",
   PARSED: "Parsed",
   SCREENED: "Screened",
-  INVITED: "Invited",
-  ASSESSED: "Assessed",
-  SHORTLISTED: "Shortlisted",
   BORDERLINE: "Borderline",
   ON_IMPROVEMENT_TRACK: "On Track",
+  OFFER_SENT: "Proposed",
   REJECTED: "Rejected",
   HIRED: "Hired",
 };

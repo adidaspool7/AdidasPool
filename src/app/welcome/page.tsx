@@ -212,7 +212,7 @@ export default function WelcomePage() {
           {/* Top bar */}
           <header className="flex items-center justify-between">
             <AdidasLogo className="h-10 w-auto text-white" />
-            <span className="font-[family-name:var(--font-bebas-neue)] text-lg tracking-[0.3em] uppercase">
+            <span className="text-lg font-black uppercase tracking-[0.3em]">
               adidas GBS Porto
             </span>
             {/* Spacer for the chatbot icon */}

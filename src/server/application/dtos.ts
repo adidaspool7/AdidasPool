@@ -239,6 +239,7 @@ export const CandidateFilterSchema = z.object({
       "ON_IMPROVEMENT_TRACK",
       "REJECTED",
       "HIRED",
+      "OFFER_SENT",
     ])
     .optional(),
   country: z.string().optional(),
@@ -306,6 +307,7 @@ export const UpdateCandidateSchema = z
         "ON_IMPROVEMENT_TRACK",
         "REJECTED",
         "HIRED",
+        "OFFER_SENT",
       ])
       .optional(),
     tags: z.array(z.string()).optional(),
@@ -314,6 +316,7 @@ export const UpdateCandidateSchema = z
     learningAgreementUrl: z.string().optional().nullable(),
     needsReview: z.boolean().nullable().optional(),
     invitationSent: z.boolean().optional(),
+    shortlisted: z.boolean().optional(),
   })
   .strict();
 

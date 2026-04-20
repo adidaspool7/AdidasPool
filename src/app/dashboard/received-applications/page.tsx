@@ -28,7 +28,21 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Star,
+  ChevronDown,
+  ArrowRight,
+  Trophy,
+  Phone,
+  Award,
+  Handshake,
+  ThumbsUp,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@client/components/ui/dropdown-menu";
 
 // ============================================
 // TYPES
@@ -51,6 +65,7 @@ interface ApplicationCandidate {
   firstName: string;
   lastName: string;
   email: string | null;
+  shortlisted?: boolean;
 }
 
 interface ReceivedApplication {
@@ -75,13 +90,70 @@ const statusConfig: Record<
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
     icon: React.ComponentType<{ className?: string }>;
+    className?: string;
   }
 > = {
   SUBMITTED: {
-    label: "Submitted",
+    label: "Received",
     variant: "outline",
     icon: SendHorizonal,
   },
+  RECEIVED: {
+    label: "Received",
+    variant: "outline",
+    icon: SendHorizonal,
+  },
+  IN_REVIEW: {
+    label: "Under Review",
+    variant: "default",
+    icon: FileSearch,
+  },
+  ASSESSMENT_READY: {
+    label: "Assessment",
+    variant: "secondary",
+    icon: CheckCircle2,
+  },
+  INTERVIEWING: {
+    label: "Interviewing",
+    variant: "default",
+    icon: Phone,
+    className: "bg-indigo-100 text-indigo-700 border-indigo-300",
+  },
+  ADVANCED: {
+    label: "Advanced",
+    variant: "default",
+    icon: ArrowRight,
+    className: "bg-blue-100 text-blue-700 border-blue-300",
+  },
+  FINAL_STAGE: {
+    label: "Final Stage",
+    variant: "default",
+    icon: Trophy,
+    className: "bg-purple-100 text-purple-700 border-purple-300",
+  },
+  OFFER_SENT: {
+    label: "Offer Sent",
+    variant: "outline",
+    icon: Award,
+    className: "bg-amber-50 text-amber-800 border-amber-300",
+  },
+  ACCEPTED: {
+    label: "Accepted",
+    variant: "default",
+    icon: ThumbsUp,
+    className: "bg-emerald-600 text-white border-emerald-700",
+  },
+  REJECTED: {
+    label: "Rejected",
+    variant: "destructive",
+    icon: XCircle,
+  },
+  WITHDRAWN: {
+    label: "Withdrawn",
+    variant: "secondary",
+    icon: XCircle,
+  },
+  // Legacy statuses (backwards compat)
   UNDER_REVIEW: {
     label: "Under Review",
     variant: "default",
@@ -102,17 +174,20 @@ const statusConfig: Record<
     variant: "default",
     icon: CheckCircle2,
   },
-  REJECTED: {
-    label: "Rejected",
-    variant: "destructive",
-    icon: XCircle,
-  },
-  WITHDRAWN: {
-    label: "Withdrawn",
-    variant: "secondary",
-    icon: XCircle,
-  },
 };
+
+/** Ordered pipeline statuses HR can assign to an application */
+const APPLICATION_TRACKING_STATUSES = [
+  "RECEIVED",
+  "IN_REVIEW",
+  "ASSESSMENT_READY",
+  "INTERVIEWING",
+  "ADVANCED",
+  "FINAL_STAGE",
+  "OFFER_SENT",
+  "ACCEPTED",
+  "REJECTED",
+] as const;
 
 // ============================================
 // RECEIVED APPLICATION CARD
@@ -120,8 +195,10 @@ const statusConfig: Record<
 
 function ReceivedApplicationCard({
   application,
+  onStatusChange,
 }: {
   application: ReceivedApplication;
+  onStatusChange: (id: string, status: string) => void;
 }) {
   const { job, candidate } = application;
   const config = statusConfig[application.status] || statusConfig.SUBMITTED;
@@ -160,16 +237,52 @@ function ReceivedApplicationCard({
               )}
             </CardDescription>
           </div>
-          <Badge variant={config.variant} className="gap-1 shrink-0">
-            <StatusIcon className="h-3 w-3" />
-            {config.label}
-          </Badge>
+          {/* Status dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="focus:outline-none shrink-0">
+                <Badge
+                  variant={config.variant}
+                  className={`gap-1 cursor-pointer hover:opacity-80 transition-opacity ${config.className || ""}`}
+                >
+                  <StatusIcon className="h-3 w-3" />
+                  {config.label}
+                  <ChevronDown className="h-3 w-3 ml-0.5" />
+                </Badge>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {APPLICATION_TRACKING_STATUSES.map((s) => {
+                const sc = statusConfig[s];
+                if (!sc) return null;
+                const SIcon = sc.icon;
+                return (
+                  <DropdownMenuItem
+                    key={s}
+                    disabled={application.status === s}
+                    onClick={() => onStatusChange(application.id, s)}
+                  >
+                    <Badge
+                      variant={sc.variant}
+                      className={`text-xs mr-2 gap-1 ${sc.className || ""}`}
+                    >
+                      <SIcon className="h-3 w-3" />
+                      {sc.label}
+                    </Badge>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
         {/* Candidate info */}
         <div className="rounded-md bg-muted/50 p-3 space-y-1.5">
           <div className="flex items-center gap-2 text-sm font-medium">
+            {candidate.shortlisted && (
+              <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
+            )}
             <User className="h-4 w-4 text-muted-foreground" />
             {candidate.firstName} {candidate.lastName}
           </div>
@@ -231,6 +344,25 @@ export default function ReceivedApplicationsPage() {
       console.error("Error fetching received applications:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleStatusChange(applicationId: string, newStatus: string) {
+    try {
+      const res = await fetch(`/api/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateStatus", status: newStatus }),
+      });
+      if (res.ok) {
+        setApplications((prev) =>
+          prev.map((a) =>
+            a.id === applicationId ? { ...a, status: newStatus } : a
+          )
+        );
+      }
+    } catch {
+      /* silent */
     }
   }
 
@@ -303,7 +435,11 @@ export default function ReceivedApplicationsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((app) => (
-            <ReceivedApplicationCard key={app.id} application={app} />
+            <ReceivedApplicationCard
+              key={app.id}
+              application={app}
+              onStatusChange={handleStatusChange}
+            />
           ))}
         </div>
       )}

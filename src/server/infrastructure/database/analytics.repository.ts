@@ -14,8 +14,8 @@ import { assertNoError } from "./db-utils";
 import type { IAnalyticsRepository, AnalyticsOverview } from "@server/domain/ports/repositories";
 
 const STATUS_ORDER = [
-  "NEW", "PARSED", "SCREENED", "INVITED", "ASSESSED",
-  "SHORTLISTED", "BORDERLINE", "ON_IMPROVEMENT_TRACK", "REJECTED", "HIRED",
+  "NEW", "PARSED", "SCREENED", "BORDERLINE",
+  "ON_IMPROVEMENT_TRACK", "OFFER_SENT", "REJECTED", "HIRED",
 ];
 
 const SCORE_BUCKETS = [

@@ -61,7 +61,6 @@ import {
   Trash2,
   SendHorizonal,
   UserCheck,
-  UserX,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 
@@ -75,6 +74,7 @@ interface Candidate {
   location: string | null;
   country: string | null;
   status: string;
+  shortlisted: boolean;
   overallCvScore: number | null;
   experienceScore: number | null;
   educationScore: number | null;
@@ -117,24 +117,29 @@ const STATUS_VARIANT: Record<
   NEW: "secondary",
   PARSED: "secondary",
   SCREENED: "outline",
-  INVITED: "outline",
-  ASSESSED: "outline",
-  SHORTLISTED: "default",
-  HIRED: "default",
   BORDERLINE: "secondary",
   ON_IMPROVEMENT_TRACK: "secondary",
+  OFFER_SENT: "outline",
   REJECTED: "destructive",
+  HIRED: "default",
+};
+
+/** Extra colour classes per status (layered on top of variant) */
+const STATUS_CLASS: Record<string, string> = {
+  REJECTED: "bg-red-100 text-red-700 border-red-300",
+  HIRED: "bg-emerald-600 text-white border-emerald-700",
+  OFFER_SENT: "bg-amber-50 text-amber-800 border-amber-300",
+  BORDERLINE: "bg-orange-50 text-orange-700 border-orange-200",
+  ON_IMPROVEMENT_TRACK: "bg-cyan-50 text-cyan-700 border-cyan-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   NEW: "New",
   PARSED: "Parsed",
   SCREENED: "Screened",
-  INVITED: "Invited",
-  ASSESSED: "Assessed",
-  SHORTLISTED: "Shortlisted",
   BORDERLINE: "Borderline",
   ON_IMPROVEMENT_TRACK: "On Track",
+  OFFER_SENT: "Proposed",
   REJECTED: "Rejected",
   HIRED: "Hired",
 };
@@ -142,11 +147,9 @@ const STATUS_LABEL: Record<string, string> = {
 // Status flow: which statuses an HR can manually assign
 const ASSIGNABLE_STATUSES = [
   "SCREENED",
-  "INVITED",
-  "ASSESSED",
-  "SHORTLISTED",
   "BORDERLINE",
   "ON_IMPROVEMENT_TRACK",
+  "OFFER_SENT",
   "REJECTED",
   "HIRED",
 ] as const;
@@ -469,6 +472,26 @@ export default function CandidatesPage() {
     }
   }
 
+  async function toggleShortlisted(e: React.MouseEvent, candidateId: string, current: boolean) {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shortlisted: !current }),
+      });
+      if (res.ok) {
+        setCandidates((prev) =>
+          prev.map((c) =>
+            c.id === candidateId ? { ...c, shortlisted: !current } : c
+          )
+        );
+      }
+    } catch {
+      /* silent */
+    }
+  }
+
   // ── Scoring weights modal logic ────────────────────────────────
 
   const totalPct = Math.round(
@@ -569,10 +592,10 @@ export default function CandidatesPage() {
     }
   }
 
-  function SortableHeader({ field, children }: { field: string; children: React.ReactNode }) {
+  function SortableHeader({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) {
     const active = sortBy === field;
     return (
-      <TableHead>
+      <TableHead className={className}>
         <button
           className="flex items-center gap-1 hover:text-foreground transition-colors"
           onClick={() => toggleSort(field)}
@@ -700,13 +723,13 @@ export default function CandidatesPage() {
             <TableHeader>
               <TableRow>
                 <SortableHeader field="firstName">Name</SortableHeader>
-                <TableHead>Department</TableHead>
-                <TableHead>Status</TableHead>
-                <SortableHeader field="overallCvScore">Overall</SortableHeader>
-                <TableHead>Score Breakdown</TableHead>
-                <TableHead>Languages</TableHead>
-                <TableHead>Activation</TableHead>
-                <SortableHeader field="createdAt">Added</SortableHeader>
+                <TableHead className="text-center">Department</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <SortableHeader field="overallCvScore" className="text-center">Overall</SortableHeader>
+                <TableHead className="text-center">Score Breakdown</TableHead>
+                <TableHead className="text-center">Languages</TableHead>
+                <TableHead className="text-center">Source</TableHead>
+                <SortableHeader field="createdAt" className="text-center">Added</SortableHeader>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -740,15 +763,24 @@ export default function CandidatesPage() {
                     {/* Name */}
                     <TableCell>
                       <div className="flex items-start gap-1.5">
+                        <button
+                          type="button"
+                          className="mt-0.5 shrink-0 focus:outline-none"
+                          title={c.shortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                          onClick={(e) => toggleShortlisted(e, c.id, c.shortlisted)}
+                        >
+                          <Star
+                            className={`h-4 w-4 transition-colors ${
+                              c.shortlisted
+                                ? "text-yellow-500 fill-yellow-500"
+                                : "text-muted-foreground/30 hover:text-yellow-400"
+                            }`}
+                          />
+                        </button>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium truncate">
-                              {c.firstName} {c.lastName}
-                            </span>
-                            {c.status === "SHORTLISTED" && (
-                              <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
-                            )}
-                          </div>
+                          <span className="font-medium truncate">
+                            {c.firstName} {c.lastName}
+                          </span>
                           {c.email && (
                             <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                               {c.email}
@@ -764,7 +796,7 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Department */}
-                    <TableCell>
+                    <TableCell className="text-center">
                       {c.primaryBusinessArea ? (
                         <Badge
                           variant="outline"
@@ -780,13 +812,13 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Status — clickable dropdown to change */}
-                    <TableCell>
+                    <TableCell className="text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <button type="button" className="focus:outline-none">
                             <Badge
                               variant={STATUS_VARIANT[c.status] || "secondary"}
-                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                              className={`cursor-pointer hover:opacity-80 transition-opacity ${STATUS_CLASS[c.status] || ""}`}
                             >
                               {STATUS_LABEL[c.status] || c.status}
                               <ChevronDown className="h-3 w-3 ml-1" />
@@ -800,7 +832,10 @@ export default function CandidatesPage() {
                               disabled={c.status === s}
                               onClick={(e) => changeStatus(e, c.id, s)}
                             >
-                              <Badge variant={STATUS_VARIANT[s]} className="text-xs mr-2">
+                              <Badge
+                                variant={STATUS_VARIANT[s]}
+                                className={`text-xs mr-2 ${STATUS_CLASS[s] || ""}`}
+                              >
                                 {STATUS_LABEL[s]}
                               </Badge>
                               {c.status === s && <Check className="h-3 w-3 ml-auto" />}
@@ -811,7 +846,7 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Overall score */}
-                    <TableCell>
+                    <TableCell className="text-center">
                       <OverallScoreBadge
                         score={
                           useCustomRanking && c.rerankedScore != null
@@ -837,7 +872,7 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Score breakdown mini bars */}
-                    <TableCell>
+                    <TableCell className="text-center">
                       <div className="space-y-0.5">
                         <ScoreBar score={c.experienceScore} label="Exp" />
                         <ScoreBar score={c.educationScore} label="Edu" />
@@ -847,7 +882,7 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Languages */}
-                    <TableCell>
+                    <TableCell className="text-center">
                       <div className="flex flex-wrap gap-1">
                         {c.languages.map((l, i) => (
                           <Badge key={i} variant="outline" className="text-xs">
@@ -858,9 +893,9 @@ export default function CandidatesPage() {
                       </div>
                     </TableCell>
 
-                    {/* Activation status */}
-                    <TableCell>
-                      {c.activatedAt ? (
+                    {/* Source / invitation */}
+                    <TableCell className="text-center">
+                      {c.sourceType === "PLATFORM" ? (
                         <Badge variant="default" className="text-xs gap-1">
                           <UserCheck className="h-3 w-3" />
                           Active
@@ -877,14 +912,14 @@ export default function CandidatesPage() {
                           className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
                           onClick={(e) => markInvitationSent(e, c.id)}
                         >
-                          <UserX className="h-3 w-3" />
-                          Not activated
+                          <SendHorizonal className="h-3 w-3" />
+                          Send Invite
                         </Button>
                       )}
                     </TableCell>
 
                     {/* Added date */}
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap text-center">
                       {new Date(c.createdAt).toLocaleDateString("en-GB", {
                         day: "numeric",
                         month: "short",
