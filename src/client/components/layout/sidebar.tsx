@@ -169,7 +169,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
                       href={item.href}
                       onClick={onNavigate}
                       className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                         active
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -179,10 +179,10 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
                       {item.name}
                       {item.name === "Notifications" && unreadCount > 0 && (
                         <span className={cn(
-                          "ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                          "ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-medium transition-colors",
                           active
                             ? "bg-primary-foreground text-primary"
-                            : "bg-destructive text-destructive-foreground"
+                            : "bg-muted-foreground/20 text-muted-foreground group-hover:text-foreground"
                         )}>
                           {unreadCount > 99 ? "99+" : unreadCount}
                         </span>

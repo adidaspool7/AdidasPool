@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck } from "lucide-react";
+import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -42,16 +42,19 @@ export default function HomePage() {
       <div className="mx-auto max-w-3xl text-center space-y-8 px-4">
         {/* Hero */}
         <div className="space-y-4">
-          <div className="inline-flex items-center rounded-full border px-4 py-1.5 text-sm text-muted-foreground">
-            adidas Talent Platform
+          <div className="inline-flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-black p-1.5">
+              <img src="/adidas-logo.svg" alt="adidas" className="h-full w-full" />
+            </div>
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
             adidas{" "}
-            <span className="text-primary">HR Management</span>
+            <span className="text-primary">HR Talent Intelligence</span>
+            {" "}Platform
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Manage recruitment end-to-end with AI-powered CV parsing,
-            candidate evaluation, and language proficiency assessment.
+            candidate evaluation, smart job matching, and AI-driven interviews.
           </p>
         </div>
 
@@ -105,12 +108,12 @@ export default function HomePage() {
         </div>
 
         {/* Feature highlights */}
-        <div className="grid gap-6 sm:grid-cols-3 pt-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 pt-8">
           <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
             <Users className="h-8 w-8 text-primary" />
             <h3 className="font-semibold">Talent Pool</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Bulk CV upload, AI parsing, structured scoring
+              Bulk CV upload, AI parsing &amp; structured scoring
             </p>
           </div>
           <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
@@ -121,10 +124,17 @@ export default function HomePage() {
             </p>
           </div>
           <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
+            <Sparkles className="h-8 w-8 text-primary" />
+            <h3 className="font-semibold">AI Interviewer</h3>
+            <p className="text-sm text-muted-foreground text-center">
+              AI-driven skill validation &amp; language proficiency interviews
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
             <BarChart3 className="h-8 w-8 text-primary" />
             <h3 className="font-semibold">Analytics</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Recruitment funnel, language proficiency reports &amp; scoring
+              Recruitment funnel insights &amp; performance reports
             </p>
           </div>
         </div>
