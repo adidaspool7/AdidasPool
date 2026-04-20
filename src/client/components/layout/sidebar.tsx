@@ -105,7 +105,7 @@ const hrNavigationSections: NavSection[] = [
 // SIDEBAR COMPONENT
 // ============================================
 
-function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, userName, userEmail }: {
+function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, userName, userEmail, unreadCount }: {
   role: UserRole;
   roleLabel: string;
   pathname: string;
@@ -113,6 +113,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
   onNavigate?: () => void;
   userName: string | null;
   userEmail: string | null;
+  unreadCount: number;
 }) {
   const initials = userName
     ? userName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
@@ -122,8 +123,8 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
     <>
       {/* Logo / Brand */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-          TI
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black p-1">
+          <img src="/adidas-logo.svg" alt="adidas" className="h-full w-full" />
         </div>
         <div>
           <h1 className="text-sm font-semibold">Talent Intelligence</h1>
@@ -176,6 +177,16 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
                     >
                       <item.icon className="h-4 w-4" />
                       {item.name}
+                      {item.name === "Notifications" && unreadCount > 0 && (
+                        <span className={cn(
+                          "ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                          active
+                            ? "bg-primary-foreground text-primary"
+                            : "bg-destructive text-destructive-foreground"
+                        )}>
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -206,6 +217,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { role, clearRole, isLoading, userName, userEmail } = useRole();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Redirect to login if not authenticated (after hydration)
   useEffect(() => {
@@ -214,11 +226,40 @@ export function Sidebar() {
     }
   }, [isLoading, role, router]);
 
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!role) return;
+    let cancelled = false;
+
+    async function fetchCount() {
+      try {
+        // For candidates, we need the candidateId first
+        let url = "/api/notifications?countOnly=true";
+        if (role === "candidate") {
+          const meRes = await fetch("/api/me");
+          if (!meRes.ok) return;
+          const me = await meRes.json();
+          url += `&role=candidate&candidateId=${encodeURIComponent(me.id)}`;
+        } else {
+          url += "&role=hr";
+        }
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setUnreadCount(data.unreadCount ?? 0);
+      } catch { /* ignore */ }
+    }
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30_000); // refresh every 30s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
+
   if (!role) {
     return null;
   }
 
-  const roleLabel = role === "hr" ? "HR Manager" : "Candidate";
+  const roleLabel = role === "hr" ? "HR Team" : "Candidate";
 
   return (
     <aside className="hidden md:flex h-screen w-64 flex-col border-r bg-card">
@@ -229,6 +270,7 @@ export function Sidebar() {
         clearRole={clearRole}
         userName={userName}
         userEmail={userEmail}
+        unreadCount={unreadCount}
       />
     </aside>
   );
@@ -239,6 +281,7 @@ export function MobileSidebar() {
   const router = useRouter();
   const { role, clearRole, isLoading, userName, userEmail } = useRole();
   const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!isLoading && !role) {
@@ -246,11 +289,39 @@ export function MobileSidebar() {
     }
   }, [isLoading, role, router]);
 
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!role) return;
+    let cancelled = false;
+
+    async function fetchCount() {
+      try {
+        let url = "/api/notifications?countOnly=true";
+        if (role === "candidate") {
+          const meRes = await fetch("/api/me");
+          if (!meRes.ok) return;
+          const me = await meRes.json();
+          url += `&role=candidate&candidateId=${encodeURIComponent(me.id)}`;
+        } else {
+          url += "&role=hr";
+        }
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setUnreadCount(data.unreadCount ?? 0);
+      } catch { /* ignore */ }
+    }
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
+
   if (!role) {
     return null;
   }
 
-  const roleLabel = role === "hr" ? "HR Manager" : "Candidate";
+  const roleLabel = role === "hr" ? "HR Team" : "Candidate";
 
   return (
     <div className="md:hidden flex items-center h-14 border-b bg-card px-4 gap-3">
@@ -271,13 +342,14 @@ export function MobileSidebar() {
               onNavigate={() => setOpen(false)}
               userName={userName}
               userEmail={userEmail}
+              unreadCount={unreadCount}
             />
           </div>
         </SheetContent>
       </Sheet>
       <div className="flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold">
-          TI
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-black p-1">
+          <img src="/adidas-logo.svg" alt="adidas" className="h-full w-full" />
         </div>
         <span className="text-sm font-semibold">Talent Intelligence</span>
       </div>

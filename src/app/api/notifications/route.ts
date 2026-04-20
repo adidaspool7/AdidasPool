@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const role = searchParams.get("role");
     const candidateId = searchParams.get("candidateId");
+    const countOnly = searchParams.get("countOnly") === "true";
     const unread = searchParams.get("unread") === "true";
     const archived = searchParams.get("archived");
     const type = searchParams.get("type") || undefined;
@@ -29,6 +30,19 @@ export async function GET(request: NextRequest) {
     const rawOffset = parseInt(searchParams.get("offset") || "0", 10);
     const limit = Number.isNaN(rawLimit) ? 100 : rawLimit;
     const offset = Number.isNaN(rawOffset) ? 0 : rawOffset;
+
+    // Fast path: only return unread count (for sidebar badge)
+    if (countOnly) {
+      if (role === "candidate" && candidateId) {
+        const unreadCount = await notificationUseCases.countUnread(candidateId, "CANDIDATE");
+        return NextResponse.json({ unreadCount });
+      }
+      if (role === "hr") {
+        const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
+        return NextResponse.json({ unreadCount });
+      }
+      return NextResponse.json({ unreadCount: 0 });
+    }
 
     const filters: Record<string, unknown> = { unread: unread || undefined, type, limit, offset };
     if (archived !== null) filters.archived = archived === "true";

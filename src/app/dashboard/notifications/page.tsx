@@ -716,7 +716,7 @@ export default function NotificationsPage() {
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="system">Updates</TabsTrigger>
-              <TabsTrigger value="promotional">Highlights</TabsTrigger>
+              <TabsTrigger value="promotional">Campaigns</TabsTrigger>
             </TabsList>
             <TabsContent value={activeTab} className="mt-4">
               <CandidateNotificationList
@@ -725,7 +725,7 @@ export default function NotificationsPage() {
                 onMarkRead={handleMarkRead}
                 emptyMessage={
                   activeTab === "promotional"
-                    ? "No highlights yet."
+                    ? "No campaigns yet."
                     : "No notifications yet. You'll be notified about new opportunities and application updates."
                 }
               />
