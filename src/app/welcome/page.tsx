@@ -61,15 +61,42 @@ function ChatbotIcon() {
   );
 }
 
-/* ── Adidas trefoil logo (simplified SVG) ── */
+/* ── Adidas Performance logo (mountain / 3 slanted bars) ── */
 function AdidasLogo({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 80 50" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      {/* Three bars / mountain shape */}
-      <polygon points="16,50 28,14 40,50" />
-      <polygon points="28,50 40,8 52,50" />
-      <polygon points="40,50 52,14 64,50" />
+    <svg
+      className={className}
+      viewBox="0 0 120 80"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Left bar — shortest */}
+      <polygon points="32,80 44,80 56,32 44,32" />
+      {/* Centre bar — medium */}
+      <polygon points="48,80 60,80 72,16 60,16" />
+      {/* Right bar — tallest */}
+      <polygon points="64,80 76,80 88,0 76,0" />
     </svg>
+  );
+}
+
+/* ── Three vertical stripes on the right edge ── */
+function ThreeStripes() {
+  return (
+    <div
+      className="pointer-events-none fixed right-0 top-0 z-20 flex h-full gap-[6px] pr-[60px]"
+      aria-hidden
+    >
+      {[0.18, 0.13, 0.08].map((opacity, i) => (
+        <div
+          key={i}
+          className="h-full w-[10px]"
+          style={{
+            background: `linear-gradient(to bottom, rgba(255,255,255,${opacity}) 0%, rgba(255,255,255,${opacity * 1.8}) 30%, rgba(255,255,255,${opacity * 1.8}) 70%, rgba(255,255,255,${opacity}) 100%)`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -178,6 +205,9 @@ export default function WelcomePage() {
       />
       {/* Dark overlay for readability */}
       <div className="fixed inset-0 bg-black/40" />
+
+      {/* ── Three vertical stripes (right edge) ── */}
+      <ThreeStripes />
 
       {/* ── Chatbot icon ── */}
       <ChatbotIcon />
