@@ -569,7 +569,11 @@ export default function NotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      setUnreadCount((c) => {
+        const next = Math.max(0, c - 1);
+        window.dispatchEvent(new CustomEvent("notifications:unread", { detail: next }));
+        return next;
+      });
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
@@ -588,6 +592,7 @@ export default function NotificationsPage() {
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
+      window.dispatchEvent(new CustomEvent("notifications:unread", { detail: 0 }));
     } catch (error) {
       console.error("Error marking all as read:", error);
     }

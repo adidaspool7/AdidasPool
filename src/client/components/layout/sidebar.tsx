@@ -252,7 +252,14 @@ export function Sidebar() {
 
     fetchCount();
     const interval = setInterval(fetchCount, 30_000); // refresh every 30s
-    return () => { cancelled = true; clearInterval(interval); };
+
+    function onUnreadEvent(e: Event) {
+      const count = (e as CustomEvent).detail;
+      if (typeof count === "number" && !cancelled) setUnreadCount(count);
+    }
+    window.addEventListener("notifications:unread", onUnreadEvent);
+
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener("notifications:unread", onUnreadEvent); };
   }, [role]);
 
   if (!role) {
@@ -314,7 +321,14 @@ export function MobileSidebar() {
 
     fetchCount();
     const interval = setInterval(fetchCount, 30_000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    function onUnreadEvent(e: Event) {
+      const count = (e as CustomEvent).detail;
+      if (typeof count === "number" && !cancelled) setUnreadCount(count);
+    }
+    window.addEventListener("notifications:unread", onUnreadEvent);
+
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener("notifications:unread", onUnreadEvent); };
   }, [role]);
 
   if (!role) {
