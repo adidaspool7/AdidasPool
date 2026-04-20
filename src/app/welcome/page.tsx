@@ -65,7 +65,7 @@ function ChatbotIcon() {
 function AdidasLogo({ className }: { className?: string }) {
   return (
     <img
-      src="/adidas-logo.svg"
+      src="/adidas-logo.png"
       alt="adidas"
       className={className}
       draggable={false}
