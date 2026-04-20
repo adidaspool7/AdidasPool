@@ -108,34 +108,42 @@ export default function HomePage() {
         </div>
 
         {/* Feature highlights */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 pt-8">
-          <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
-            <Users className="h-8 w-8 text-primary" />
-            <h3 className="font-semibold">Talent Pool</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              Bulk CV upload, AI parsing &amp; structured scoring
-            </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-8">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <Users className="h-5 w-5 text-primary shrink-0" />
+            <div className="text-left">
+              <h3 className="text-sm font-semibold">Talent Pool</h3>
+              <p className="text-xs text-muted-foreground">
+                AI parsing &amp; structured scoring
+              </p>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
-            <Briefcase className="h-8 w-8 text-primary" />
-            <h3 className="font-semibold">Job Matching</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              Smart matching engine with automated candidate ranking
-            </p>
+          <div className="flex items-center gap-3 px-3 py-2">
+            <Briefcase className="h-5 w-5 text-primary shrink-0" />
+            <div className="text-left">
+              <h3 className="text-sm font-semibold">Job Matching</h3>
+              <p className="text-xs text-muted-foreground">
+                Automated candidate ranking
+              </p>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h3 className="font-semibold">AI Interviewer</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              AI-driven skill validation &amp; language proficiency interviews
-            </p>
+          <div className="flex items-center gap-3 px-3 py-2">
+            <Sparkles className="h-5 w-5 text-primary shrink-0" />
+            <div className="text-left">
+              <h3 className="text-sm font-semibold">AI Interviewer</h3>
+              <p className="text-xs text-muted-foreground">
+                Skill &amp; language validation
+              </p>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card">
-            <BarChart3 className="h-8 w-8 text-primary" />
-            <h3 className="font-semibold">Analytics</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              Recruitment funnel insights &amp; performance reports
-            </p>
+          <div className="flex items-center gap-3 px-3 py-2">
+            <BarChart3 className="h-5 w-5 text-primary shrink-0" />
+            <div className="text-left">
+              <h3 className="text-sm font-semibold">Analytics</h3>
+              <p className="text-xs text-muted-foreground">
+                Funnel insights &amp; reports
+              </p>
+            </div>
           </div>
         </div>
       </div>
