@@ -174,25 +174,26 @@ export class SupabaseJobRepository implements IJobRepository {
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
 
-    // Get existing external IDs in chunked queries to avoid PostgREST row limits.
-    // Supabase .in() + default select returns max ~1000 rows, so we query in batches.
+    // Get existing jobs (id + external_id) in chunked queries to avoid PostgREST row limits.
+    // We need the existing id to avoid overwriting PKs that have FK references.
     const externalIds = jobs.map((j) => j.externalId);
-    const existingSet = new Set<string>();
+    const existingMap = new Map<string, string>(); // external_id → id
     const ID_QUERY_CHUNK = 500;
     for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
       const idChunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
       const { data: existing } = await db
         .from("jobs")
-        .select("external_id")
+        .select("id, external_id")
         .in("external_id", idChunk);
       for (const r of existing ?? []) {
-        existingSet.add((r as { external_id: string }).external_id);
+        const row = r as { id: string; external_id: string };
+        existingMap.set(row.external_id, row.id);
       }
     }
 
-    // Build rows for upsert
+    // Build rows for upsert — reuse existing id to avoid FK violations
     const rows = jobs.map((j) => ({
-      id: generateId(),
+      id: existingMap.get(j.externalId) ?? generateId(),
       external_id: j.externalId,
       title: j.title,
       department: j.department,
@@ -216,7 +217,7 @@ export class SupabaseJobRepository implements IJobRepository {
       assertNoError(error, `job.bulkUpsert (chunk ${Math.floor(i / CHUNK_SIZE) + 1})`);
     }
 
-    const created = jobs.filter((j) => !existingSet.has(j.externalId)).length;
+    const created = jobs.filter((j) => !existingMap.has(j.externalId)).length;
     const updated = jobs.length - created;
 
     return { created, updated };
