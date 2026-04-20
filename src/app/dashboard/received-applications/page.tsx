@@ -12,6 +12,13 @@ import { Badge } from "@client/components/ui/badge";
 import { Separator } from "@client/components/ui/separator";
 import { Input } from "@client/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@client/components/ui/select";
+import {
   Briefcase,
   MapPin,
   Building2,
@@ -328,6 +335,7 @@ export default function ReceivedApplicationsPage() {
   const [applications, setApplications] = useState<ReceivedApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     fetchApplications();
@@ -372,6 +380,9 @@ export default function ReceivedApplicationsPage() {
   );
 
   const filtered = activeApplications.filter((app) => {
+    // Status filter
+    if (statusFilter && app.status !== statusFilter) return false;
+    // Search filter
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -396,15 +407,38 @@ export default function ReceivedApplicationsPage() {
         </p>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by job, candidate, location..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search & Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by job, candidate, location..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <Select
+          value={statusFilter || "all"}
+          onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {APPLICATION_TRACKING_STATUSES.map((s) => {
+              const sc = statusConfig[s];
+              if (!sc) return null;
+              return (
+                <SelectItem key={s} value={s}>
+                  {sc.label}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Stats */}

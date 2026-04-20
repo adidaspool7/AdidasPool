@@ -393,7 +393,8 @@ export default function CandidatesPage() {
               page,
               pageSize: 20,
               search: search || undefined,
-              status: statusFilter || undefined,
+              status: statusFilter && statusFilter !== "SHORTLISTED_FILTER" ? statusFilter : undefined,
+              shortlisted: statusFilter === "SHORTLISTED_FILTER" ? true : undefined,
               businessArea: businessAreaFilter || undefined,
             }),
           });
@@ -408,7 +409,8 @@ export default function CandidatesPage() {
           params.set("sortBy", sortBy);
           params.set("sortOrder", sortOrder);
           if (search) params.set("search", search);
-          if (statusFilter) params.set("status", statusFilter);
+          if (statusFilter && statusFilter !== "SHORTLISTED_FILTER") params.set("status", statusFilter);
+          if (statusFilter === "SHORTLISTED_FILTER") params.set("shortlisted", "true");
           if (businessAreaFilter) params.set("businessArea", businessAreaFilter);
           if (locationSearch) params.set("locationSearch", locationSearch);
 
@@ -687,6 +689,7 @@ export default function CandidatesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="SHORTLISTED_FILTER">⭐ Shortlisted</SelectItem>
             {Object.entries(STATUS_LABEL).map(([val, label]) => (
               <SelectItem key={val} value={val}>
                 {label}

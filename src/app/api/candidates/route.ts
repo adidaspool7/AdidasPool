@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
       languageLevel: searchParams.get("languageLevel") || undefined,
       sourceType: searchParams.get("sourceType") || undefined,
       businessArea: searchParams.get("businessArea") || undefined,
+      shortlisted: searchParams.get("shortlisted") === "true"
+        ? true
+        : undefined,
       needsReview: searchParams.get("needsReview") === "true"
         ? true
         : searchParams.get("needsReview") === "false"

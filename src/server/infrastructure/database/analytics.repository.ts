@@ -127,7 +127,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       db.from("candidates").select("*", { count: "exact", head: true }),
       db.from("jobs").select("*", { count: "exact", head: true }).eq("status", "OPEN"),
       db.from("job_applications").select("*", { count: "exact", head: true }),
-      db.from("candidates").select("*", { count: "exact", head: true }).eq("status", "SHORTLISTED"),
+      db.from("candidates").select("*", { count: "exact", head: true }).eq("shortlisted", true),
       db.from("assessments").select("*", { count: "exact", head: true }),
     ]);
 

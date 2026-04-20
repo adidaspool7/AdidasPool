@@ -162,6 +162,7 @@ export class NotificationUseCases {
     isPinned?: boolean;
     scheduledAt?: Date;
     targetAll?: boolean;
+    targetInternshipsOnly?: boolean;
     targetCountries?: string[];
     targetFields?: string[];
     targetEducation?: string[];
@@ -222,6 +223,12 @@ export class NotificationUseCases {
     // Get all candidates (including NEW status)
     const candidates = await this.candidateRepo.findForNotifications();
 
+    // If targeting internship candidates only, get the set of candidate IDs who applied to internships
+    let internshipCandidateIds: Set<string> | null = null;
+    if (campaign.targetInternshipsOnly) {
+      internshipCandidateIds = await this.candidateRepo.findInternshipCandidateIds();
+    }
+
     // Bulk-load preferences
     const prefsMap = new Map<string, any>();
     for (const c of candidates) {
@@ -237,6 +244,8 @@ export class NotificationUseCases {
       if (prefs && !prefs.promotionalNotifications) continue;
 
       if (!campaign.targetAll) {
+        // Internship candidates filter
+        if (internshipCandidateIds && !internshipCandidateIds.has(c.id)) continue;
         // Country filter
         if (campaign.targetCountries?.length > 0 && c.country) {
           if (!campaign.targetCountries.includes(c.country)) continue;
@@ -293,12 +302,19 @@ export class NotificationUseCases {
    */
   async previewAudience(campaign: {
     targetAll: boolean;
+    targetInternshipsOnly?: boolean;
     targetCountries?: string[];
     targetFields?: string[];
     targetEducation?: string[];
   }): Promise<number> {
     if (!this.candidateRepo) return 0;
     const candidates = await this.candidateRepo.findForNotifications();
+
+    // If targeting internship candidates only, get the set of candidate IDs who applied to internships
+    let internshipCandidateIds: Set<string> | null = null;
+    if (campaign.targetInternshipsOnly) {
+      internshipCandidateIds = await this.candidateRepo.findInternshipCandidateIds();
+    }
 
     // Bulk-load preferences
     const prefsMap = new Map<string, any>();
@@ -312,6 +328,7 @@ export class NotificationUseCases {
       const prefs = prefsMap.get(c.id);
       if (prefs && !prefs.promotionalNotifications) continue;
       if (!campaign.targetAll) {
+        if (internshipCandidateIds && !internshipCandidateIds.has(c.id)) continue;
         if (campaign.targetCountries?.length && c.country) {
           if (!campaign.targetCountries.includes(c.country)) continue;
         }

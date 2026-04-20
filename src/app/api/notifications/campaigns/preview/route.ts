@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       targetAll = true,
+      targetInternshipsOnly = false,
       targetCountries = [],
       targetFields = [],
       targetEducation = [],
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
 
     const count = await notificationUseCases.previewAudience({
       targetAll,
+      targetInternshipsOnly,
       targetCountries,
       targetFields,
       targetEducation,

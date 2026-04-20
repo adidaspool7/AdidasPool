@@ -250,6 +250,7 @@ export const CandidateFilterSchema = z.object({
   languageLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).optional(),
   sourceType: z.enum(["EXTERNAL", "INTERNAL"]).optional(),
   businessArea: z.string().optional(),
+  shortlisted: z.boolean().optional(),
   needsReview: z.boolean().nullable().optional(),
   tags: z.array(z.string()).optional(),
   page: z.number().int().min(1).default(1),

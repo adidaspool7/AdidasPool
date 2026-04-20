@@ -82,6 +82,10 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     if (filters.businessArea)
       query = query.eq("primary_business_area", filters.businessArea);
 
+    // Shortlisted
+    if (filters.shortlisted !== undefined)
+      query = query.eq("shortlisted", filters.shortlisted);
+
     // Needs review
     if (filters.needsReview !== undefined)
       query = query.eq("needs_review", filters.needsReview);
@@ -234,6 +238,19 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
       .eq("is_duplicate", false);
     assertNoError(error, "candidate.findForNotifications");
     return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
+  }
+
+  async findInternshipCandidateIds(): Promise<Set<string>> {
+    const { data, error } = await db
+      .from("job_applications")
+      .select("candidate_id, jobs!inner(type)")
+      .eq("jobs.type", "INTERNSHIP");
+    assertNoError(error, "candidate.findInternshipCandidateIds");
+    const ids = new Set<string>();
+    for (const row of data ?? []) {
+      ids.add((row as any).candidate_id);
+    }
+    return ids;
   }
 
   async findForExport() {

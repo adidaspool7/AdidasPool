@@ -34,6 +34,7 @@ export interface CandidateFilters {
   languageLevel?: string;
   sourceType?: string;
   businessArea?: string;
+  shortlisted?: boolean;
   needsReview?: boolean | null;
   page: number;
   pageSize: number;
@@ -71,6 +72,7 @@ export interface ICandidateRepository {
   updateStatus(candidateId: string, status: string): Promise<void>;
   findForMatching(): Promise<any[]>;
   findForNotifications(): Promise<any[]>;
+  findInternshipCandidateIds(): Promise<Set<string>>;
   findForExport(): Promise<any[]>;
   findForRescore(): Promise<any[]>;
 

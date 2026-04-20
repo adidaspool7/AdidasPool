@@ -50,6 +50,7 @@ import {
   Pin,
   Archive,
   Search,
+  GraduationCap,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 
@@ -93,6 +94,7 @@ interface Campaign {
   scheduledAt: string | null;
   status: "DRAFT" | "SENT" | "TERMINATED" | "ARCHIVED";
   targetAll: boolean;
+  targetInternshipsOnly: boolean;
   targetCountries: string[];
   targetFields: string[];
   targetEducation: string[];
@@ -304,6 +306,7 @@ function CampaignEditorForm({
   const [body, setBody] = useState(campaign?.body ?? "");
   const [linkUrl, setLinkUrl] = useState(campaign?.linkUrl ?? "");
   const [targetAll, setTargetAll] = useState(campaign?.targetAll ?? true);
+  const [targetInternshipsOnly, setTargetInternshipsOnly] = useState(campaign?.targetInternshipsOnly ?? false);
   const [targetCountries, setTargetCountries] = useState<string[]>(campaign?.targetCountries ?? []);
   const [scheduledAt, setScheduledAt] = useState(campaign?.scheduledAt ?? "");
   const [targetFields, setTargetFields] = useState<string[]>(campaign?.targetFields ?? []);
@@ -318,7 +321,7 @@ function CampaignEditorForm({
       const res = await fetch("/api/notifications/campaigns/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetAll, targetCountries: targetAll ? [] : targetCountries }),
+        body: JSON.stringify({ targetAll, targetCountries: targetAll ? [] : targetCountries, targetInternshipsOnly: !targetAll && targetInternshipsOnly }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -339,6 +342,7 @@ function CampaignEditorForm({
         body: body.trim(),
         linkUrl: linkUrl.trim() || undefined,
         targetAll: targetEmails.length > 0 ? false : targetAll,
+        targetInternshipsOnly: !targetAll && targetInternshipsOnly,
         targetCountries: targetAll ? [] : targetCountries,
         targetFields: targetAll ? [] : targetFields,
         targetEmails,
@@ -414,6 +418,18 @@ function CampaignEditorForm({
         </div>
         {!targetAll && (
           <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Internship candidates only</p>
+                  <p className="text-xs text-muted-foreground">Only target candidates who applied to internships.</p>
+                </div>
+              </div>
+              <Button type="button" variant={targetInternshipsOnly ? "default" : "outline"} size="sm" onClick={() => setTargetInternshipsOnly(!targetInternshipsOnly)} className="shrink-0 min-w-[60px]">
+                {targetInternshipsOnly ? "On" : "Off"}
+              </Button>
+            </div>
             <div className="space-y-2">
               <Label className="text-xs">Countries</Label>
               <CountryMultiSelect selected={targetCountries} onChange={setTargetCountries} />
