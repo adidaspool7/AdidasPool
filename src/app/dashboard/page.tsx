@@ -150,30 +150,30 @@ function CandidateDashboard() {
       /* ignore corrupted data */
     }
 
-    // Fetch real application stats
-    const candidateId = localStorage.getItem("candidate-id");
-    if (candidateId) {
-      fetch(`/api/applications?candidateId=${candidateId}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((apps) => {
-          const list = Array.isArray(apps) ? apps : apps.applications || [];
-          const total = list.filter(
-            (a: any) => a.status !== "WITHDRAWN"
-          ).length;
-          const inProgress = list.filter(
-            (a: any) =>
-              a.status === "SUBMITTED" || a.status === "UNDER_REVIEW"
-          ).length;
-          const completed = list.filter(
-            (a: any) =>
-              a.status === "ACCEPTED" ||
-              a.status === "REJECTED" ||
-              a.status === "HIRED"
-          ).length;
-          setAppStats({ total, inProgress, completed });
-        })
-        .catch(() => {});
-    }
+    // Fetch real application stats via /api/me to get candidateId
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((candidate) => {
+        if (!candidate?.id) return;
+        return fetch(`/api/applications?candidateId=${candidate.id}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then((apps) => {
+            const list = Array.isArray(apps) ? apps : apps.applications || [];
+            const total = list.filter(
+              (a: any) => a.status !== "WITHDRAWN"
+            ).length;
+            const completedStatuses = ["ACCEPTED", "REJECTED", "HIRED"];
+            const inProgress = list.filter(
+              (a: any) =>
+                a.status !== "WITHDRAWN" && !completedStatuses.includes(a.status)
+            ).length;
+            const completed = list.filter(
+              (a: any) => completedStatuses.includes(a.status)
+            ).length;
+            setAppStats({ total, inProgress, completed });
+          });
+      })
+      .catch(() => {});
   }, []);
 
   const formatDate = (iso: string) =>
