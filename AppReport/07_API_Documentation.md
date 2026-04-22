@@ -73,6 +73,28 @@
 | 38 | PUT | `/api/scoring/weights` | Update scoring weights |
 | 39 | GET/POST | `/api/scoring/presets` | List/create scoring presets |
 | 40 | DELETE | `/api/scoring/presets/[id]` | Delete a scoring preset |
+| 41 | POST | `/api/candidates/rescore` | Batch rescore + persist (HR-only) |
+| 42 | POST | `/api/candidates/[id]/skills/[skillId]/verification` | Run a per-skill verification (HR-only) |
+| 43 | POST | `/api/interview/realtime/session` | Create a real-time AI interview session (proxied to FastAPI) |
+| 44 | POST | `/api/interview/realtime/turn` | Submit a turn; persists `turn_count` + `evidence` into `evaluation_rationale` |
+| 45 | POST | `/api/interview/realtime/complete` | Finalize the interview and persist the rubric result |
+
+### Middleware-Level Authorization
+
+All `/api/**` routes (except the `PUBLIC_API_PREFIXES` list in `middleware.ts`) require an authenticated Supabase session. A subset listed under `HR_ONLY_API_PREFIXES` additionally require `app_metadata.role === "hr"`:
+
+```
+/api/candidates/rescore
+/api/candidates/rerank
+/api/scoring/
+/api/export/
+/api/notifications/campaigns
+/api/jobs/sync
+/api/upload/bulk
+/api/analytics
+```
+
+Unauthenticated requests \u2192 `401`. Authenticated non-HR requests to HR-only paths \u2192 `403`. Route handlers themselves do not re-implement these checks (except the skill-verification route which double-checks role as defense-in-depth).
 
 ---
 

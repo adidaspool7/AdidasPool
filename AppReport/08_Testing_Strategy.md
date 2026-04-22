@@ -53,11 +53,11 @@ export default defineConfig({
 | 1 | `cv-validation.test.ts` | 15 | Schema validation | Application (DTOs) |
 | 2 | `scoring.test.ts` | 9 | Domain logic | Domain (services) |
 | 3 | `matching.test.ts` | 4 | Domain logic | Domain (services) |
-| 4 | `text-extraction.test.ts` | 8 | Infrastructure | Infrastructure (AI) |
+| 4 | `text-extraction.test.ts` | 8 | Infrastructure | Infrastructure (extraction) |
 | 5 | `upload-use-cases.test.ts` | 16 | Use case orchestration | Application |
-| 6 | `vercel-blob-storage.test.ts` | 3 | Infrastructure | Infrastructure (storage) |
+| 6 | `interview-runtime.test.ts` | 49 | Interview rubric + evidence persistence | Application + Infrastructure |
 
-**Total: 6 files, 65 test cases, all passing.**
+**Total: 6 files, 101 test cases, all passing.**
 
 ---
 
@@ -117,12 +117,18 @@ Tests the complete CV upload pipeline with all dependencies mocked:
 - Bulk upload: parsing job tracking, success/failure counting
 - `ValidationError` class behavior
 
-#### Vercel Blob Storage Tests (3 tests)
-Tests `VercelBlobStorageService` with mocked `@vercel/blob`:
+#### Vercel Blob Storage Tests (removed)
+The original `vercel-blob-storage.test.ts` suite was deleted alongside the Vercel Blob dependency when the project consolidated on Supabase Storage. Storage is thin, I/O-dominated, and covered indirectly through the upload use-case tests.
 
-- File upload via `put()`
-- File deletion via `del()`
-- URL return format
+#### Interview Runtime Tests (49 tests)
+Tests the AI Interviewer integration layer that proxies to the FastAPI backend:
+
+- Session creation persists the correct `assessment_mode = INTERVIEW`
+- Turn submission increments `turn_count` and appends to the `evidence` array inside `evaluation_rationale`
+- Rubric-derived scores are validated against the Zod schema before persistence
+- Empty-evidence FAIL verdicts are auto-reverted to PASS (mirrors the Python `evaluator.py` guardrail)
+- `max_tokens=500` cap is honoured in prompts
+- Completion endpoint finalizes the assessment status to `SCORED`
 
 ---
 
@@ -169,7 +175,7 @@ The Onion Architecture enables clean testing through **port-based mocking**. Eve
 | `createMockDedup()` | `DeduplicationService` port | upload-use-cases |
 | `vi.mock("unpdf")` | External library | text-extraction |
 | `vi.mock("mammoth")` | External library | text-extraction |
-| `vi.mock("@vercel/blob")` | External library | vercel-blob-storage |
+| `vi.mock("@supabase/supabase-js")` / `vi.mock("@/server/infrastructure/database/supabase-client")` | Supabase client | interview-runtime |
 
 **Pattern:** `vi.fn()` with manual return values — no mocking library (e.g., no `msw`, no `nock`).
 
@@ -204,7 +210,8 @@ Each test file is **self-contained** — no shared test utilities, no global fix
 | Matching engine | **Medium** | Core business logic; formula-based |
 | Schema validation | **High** | Data integrity at system boundary (AI → application) |
 | Text extraction | **Medium** | Integration point; parser behavior with edge cases |
-| Blob storage | **Low** | Thin wrapper; verifies API contract |
+| Interview runtime | **High** | Rubric enforcement + evidence persistence on every turn |
+| Storage | **Low** | Thin wrapper; verified indirectly through upload use-case tests |
 
 ### Not Tested (with Justification)
 
@@ -212,12 +219,12 @@ Each test file is **self-contained** — no shared test utilities, no global fix
 |------|--------|
 | React components | Environment is `node` (no jsdom); would need component testing setup |
 | API route handlers | Thin delegation layer; routes call use cases only, minimal logic |
-| Database repositories | Would require test database or in-memory DB (Prisma limitation) |
+| Database repositories | Would require a dedicated Supabase test project or in-memory PG stub; deferred |
 | Email sending | External service (Resend); would require integration test environment |
 | Job scraping | External dependency (adidas careers portal); fragile to changes |
 | Notification system | Follows CRUD pattern; lower risk than algorithmic code |
 | Export functionality | Simple transformation; CSV generation is straightforward |
-| Authentication | Demo application — no real auth flow to test |
+| Authentication | Supabase Auth + middleware enforcement; covered manually plus the role-based access patterns are one-line checks |
 
 ### Testing Priority Rationale
 
@@ -246,10 +253,10 @@ The testing strategy prioritizes the **CV upload pipeline** because it is:
 ✓ tests/matching.test.ts (4 tests)
 ✓ tests/text-extraction.test.ts (8 tests)
 ✓ tests/upload-use-cases.test.ts (16 tests)
-✓ tests/vercel-blob-storage.test.ts (3 tests)
+✓ tests/interview-runtime.test.ts (49 tests)
 
 Test Files  6 passed (6)
-Tests       55 passed (55)
+Tests       101 passed (101)
 ```
 
 ---
@@ -263,4 +270,4 @@ Tests       55 passed (55)
 | E2E Testing | Playwright | Full user flows (upload, apply, assess) |
 | Visual Regression | Playwright + snapshots | UI consistency |
 | Load Testing | k6 or Artillery | API endpoint performance |
-| Database Integration | Prisma + test containers | Repository layer |
+| Database Integration | Supabase test project + `pg-mem` stubs | Repository layer |

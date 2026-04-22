@@ -18,24 +18,25 @@
 | Custom config | Minimal — `vercel.json` contains only `$schema` reference |
 | `next.config.ts` | Empty — no custom headers, rewrites, or redirects |
 
-### 9.1.2 Database: Neon PostgreSQL
+### 9.1.2 Database & Platform: Supabase
 
 | Aspect | Details |
 |--------|---------|
-| Provider | Neon Serverless PostgreSQL |
-| Connection | `DATABASE_URL` environment variable (Prisma) |
-| Pooling | Neon built-in connection pooling |
-| Dev mode | Prisma Client singleton pattern prevents connection exhaustion during hot reload |
-| Logging | Verbose (`["query", "error", "warn"]`) in development; error-only in production |
+| Provider | Supabase (PostgreSQL + Auth + Storage) |
+| Connection | `SUPABASE_URL` + `SUPABASE_ANON_KEY` (client) + `SUPABASE_SERVICE_ROLE_KEY` (server privileged) |
+| SDK | `@supabase/supabase-js` + `@supabase/ssr` for cookie-aware Next.js sessions |
+| Migrations | Plain SQL under `supabase/migrations/` |
+| Row-Level Security | Enabled on candidate-owned tables; policies reference `auth.uid()` |
+| Logging | Supabase dashboard (query logs, auth logs) |
 
 ### 9.1.3 Storage: Dual-Mode Architecture
 
 | Mode | Service | Trigger | File Access |
 |------|---------|---------|-------------|
-| Production | `VercelBlobStorageService` | `BLOB_READ_WRITE_TOKEN` present | Public URLs (Vercel Blob CDN) |
-| Development | `LocalStorageService` | Token absent | `public/uploads/` via dev server |
+| Production | `SupabaseStorageService` | `SUPABASE_SERVICE_ROLE_KEY` present | Signed / public URLs from Supabase Storage buckets |
+| Development | `LocalStorageService` | Key absent | `public/uploads/` via dev server |
 
-Selection is automatic in the composition root (`container.ts`).
+Selection is automatic in the composition root (`container.ts`). The previous Vercel Blob backend (and its dependency) was removed during the Supabase consolidation.
 
 ---
 
@@ -45,49 +46,64 @@ All secrets are managed externally via the Vercel dashboard — **no `.env` file
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection string (Neon) | **Yes** |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (exposed to client) | **Yes** |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (exposed to client, RLS-gated) | **Yes** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key (server only — bypasses RLS, sets `app_metadata.role`) | **Yes** in production |
 | `GROQ_API_KEY` | Primary LLM provider (Groq — Llama 3.3 70B, free tier) | **Yes** |
-| `OPENAI_API_KEY` | Fallback LLM provider (GPT-4o-mini, paid) | No (graceful degradation) |
+| `OPENAI_API_KEY` | Fallback LLM + interview scoring (GPT-4o / GPT-4o-mini) | **Yes** for interview mode |
 | `RESEND_API_KEY` | Transactional email delivery | No (emails fail silently) |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage for CV uploads | No (falls back to local storage) |
-| `NEXT_PUBLIC_APP_URL` | Public app URL for magic link generation | No (defaults to `http://localhost:3000`) |
+| `INTERVIEW_BACKEND_URL` | URL of the FastAPI AI Interviewer backend | **Yes** for interview mode |
+| `NEXT_PUBLIC_APP_URL` | Public app URL for magic link + OAuth callback | No (defaults to `http://localhost:3000`) |
 | `NODE_ENV` | Runtime environment | Automatic (Vercel sets to `production`) |
 
-**Note:** No `.env.example` file exists. New developers must discover required variables from source code inspection.
+**Note:** Secrets are managed via the Vercel dashboard for the Next.js app and the Supabase dashboard for RLS / auth provider configuration. No `.env` files are committed.
 
 ---
 
 ## 9.3 Authentication & Authorization
 
-### Current State: Demo/Prototype Mode
-
-This is a deliberate design decision for the academic prototype phase.
+### Identity Provider: Supabase Auth + Google OAuth
 
 | Mechanism | Implementation |
 |-----------|---------------|
-| User identity | None — no login, no sessions, no JWT |
-| Role system | Client-side `RoleProvider` stores `"candidate"` or `"hr"` in `localStorage` key `ti_platform_role` |
-| Server enforcement | **None** — API routes have no auth checks |
-| Demo user | `GET /api/me` auto-creates a demo candidate profile if none exists |
-| Middleware | **None** — no `middleware.ts` file exists |
-| Session management | **None** — no cookies, tokens, or session storage |
+| User identity | Supabase Auth — Google OAuth as the only configured identity provider |
+| Session management | Cookie-based via `@supabase/ssr`; sessions are refreshed by `middleware.ts` on each request |
+| Role storage | `auth.users.app_metadata.role` — either `"hr"` or `"candidate"` |
+| Role assignment | Server-side only, using the service-role key (users cannot change their own role via `auth.updateUser()` because that only touches `user_metadata`) |
+| Client role context | `RoleProvider` reads `user.app_metadata.role` and exposes `role`, `clearRole`, `isLoading`, `userEmail`, `userName` |
 
-**Code comment:** The role provider explicitly states: *"Will be replaced by proper RBAC auth later."*
+### Middleware-Level Enforcement (`middleware.ts`)
 
-### Magic Link Assessment (Partial Implementation)
+```typescript
+const PUBLIC_API_PREFIXES = ["/api/auth/"];
+const HR_ONLY_API_PREFIXES = [
+  "/api/candidates/rescore",
+  "/api/candidates/rerank",
+  "/api/scoring/",
+  "/api/export/",
+  "/api/notifications/campaigns",
+  "/api/jobs/sync",
+  "/api/upload/bulk",
+  "/api/analytics",
+];
+```
 
-The assessment system uses token-based access:
+Rules applied on every request:
 
-1. **Token generation:** `POST /api/assessments` creates a CUID token stored in the database
-2. **Token URL:** `/assess/[token]` — publicly accessible assessment page
-3. **Token validation:** Page exists at `src/app/assess/[token]/page.tsx` but contains TODO placeholders for token validation, expiry checking, and assessment loading
+1. **Session refresh** — `@supabase/ssr` refreshes the access token and rewrites cookies.
+2. **`/dashboard/**`** — unauthenticated requests redirect to `/`.
+3. **`/api/**` (outside `PUBLIC_API_PREFIXES`)** — unauthenticated requests return `401`.
+4. **`HR_ONLY_API_PREFIXES`** — authenticated non-HR requests return `403`.
 
-### Why No Auth (Justification)
+Route handlers do not reimplement these checks (the skill-verification route double-checks for defense-in-depth).
 
-- **Academic project scope:** Focus on AI/ML features and HR workflow design
-- **Faster iteration:** No auth complexity during prototype development
-- **Demo accessibility:** Evaluators can test all features without account creation
-- **Clear upgrade path:** Port architecture supports adding auth middleware without refactoring
+### Row-Level Security (Supabase)
+
+Candidate-owned tables (candidates, applications, notifications, assessments, skill verifications) have RLS policies keyed on `auth.uid()`, so a candidate can only read or update their own rows when using the anon key. Privileged server-side operations use the service-role key to bypass RLS deliberately.
+
+### Magic Link Assessment
+
+Assessments continue to be accessed by candidates through a magic token URL (`/assess/[token]`) — this is intentionally public (no auth) so candidates can complete the assessment without signing in to the Supabase-managed portal. Tokens are CUIDs stored in the database with explicit expiry timestamps.
 
 ---
 
@@ -195,33 +211,35 @@ Logging uses `console.error`/`console.log` with informal namespace prefixes:
 | Measure | Status | Details |
 |---------|--------|---------|
 | HTTPS enforcement | ✅ | Vercel platform default |
-| Input validation (Zod) | ✅ | All API routes validated |
+| Authentication | ✅ | Supabase Auth + Google OAuth |
+| Authorization / RBAC | ✅ | Middleware-level gating with `PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES`; `app_metadata.role` as source of truth |
+| Row-Level Security | ✅ | Enabled on candidate-owned tables in Supabase |
+| Route middleware | ✅ | `middleware.ts` handles session refresh + /dashboard + /api/* gating |
+| Input validation (Zod) | ✅ | All API routes validated; notes and applications recently added schemas |
 | `.strict()` on update schemas | ✅ | Mass-assignment prevention |
 | Cascade deletes | ✅ | Full data cleanup on entity removal |
 | Text sanitization (CVs) | ✅ | Unicode normalization for LLM input |
 | LLM output validation | ✅ | Zod schema enforcement on AI responses |
 | LLM rate limit handling | ✅ | Auto-failover with quota detection |
-| Secret management | ✅ | Environment variables only, no committed secrets |
+| Interview guardrails | ✅ | `evaluator.py` enforces evidence arrays, turn counts, token caps |
+| Secret management | ✅ | Env vars in Vercel + Supabase dashboards; no committed secrets |
 | React XSS baseline | ✅ | JSX escaping prevents most XSS vectors |
 
 ### Deliberately Omitted (with Rationale)
 
 | Measure | Status | Rationale |
 |---------|--------|-----------|
-| Authentication | ❌ | Academic prototype — demo accessibility prioritized |
-| Authorization / RBAC | ❌ | Depends on auth; deferred to production phase |
-| Route middleware | ❌ | No auth to enforce |
 | Security headers (CSP, HSTS, X-Frame) | ❌ | Vercel provides baseline; custom headers deferred |
-| API rate limiting | ❌ | Demo scope — no abuse vector without public deployment |
+| API rate limiting | ❌ | Prototype scope — add via Vercel Edge Config or Supabase before public launch |
 | CORS configuration | ❌ | Same-origin API calls only |
 | Structured logging | ❌ | Console logging sufficient for prototype monitoring |
-| Audit trail | ❌ | Would require auth system to be meaningful |
+| Audit trail | ❌ | Would need a dedicated `audit_log` table; deferred |
 
 ### Known Considerations
 
 | Item | Risk Level | Notes |
 |------|-----------|-------|
 | Email template HTML interpolation | Low | Candidate names inserted into email HTML without escaping — mitigated by data being admin-entered |
-| Public blob storage URLs | Low | Uploaded CVs are publicly accessible by URL — acceptable for demo, needs signed URLs for production |
+| Signed URL lifetime | Low | Supabase Storage public URLs live as long as the file; rotate via bucket policy if needed |
+| File upload validation | Medium | MIME/size checks exist in use-case layer; middleware does not duplicate them but routes are HR-only |
 | No `.env.example` | Low | Developer onboarding friction — easily remedied |
-| File upload validation | Medium | MIME/size checks exist in use-case layer but not at route level |

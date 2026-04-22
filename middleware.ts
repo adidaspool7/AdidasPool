@@ -6,10 +6,11 @@ import { NextResponse, type NextRequest } from "next/server";
  *
  * Responsibilities:
  * 1. Refresh the Supabase session on every request (keeps JWT alive).
- * 2. Protect /dashboard/* — redirect unauthenticated users to landing.
- * 3. Redirect authenticated users away from /auth/login to /dashboard.
- * 4. Redirect authenticated users without a role to /auth/select-role.
- * 5. Redirect / to /dashboard if authenticated.
+ * 2. Gate /api/* — unauthenticated 401, non-HR 403 on HR_ONLY_API_PREFIXES.
+ * 3. Protect /dashboard/* — redirect unauthenticated users to landing.
+ * 4. Redirect authenticated users away from /auth/login to /dashboard.
+ * 5. Redirect authenticated users without a role back to landing to pick one.
+ * 6. Redirect / to /dashboard if authenticated and already has a role.
  *
  * IMPORTANT: Every redirect copies cookies from supabaseResponse so that
  * token refreshes are not lost when the middleware returns a redirect
@@ -46,6 +47,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const role = user?.app_metadata?.role as "hr" | "candidate" | undefined;
 
   /** Helper: create a redirect that carries all Supabase session cookies */
   function redirect(url: URL) {
@@ -54,6 +56,44 @@ export async function middleware(request: NextRequest) {
       r.cookies.set(c.name, c.value);
     });
     return r;
+  }
+
+  /**
+   * 0. API protection — prototype-friendly: one guard for all /api/*.
+   *
+   * Rules:
+   *  - Everything under /api/* requires an authenticated session, except the
+   *    public allowlist below (auth callback, webhook-style endpoints, etc.).
+   *  - Paths in HR_ONLY_API_PREFIXES additionally require app_metadata.role === "hr".
+   *
+   * Keep auth logic here instead of duplicating it in every route handler —
+   * cheaper for a prototype and impossible to forget when adding new routes.
+   */
+  const PUBLIC_API_PREFIXES = [
+    "/api/auth/", // supabase callback, if any
+  ];
+  const HR_ONLY_API_PREFIXES = [
+    "/api/candidates/rescore",
+    "/api/candidates/rerank",
+    "/api/scoring/",
+    "/api/export/",
+    "/api/notifications/campaigns",
+    "/api/jobs/sync",
+    "/api/upload/bulk",
+    "/api/analytics",
+  ];
+
+  if (pathname.startsWith("/api/")) {
+    const isPublic = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+    if (!isPublic) {
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const isHrOnly = HR_ONLY_API_PREFIXES.some((p) => pathname.startsWith(p));
+      if (isHrOnly && role !== "hr") {
+        return NextResponse.json({ error: "Forbidden — HR only" }, { status: 403 });
+      }
+    }
   }
 
   // 1. Protect /dashboard — redirect to landing if not authenticated

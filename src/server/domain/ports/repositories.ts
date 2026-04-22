@@ -5,7 +5,7 @@
  * DEPENDENCIES: None.
  *
  * These interfaces define what the application layer needs from persistence.
- * Infrastructure layer provides concrete implementations (e.g., Prisma).
+ * Infrastructure layer provides concrete implementations (Supabase).
  * This is the Dependency Inversion Principle in action.
  */
 

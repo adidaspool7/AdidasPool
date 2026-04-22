@@ -13,9 +13,9 @@ The system follows the **Onion Architecture** (also called Clean Architecture or
 | Decision Factor | How Onion Addresses It |
 |----------------|----------------------|
 | Testability | Domain and Application layers have zero infrastructure dependencies — testable without mocks |
-| Swappability | Changing from PostgreSQL to MongoDB requires only new repository implementations; no business logic changes |
+| Swappability | The move from Prisma/Neon + Vercel Blob to Supabase (DB + Auth + Storage) required only new repository implementations; zero domain or use-case changes |
 | AI provider flexibility | Switching from Groq to OpenAI (or any future LLM) requires only a new `ICvParserService` implementation |
-| Framework independence | Domain knows nothing about Next.js, Prisma, or React |
+| Framework independence | Domain knows nothing about Next.js, Supabase, or React |
 | Enforced structure | Clear boundaries prevent "spaghetti code" as the project grows |
 
 ### Alternatives Considered
@@ -198,21 +198,23 @@ Implements domain ports using concrete technologies. The **only layer** aware of
 
 | Category | Implementation | Implements Port |
 |----------|---------------|----------------|
-| **Database** | `PrismaCandidateRepository` | `ICandidateRepository` |
-| | `PrismaJobRepository` | `IJobRepository` |
-| | `PrismaAssessmentRepository` | `IAssessmentRepository` |
-| | `PrismaDeduplicationRepository` | `IDeduplicationRepository` |
-| | `PrismaJobApplicationRepository` | `IJobApplicationRepository` |
-| | `PrismaNotificationRepository` | `INotificationRepository` |
-| | `PrismaParsingJobRepository` | `IParsingJobRepository` |
+| **Database** | `SupabaseCandidateRepository` | `ICandidateRepository` |
+| | `SupabaseJobRepository` | `IJobRepository` |
+| | `SupabaseAssessmentRepository` | `IAssessmentRepository` |
+| | `SupabaseDeduplicationRepository` | `IDeduplicationRepository` |
+| | `SupabaseApplicationRepository` | `IJobApplicationRepository` |
+| | `SupabaseNotificationRepository` | `INotificationRepository` |
+| | `SupabaseParsingJobRepository` | `IParsingJobRepository` |
+| | `SupabaseAnalyticsRepository` | `IAnalyticsRepository` |
+| | `SupabaseScoringWeightsRepository` + `SupabaseScoringPresetRepository` | scoring ports |
 | **AI** | `OpenAiCvParserService` | `ICvParserService` |
 | **Email** | `ResendEmailService` | `IEmailService` |
 | **Storage** | `LocalStorageService` | `IStorageService` |
-| | `VercelBlobStorageService` | `IStorageService` |
+| | `SupabaseStorageService` | `IStorageService` |
 | **Extraction** | `TextExtractionService` | `ITextExtractionService` |
 | **Scraping** | `AdidasJobScraperService` | `IJobScraperService` |
 
-Total: **13 concrete implementations** fulfilling **12 port interfaces** (storage has 2 implementations — conditional selection via environment variable).
+All database-backed implementations live under `src/server/infrastructure/database/` and use the shared `supabase-client.ts` helper.
 
 ### Layer 4: Presentation (API Routes + Pages) — `src/app/`
 
@@ -254,38 +256,41 @@ This is the **only file** in the entire project that imports concrete infrastruc
 
 ### Bindings
 
-**Repository Bindings (7):**
+**Repository Bindings:**
 
 | Export | Type | Implementation |
 |--------|------|----------------|
-| `candidateRepository` | `ICandidateRepository` | `PrismaCandidateRepository(prisma)` |
-| `jobRepository` | `IJobRepository` | `PrismaJobRepository(prisma)` |
-| `assessmentRepository` | `IAssessmentRepository` | `PrismaAssessmentRepository(prisma)` |
-| `deduplicationRepository` | `IDeduplicationRepository` | `PrismaDeduplicationRepository(prisma)` |
-| `jobApplicationRepository` | `IJobApplicationRepository` | `PrismaJobApplicationRepository(prisma)` |
-| `notificationRepository` | `INotificationRepository` | `PrismaNotificationRepository(prisma)` |
-| `parsingJobRepository` | `IParsingJobRepository` | `PrismaParsingJobRepository(prisma)` |
+| `candidateRepository` | `ICandidateRepository` | `SupabaseCandidateRepository()` |
+| `jobRepository` | `IJobRepository` | `SupabaseJobRepository()` |
+| `assessmentRepository` | `IAssessmentRepository` | `SupabaseAssessmentRepository()` |
+| `deduplicationRepository` | `IDeduplicationRepository` | `SupabaseDeduplicationRepository()` |
+| `jobApplicationRepository` | `IJobApplicationRepository` | `SupabaseApplicationRepository()` |
+| `notificationRepository` | `INotificationRepository` | `SupabaseNotificationRepository()` |
+| `parsingJobRepository` | `IParsingJobRepository` | `SupabaseParsingJobRepository()` |
+| `analyticsRepository` | `IAnalyticsRepository` | `SupabaseAnalyticsRepository()` |
+| `scoringWeightsRepository` | scoring ports | `SupabaseScoringWeightsRepository()` |
+| `scoringPresetRepository` | scoring ports | `SupabaseScoringPresetRepository()` |
 
-**Service Bindings (5):**
+**Service Bindings:**
 
 | Export | Type | Implementation | Notes |
 |--------|------|----------------|-------|
 | `cvParserService` | `ICvParserService` | `OpenAiCvParserService()` | Internally uses Groq or OpenAI |
 | `emailService` | `IEmailService` | `ResendEmailService()` | Lazy-loaded |
 | `jobScraperService` | `IJobScraperService` | `AdidasJobScraperService()` | Cheerio-based |
-| `storageService` | `IStorageService` | `VercelBlobStorageService()` or `LocalStorageService()` | **Conditional:** uses Vercel Blob if `BLOB_READ_WRITE_TOKEN` exists, otherwise local filesystem |
+| `storageService` | `IStorageService` | `SupabaseStorageService()` or `LocalStorageService()` | **Conditional:** uses Supabase Storage if `SUPABASE_SERVICE_ROLE_KEY` exists, otherwise local filesystem |
 | `textExtractionService` | `ITextExtractionService` | `TextExtractionService()` | unpdf + mammoth |
 
 ### Conditional Binding Pattern
 
 ```typescript
 export const storageService: IStorageService =
-  process.env.BLOB_READ_WRITE_TOKEN
-    ? new VercelBlobStorageService()
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? new SupabaseStorageService()
     : new LocalStorageService();
 ```
 
-This enables **zero-configuration development**: developers run `npm run dev` without cloud credentials. Files are stored in `public/uploads/`. Production deployments on Vercel automatically use cloud storage.
+This enables **zero-configuration development**: developers run `npm run dev` without cloud credentials. Files are stored in `public/uploads/`. Production deployments on Vercel use Supabase Storage.
 
 ---
 
@@ -293,15 +298,15 @@ This enables **zero-configuration development**: developers run `npm run dev` wi
 
 ### 4.4.1 Repository Pattern
 
-Every database table is accessed through a repository interface. The infrastructure layer provides Prisma implementations.
+Every database table is accessed through a repository interface. The infrastructure layer provides Supabase-backed implementations (`src/server/infrastructure/database/*.repository.ts`).
 
 **Benefits:**
-- Business logic is database-agnostic
+- Business logic is database-agnostic (the project migrated from Prisma/Neon to Supabase without touching a single use case)
 - Complex queries are encapsulated (e.g., multi-word search with AND-of-ORs)
 - Pagination logic is standardized across all repositories
 - Testing can substitute in-memory implementations
 
-**Example — Multi-word Search in `PrismaJobRepository`:**
+**Example — Multi-word Search in `SupabaseJobRepository`:**
 
 The `findMany` method supports search across title, location, and department with AND semantics for multiple words:
 
@@ -311,7 +316,7 @@ Search: "Berlin Marketing"
 → Each word checked against title OR location OR department (case-insensitive)
 ```
 
-This is implemented as nested Prisma `AND` + `OR` queries.
+This is implemented as a chained `.or(...)` filter composition against the Supabase query builder.
 
 ### 4.4.2 Use Case Pattern
 
@@ -353,8 +358,8 @@ The storage implementation is selected at startup based on environment:
 
 | Environment | Strategy | Behavior |
 |-------------|----------|----------|
-| Development (no token) | `LocalStorageService` | Writes to `public/uploads/` |
-| Production (with token) | `VercelBlobStorageService` | Uploads to Vercel Blob CDN |
+| Development (no service-role key) | `LocalStorageService` | Writes to `public/uploads/` |
+| Production (with `SUPABASE_SERVICE_ROLE_KEY`) | `SupabaseStorageService` | Uploads to a Supabase Storage bucket |
 
 Both implement `IStorageService` with identical `uploadFile(file, path)` and `deleteFile(url)` signatures.
 

@@ -8,13 +8,23 @@
 
 | Attribute | Detail |
 |-----------|--------|
-| Engine | PostgreSQL 17.2 (local) / Neon Serverless (production) |
-| ORM | Prisma 6.19.2 |
-| Schema File | `prisma/schema.prisma` |
-| Models | 21 |
+| Engine | PostgreSQL (managed by Supabase) |
+| Access Layer | `@supabase/supabase-js` + `@supabase/ssr` (no ORM) |
+| Migrations | Plain SQL under `supabase/migrations/` (currently 4 files) |
+| Tables | 23 application tables + Supabase's `auth.users` |
 | Enums | 15 |
-| ID Strategy | CUID (`@default(cuid())`) |
-| Timestamps | `createdAt` (auto), `updatedAt` (auto via `@updatedAt`) |
+| ID Strategy | `uuid` generated via `gen_random_uuid()` (Postgres pgcrypto) for new tables; legacy CUIDs retained where introduced during the Prisma phase |
+| Timestamps | `created_at` and `updated_at` (trigger-managed) |
+| Row-Level Security | Enabled on candidate-owned tables; policies allow the candidate to read/update their own rows |
+
+### Migration Files (`supabase/migrations/`)
+
+| File | Purpose |
+|------|---------|
+| `20260413000000_initial_schema.sql` | Tables migrated off the original Prisma schema |
+| `20260414000000_add_interview_mode.sql` | `assessment_mode`, `evaluation_rationale` JSONB, interview fields |
+| `20260415000000_add_skill_verification.sql` | `skill_verifications` table + per-skill outcomes |
+| `20260419000000_add_activation_and_invitation.sql` | Candidate activation flow and HR invitation tracking |
 
 ### Why Relational?
 
@@ -26,13 +36,16 @@ The domain is inherently relational:
 
 Document databases (MongoDB) would require denormalization, manual joins, and sacrifice referential integrity.
 
-### Why CUIDs over UUIDs?
+### Why UUIDs?
 
-CUIDs are chosen as primary keys:
-- **Sortable** — CUIDs are roughly time-ordered (unlike UUIDv4)
-- **Collision-resistant** — Safe for distributed generation
-- **URL-friendly** — Shorter than UUIDs, safe in URLs
-- **No sequential exposure** — Unlike auto-increment, CUIDs don't reveal record counts
+New tables use Postgres-native `uuid` values generated via `gen_random_uuid()`:
+
+- **Supabase-friendly** — aligns with the convention used by `auth.users.id` and RLS policies that reference `auth.uid()`
+- **Standard** — RFC 4122 UUIDs, no external library dependency
+- **Collision-resistant** — safe for distributed generation
+- **URL-friendly** — acceptable length, safe in URLs
+
+Legacy tables introduced during the Prisma phase retain CUIDs; mixed ID schemes are tolerated because the types are opaque strings at the application boundary.
 
 ---
 
@@ -395,16 +408,18 @@ All child records cascade-delete when their parent is removed:
 
 ## 5.6 Migration History
 
-The database schema evolved through iterative `prisma db push` and `prisma migrate dev` operations. Key migrations:
+The database schema was originally iterated via `prisma db push` / `prisma migrate dev`, then consolidated into plain SQL migrations when the project migrated to Supabase. The canonical migration log now lives under `supabase/migrations/`.
 
-| Migration | Models Affected | Change |
-|-----------|----------------|--------|
-| Initial schema | 12 models | Core entities: Candidate, Job, Assessment, etc. |
-| Internship support | Job | Added `type`, `startDate`, `endDate`, `stipend`, `mentorName`, `mentorEmail`, `isErasmus`, `internshipStatus` |
-| Applications | JobApplication | New model for candidate-to-job applications |
-| Notifications v2 | Notification, NotificationPreference, PromoCampaign | Full notification system with preferences and campaigns |
-| Fields of work | NotificationPreference | Added `fieldFilters` array field |
-| Parsing pipeline | ParsingJob | Bulk upload tracking with progress and error log |
+| Migration File | Tables / Columns Affected | Change |
+|----------------|---------------------------|--------|
+| `20260413000000_initial_schema.sql` | 20+ tables | Full schema ported from the Prisma-era models: candidates, jobs, assessments, applications, notifications, parsing jobs, scoring weights/presets, and supporting tables |
+| `20260414000000_add_interview_mode.sql` | `assessments` | Added dual assessment mode (`WRITTEN` / `INTERVIEW`), `evaluation_rationale` JSONB, and interview-specific fields |
+| `20260415000000_add_skill_verification.sql` | `skill_verifications` | New table capturing per-skill verification outcomes with AI-generated rationale |
+| `20260419000000_add_activation_and_invitation.sql` | `candidates`, invitation tables | Candidate activation flow + HR invitation tracking |
+
+### RLS Policies
+
+Candidate-owned tables (candidates, applications, notifications, assessments, skill verifications) have Row-Level Security enabled with policies keyed on `auth.uid()`. HR users bypass RLS via the service-role key used server-side for privileged operations.
 
 ---
 

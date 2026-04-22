@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { candidateRepository } from "@server/container";
 import { calculateCvScore } from "@server/domain/services/scoring.service";
+import db from "@server/infrastructure/database/supabase-client";
 
 /**
  * POST /api/candidates/rescore
  *
  * Re-calculates scores for all candidates using the current scoring formula.
  * Used after updating scoring logic (e.g. distance-based location).
+ *
+ * Performance: a single upsert batches all score updates into one round-trip
+ * (previously one UPDATE per candidate — see What-to-check-improve.md §3B).
  */
 export async function POST() {
   try {
     const candidates = await candidateRepository.findForRescore();
-    let updated = 0;
 
-    for (const c of candidates) {
+    const rows = candidates.map((c: any) => {
       const highestEdu = getHighestEducationLevel(
         c.education.map((e: { level: string | null }) => e.level)
       );
@@ -29,17 +32,24 @@ export async function POST() {
         })),
       });
 
-      await candidateRepository.update(c.id, {
-        overallCvScore: scoring.overallScore,
-        experienceScore: scoring.experienceScore,
-        educationScore: scoring.educationScore,
-        locationScore: scoring.locationScore,
-        languageScore: scoring.languageScore,
-      });
-      updated++;
+      return {
+        id: c.id,
+        overall_cv_score: scoring.overallScore,
+        experience_score: scoring.experienceScore,
+        education_score: scoring.educationScore,
+        location_score: scoring.locationScore,
+        language_score: scoring.languageScore,
+      };
+    });
+
+    if (rows.length > 0) {
+      const { error } = await db
+        .from("candidates")
+        .upsert(rows, { onConflict: "id" });
+      if (error) throw error;
     }
 
-    return NextResponse.json({ updated });
+    return NextResponse.json({ updated: rows.length });
   } catch (error) {
     console.error("[Rescore]", error);
     return NextResponse.json(

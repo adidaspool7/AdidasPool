@@ -8,19 +8,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { applicationUseCases } from "@server/application";
+
+const ApplySchema = z.object({
+  jobId: z.string().uuid(),
+  candidateId: z.string().uuid(),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { jobId, candidateId } = body;
-
-    if (!jobId || !candidateId) {
+    const parsed = ApplySchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "jobId and candidateId are required" },
+        { error: "Validation failed", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+    const { jobId, candidateId } = parsed.data;
 
     const result = await applicationUseCases.applyToJob(jobId, candidateId);
 

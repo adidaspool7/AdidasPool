@@ -84,7 +84,7 @@ export class UploadUseCases {
     // 1. Validate
     this.validateFile(file);
 
-    // 2. Upload original to Vercel Blob
+    // 2. Upload original to storage (Supabase Storage in prod, local in dev)
     const { url: rawCvUrl } = await this.storageService.uploadFile(
       file,
       `cvs/candidates/${Date.now()}-${file.name}`

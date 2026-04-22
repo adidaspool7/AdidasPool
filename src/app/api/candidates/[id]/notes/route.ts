@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { candidateUseCases, ValidationError } from "@server/application";
+
+const NoteSchema = z.object({
+  author: z.string().trim().min(1).max(200),
+  content: z.string().trim().min(1).max(5000),
+});
 
 /**
  * POST /api/candidates/[id]/notes
@@ -13,7 +19,14 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { author, content } = await request.json();
+    const parsed = NoteSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const { author, content } = parsed.data;
 
     const note = await candidateUseCases.addNote(id, author, content);
     return NextResponse.json(note, { status: 201 });

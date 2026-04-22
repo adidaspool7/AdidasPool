@@ -60,11 +60,15 @@ export async function GET(request: NextRequest) {
       const campaignIds = [...new Set(notifications.filter((n: any) => n.campaignId).map((n: any) => n.campaignId))];
       const pinnedSet = new Set<string>();
       const archivedSet = new Set<string>();
-      for (const cid of campaignIds) {
-        const campaign = await notificationUseCases.getCampaign(cid as string);
+      // Parallel fetch instead of sequential await loop (prototype-friendly N+1 fix)
+      const campaigns = await Promise.all(
+        campaignIds.map((cid) => notificationUseCases.getCampaign(cid as string))
+      );
+      campaignIds.forEach((cid, i) => {
+        const campaign = campaigns[i];
         if (campaign?.isPinned) pinnedSet.add(cid as string);
         if (campaign?.status === "ARCHIVED") archivedSet.add(cid as string);
-      }
+      });
       // Filter out notifications from archived campaigns
       const visible = notifications.filter((n: any) => !n.campaignId || !archivedSet.has(n.campaignId));
       const enriched = visible.map((n: any) => ({

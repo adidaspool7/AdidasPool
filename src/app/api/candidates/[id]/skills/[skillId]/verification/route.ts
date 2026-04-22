@@ -33,7 +33,7 @@ export async function PATCH(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if ((user.app_metadata?.role ?? user.user_metadata?.role) !== "hr") {
+    if (user.app_metadata?.role !== "hr") {
       return NextResponse.json({ error: "Forbidden — HR only" }, { status: 403 });
     }
 

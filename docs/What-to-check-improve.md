@@ -1,5 +1,8 @@
 # Codebase Audit — What to Check & Improve
 
+> Last updated: 2026-04-22 — prototype-friendly security pass + cleanup applied.
+> Remaining items are tracked below; completed items are struck through.
+
 ## 1. DEAD CODE
 
 ### 1A. Dead Pages & Routes
@@ -34,15 +37,16 @@
 
 ### TO-DO
 
-- [ ] Delete `src/app/auth/select-role/` directory
-- [ ] Delete `src/app/api/me/role/` directory
-- [ ] Delete `src/server/infrastructure/storage/vercel-blob-storage.service.ts`
-- [ ] Delete `src/server/infrastructure/database/prisma-client.ts`
-- [ ] Remove `setRole` from `RoleProvider` (keep only `role`, `clearRole`, `isLoading`, `userEmail`, `userName`)
-- [ ] Remove `sleep()` from `utils.ts`
-- [ ] Remove `@vercel/blob`, `bullmq`, `ioredis` from `package.json`
-- [ ] Update sidebar to push to `/` instead of `/auth/login`
-- [ ] Update auth error page link from `/auth/login` to `/`
+- [x] Delete `src/app/auth/select-role/` directory
+- [x] Delete `src/app/api/me/role/` directory
+- [x] Delete `src/server/infrastructure/storage/vercel-blob-storage.service.ts` (+ its test)
+- [x] Delete `src/server/infrastructure/database/prisma-client.ts`
+- [x] Remove `setRole` from `RoleProvider` (only `role`, `clearRole`, `isLoading`, `userEmail`, `userName` remain)
+- [x] Remove `sleep()` from `utils.ts`
+- [x] Remove `@vercel/blob`, `bullmq`, `ioredis` from `package.json`
+- [x] Update sidebar to push to `/` instead of `/auth/login`
+- [x] Update auth error page link from `/auth/login` to `/`
+- [ ] Remove `node_modules` + reinstall so lockfile drops the 3 deleted deps (run `rm -rf node_modules; npm install`)
 
 ---
 
@@ -109,11 +113,13 @@ The middleware only protects `/dashboard/*` paths. **API routes under `/api/*` a
 
 ### TO-DO
 
-- [ ] **CRITICAL**: Add auth middleware or explicit `getUser()` checks to ALL `/api/*` routes
-- [ ] **CRITICAL**: Add role-based access control (HR-only for admin routes like rescore, export, campaigns)
-- [ ] Remove `user_metadata` fallback from verification route and role-provider
-- [ ] Add Zod validation to notes, applications, and campaign send routes
+- [x] **CRITICAL**: Add auth middleware or explicit `getUser()` checks to ALL `/api/*` routes — centralised in [middleware.ts](middleware.ts) (401 for unauthenticated `/api/*` except `PUBLIC_API_PREFIXES`)
+- [x] **CRITICAL**: Add role-based access control (HR-only for admin routes like rescore, export, campaigns) — `HR_ONLY_API_PREFIXES` in middleware returns 403 for non-HR
+- [x] Remove `user_metadata` fallback from verification route and role-provider
+- [x] Add Zod validation to notes + applications routes (campaign-send still open)
+- [ ] Add Zod validation to `/api/notifications/campaigns/[id]/send` (`sentBy` allows arbitrary string)
 - [ ] Update `CLAUDE.md` L84-85 and `INSTRUCTIONS.md` L91 to reference `app_metadata.role`
+- [ ] Remove legacy `user_metadata.role` migration block in [auth/callback/route.ts](src/app/auth/callback/route.ts) once all live users have `app_metadata.role` set
 
 ---
 
@@ -174,24 +180,25 @@ The middleware only protects `/dashboard/*` paths. **API routes under `/api/*` a
 ### TO-DO
 
 - [ ] Type repository ports with proper interfaces instead of `any`
-- [ ] Batch rescore and notification queries to avoid N+1
+- [x] Batch rescore query (single `upsert` call, no more per-row UPDATE loop)
+- [x] Parallelise campaign enrichment in `/api/notifications` (`Promise.all` instead of sequential `await` loop)
 - [ ] Standardize error handling pattern across all API routes
 - [ ] Move interview routes through use-case layer
 - [ ] Move scoring routes through use-case layer
 - [ ] Replace `localhost:3000` fallback with a proper env var check
-- [ ] Update all stale Prisma/Vercel Blob comments
+- [x] Update all stale Prisma/Vercel Blob comments in source (historical `REPLACES:` headers kept intentionally)
 
 ---
 
 ## Priority Summary
 
-| Priority | Category | Action |
-|----------|----------|--------|
-| 🔴 CRITICAL | Security | Add auth to all `/api/*` routes |
-| 🔴 CRITICAL | Security | Add role-based access (HR-only for admin routes) |
-| 🟠 HIGH | Dead Code | Delete dead pages, files, and npm packages |
-| 🟠 HIGH | Security | Update docs to reference `app_metadata.role` |
-| 🟡 MEDIUM | Security | Remove `user_metadata` fallbacks |
-| 🟡 MEDIUM | Performance | Fix N+1 queries |
-| 🟢 LOW | Code Quality | Replace `any` types with proper interfaces |
-| 🟢 LOW | Code Quality | Clean up stale comments |
+| Priority | Category | Action | Status |
+|----------|----------|--------|--------|
+| 🔴 CRITICAL | Security | Add auth to all `/api/*` routes | ✅ Done (middleware) |
+| 🔴 CRITICAL | Security | Add role-based access (HR-only for admin routes) | ✅ Done (middleware) |
+| 🟠 HIGH | Dead Code | Delete dead pages, files, and npm packages | ✅ Done |
+| 🟠 HIGH | Security | Update docs to reference `app_metadata.role` | ⏳ Pending (docs only) |
+| 🟡 MEDIUM | Security | Remove `user_metadata` fallbacks | ✅ Done |
+| 🟡 MEDIUM | Performance | Fix N+1 queries | ✅ Done |
+| 🟢 LOW | Code Quality | Replace `any` types with proper interfaces | ⏳ Pending |
+| 🟢 LOW | Code Quality | Clean up stale comments | ✅ Done |

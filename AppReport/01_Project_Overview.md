@@ -73,36 +73,41 @@ These principles were established at the start and guided every technical and de
 |-------|-----------|--------|
 | Month 1 | Foundation — Schema design, CV upload/storage, parsing pipeline, structured extraction | ✅ Complete |
 | Month 2 | Intelligence Layer — Scoring engine, matching engine, job scraper, filtering dashboard | ✅ Complete |
-| Month 3 | Assessment & Communication — Assessment framework, notification system, internship management | ✅ Partially complete |
-| Month 4 | Finalization — Improvement tracks, analytics, demo dataset, documentation | 🔜 In progress |
+| Month 3 | Assessment & Communication — Assessment framework, notification system, internship management | ✅ Complete |
+| Month 4 | AI Interviewer, Skill Verification, CEFR scoring, Analytics dashboard, Supabase migration | ✅ Complete |
+| Month 5 | Hardening & Documentation — Auth/RBAC, dead-code cleanup, improvement tracks, demo dataset | 🔄 In progress |
 
 ---
 
-## 1.6 Current Platform State (March 2026)
+## 1.6 Current Platform State (April 2026)
 
 ### By the Numbers
 
 | Metric | Value |
 |--------|-------|
-| Database models | 21 (Prisma schema) |
-| Database enums | 15 |
-| API endpoints | 40+ HTTP handlers across 32 route files |
-| Dashboard pages | 14 pages + layouts |
+| Database tables | 23 (Supabase / PostgreSQL) |
+| SQL migrations | 4 (under `supabase/migrations/`) |
+| API endpoints | 40+ HTTP handlers across the `src/app/api/` tree |
+| Dashboard pages | 15+ pages + layouts |
 | UI components | 20+ shadcn/ui components |
-| Test cases | 65 passing (6 test files) |
+| Test cases | 101 passing (6 Vitest test files) |
 | Scraped job openings | 1,019 (from adidas careers portal) |
 | Fields of work extracted | 16 consolidated departments |
-| Lines of backend code | ~5,000+ across domain/application/infrastructure |
-| Production deployment | Vercel (live) with Neon PostgreSQL |
+| Lines of backend code | ~6,500+ across domain/application/infrastructure |
+| Production deployment | Vercel (serverless) + Supabase (DB, Auth, Storage) |
+| AI Interviewer backend | FastAPI (Python) sidecar for real-time CEFR interviews |
 
 ### Architecture
 
 - **Pattern**: Onion Architecture (Clean Architecture / Ports & Adapters)
-- **Backend**: Next.js 16 API Routes → Application Use Cases → Domain Services → Infrastructure
-- **Frontend**: React 19 with shadcn/ui component library
-- **Database**: PostgreSQL via Prisma 6 ORM
-- **AI**: Groq (Llama 3.3 70B) primary / OpenAI GPT-4o fallback for CV parsing
-- **Deployment**: Vercel with serverless functions + Neon PostgreSQL
+- **Backend**: Next.js 16 API Routes → Application Use Cases → Domain Services → Infrastructure (Supabase)
+- **Frontend**: React 19 + shadcn/ui + Recharts analytics
+- **Database**: PostgreSQL managed by Supabase (migrations via `supabase/migrations/`, RLS enabled)
+- **Authentication**: Supabase Auth with Google OAuth; role stored in `app_metadata.role` (`hr` / `candidate`)
+- **Storage**: Supabase Storage (production) / Local filesystem (development fallback)
+- **AI**: Groq (Llama 3.3 70B) primary / OpenAI GPT-4o fallback for CV parsing; OpenAI Whisper + GPT-4o mini for real-time interview evaluation
+- **Async processing**: Next.js `after()` primitive for bulk CV parsing (no external queue)
+- **Deployment**: Vercel (Next.js) + Supabase (DB/Auth/Storage) + separately hosted FastAPI interview backend
 
 ---
 
@@ -111,23 +116,26 @@ These principles were established at the start and guided every technical and de
 The platform serves two distinct user types through a role-based interface:
 
 ### HR Manager
-- Upload and manage bulk CVs
-- Create and configure job openings
+- Upload and manage bulk CVs (sync + async pipeline via Next.js `after()`)
+- Create and configure job openings with language/experience/education criteria
 - Sync jobs from the adidas careers portal
-- Review and filter candidates
-- Send assessments via magic links
-- Manage internship programs (including Erasmus)
-- Create and send promotional campaigns/announcements
+- Review, filter, rescore, and rerank candidates (custom scoring weights + presets)
+- Send language assessments via magic links (written mode) **or** invite to a real-time AI Interviewer (voice mode)
+- Verify individual CV skills through short AI-driven skill checks
+- Manage internship programs (including Erasmus + activation flow)
+- Create and send promotional campaigns/announcements (TipTap rich text)
+- View analytics dashboard (funnel, pipeline, top skills/languages, application trends)
 - Export candidate data (CSV)
 
 ### Candidate
-- Upload personal CV with AI-powered parsing
-- Review and edit extracted data before saving
-- Browse job openings and internships
+- Sign in via Google OAuth (Supabase Auth)
+- Upload personal CV with AI-powered parsing + inline review of extracted data
+- Browse job openings and internships (multi-word AND-of-ORs search)
 - Apply to positions with one click
 - Upload motivation letters and learning agreements
-- Take language assessments (magic link, no login required)
-- Receive targeted notifications
+- Take language assessments — written (magic link) or real-time AI interview (dual mode)
+- Complete on-demand skill verification when prompted by HR
+- Receive targeted notifications (per-field, per-country, opt-out supported)
 - Configure notification preferences
 
 ---

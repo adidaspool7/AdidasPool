@@ -19,15 +19,18 @@ The client (multinational company operating in 50+ countries) presented the foll
 | FR-03 | Deterministic candidate scoring (no black-box) | Must-have | ✅ Implemented |
 | FR-04 | Job opening configuration with language/experience requirements | Must-have | ✅ Implemented |
 | FR-05 | Automated candidate-to-job matching engine | Must-have | ✅ Implemented |
-| FR-06 | CEFR-based language assessment framework | Must-have | ⚠️ Framework built, execution flow partial |
+| FR-06 | CEFR-based language assessment framework | Must-have | ✅ Implemented (written mode + real-time AI interview mode) |
 | FR-07 | Deduplication of candidate records | Must-have | ✅ Implemented |
 | FR-08 | CSV/PDF export of candidate data | Should-have | ✅ CSV complete, PDF planned |
 | FR-09 | HR notification system for pipeline events | Should-have | ✅ Implemented (full system) |
 | FR-10 | Borderline candidate identification | Should-have | ✅ Algorithm implemented |
 | FR-11 | Structured improvement tracks for borderline candidates | Could-have | ❌ Placeholder only |
-| FR-12 | Analytics dashboard with recruitment metrics | Could-have | ❌ Placeholder (Recharts installed) |
+| FR-12 | Analytics dashboard with recruitment metrics | Could-have | ✅ Implemented (Recharts: funnel, pipeline, top skills/languages, trends) |
 | FR-13 | Bias detection and fairness module | Could-have | ❌ Not started |
 | FR-14 | Internal mobility matching for existing employees | Won't-have (v1) | ❌ Deferred |
+| FR-15 | Real-time voice AI interviewer (CEFR evaluation) | Emerged | ✅ Implemented (FastAPI backend, Whisper + GPT-4o mini) |
+| FR-16 | Per-skill verification (on-demand skill checks) | Emerged | ✅ Implemented |
+| FR-17 | Authentication & role-based access control | Emerged | ✅ Supabase Auth + Google OAuth + middleware-level RBAC |
 
 ### Non-Functional Requirements
 
@@ -36,8 +39,8 @@ The client (multinational company operating in 50+ countries) presented the foll
 | NFR-01 | Transparency of all scoring decisions | Deterministic formulas with per-component breakdowns; weights defined as domain constants |
 | NFR-02 | No automatic rejection without human review | System scores and ranks only — all final decisions require HR action |
 | NFR-03 | GDPR-aware data handling | Minimal inference stored; data deletion capability via standard DB operations |
-| NFR-04 | Ability to run without paid API keys | Groq (free tier) as primary LLM; local storage fallback; app runs fully offline for development |
-| NFR-05 | Deployable to cloud (Vercel) | Serverless-compatible architecture; no background processes required for core features |
+| NFR-04 | Ability to run without paid API keys | Groq (free tier) as primary LLM; local storage fallback; Supabase free tier covers DB/Auth/Storage |
+| NFR-05 | Deployable to cloud (Vercel + Supabase) | Serverless-compatible architecture; Next.js `after()` handles async bulk parsing without an external queue |
 | NFR-06 | Demonstrable with realistic data | 1,019 real job openings scraped from adidas careers portal |
 
 ---
@@ -55,7 +58,10 @@ Several features were added beyond the original specification based on practical
 | Notification preferences (field/country filters) | Candidate preference — don't spam irrelevant jobs | ✅ Preference-aware targeting |
 | Promotional campaigns with rich text | HR communication need — announcements beyond system notifications | ✅ TipTap rich text editor |
 | Motivation letter upload | Application completeness — some positions require cover letters | ✅ Separate upload endpoint |
-| Role-based navigation (candidate vs HR) | Dual persona requirement — same app, different views | ✅ Client-side role switching |
+| Role-based navigation (candidate vs HR) | Dual persona requirement — same app, different views | ✅ Supabase Auth + `app_metadata.role` drives server + client navigation |
+| Real-time AI interviewer (voice) | Richer CEFR assessment beyond written text | ✅ FastAPI backend with OpenAI Whisper (STT) + GPT-4o mini (scoring) |
+| Per-skill verification | HR needs to validate single skills without a full assessment | ✅ Dedicated verification endpoint + candidate UI |
+| Analytics dashboard (wired with data) | Stakeholder visibility into funnel and pipeline | ✅ `/api/analytics` + Recharts on `dashboard/analytics` |
 
 ---
 
@@ -87,12 +93,18 @@ Several features were added beyond the original specification based on practical
    → Results sorted by match score
 
 5. HR invites candidates to language assessment
+   → Chooses mode: WRITTEN (magic link + text prompts) or INTERVIEW (real-time AI voice)
    → Creates assessment with type, language, expiry (default 48 hours)
    → System generates magic link token
    → Sends email via Resend with magic link
    → Candidate status updates to INVITED
 
-6. HR reviews results and shortlists
+6. HR verifies specific skills (optional)
+   → Selects one skill on the candidate profile
+   → System generates a short verification interaction (AI-driven prompts)
+   → Persists PASS / FAIL / INCONCLUSIVE outcome with rationale
+
+7. HR reviews results and shortlists
    → Reviews assessment scores (5 sub-dimensions + overall)
    → Identifies borderline candidates (score 45-60)
    → Routes borderline to improvement tracks (planned)
@@ -178,6 +190,8 @@ Several features were added beyond the original specification based on practical
    → Receives magic link via email (or notification)
    → Opens link → public assessment page (no login required)
    → Token validates, loads assessment context
+   → WRITTEN mode: answers text prompts scored by rubric
+   → INTERVIEW mode: connects to FastAPI backend for real-time voice interview; turns are transcribed (Whisper) and scored live (GPT-4o mini) against CEFR sub-dimensions
 ```
 
 ### Flow 5: Candidate — Application Management
@@ -213,9 +227,8 @@ Several features were added beyond the original specification based on practical
 
 | Feature | Reason | Dependencies |
 |---------|--------|-------------|
-| Speech-to-text assessment (Whisper) | Core assessment feature, complex integration | OpenAI Whisper API |
+| Improvement tracks (content + UI) | Curriculum generation for borderline candidates | LLM content generator + track UI |
 | Bias detection module | Important for fairness, requires statistical analysis | Analytics foundation |
-| Analytics dashboard (wired) | Recharts installed, needs data aggregation endpoints | API /api/analytics exists |
 | E2E tests (Playwright) | Quality assurance for critical user flows | Playwright setup |
 | PDF export | Nice-to-have export format | PDF generation library |
 | Synthetic dataset (200-500 CVs) | Demo data for presentation | Scripting |

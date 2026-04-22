@@ -45,7 +45,7 @@ export class JobUseCases {
    * Create a new job opening.
    */
   async createJob(data: CreateJobInput) {
-    // Convert date strings to Date objects for Prisma
+    // Convert date strings to Date objects for the repository layer
     const dbData: Record<string, unknown> = { ...data };
     if (data.startDate) dbData.startDate = new Date(data.startDate);
     if (data.endDate) dbData.endDate = new Date(data.endDate);

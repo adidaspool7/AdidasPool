@@ -1,6 +1,6 @@
 # adidas Talent Intelligence Platform — User Guide
 
-> **Version:** 1.0 — March 2026
+> **Version:** 1.1 — April 2026
 > **Platform URL:** [githubrepo-mocha.vercel.app](https://githubrepo-mocha.vercel.app)
 
 ---
@@ -46,11 +46,12 @@
 
 ## 1. Getting Started (Candidate)
 
-### Accessing the Platform
+### Signing In
 
 1. Open the platform URL in your browser.
-2. On the landing page, click **"I'm a Candidate"** to enter the candidate dashboard.
-3. Your role is stored locally — you won't need to select it again in the same browser.
+2. Click **"Sign in with Google"** on the landing page.
+3. The platform uses **Supabase Auth** with Google OAuth as the only sign-in method — no password required.
+4. Your role (`candidate` or `hr`) is assigned server-side and stored in your Supabase session; it cannot be changed from the browser.
 
 ### What You Can Do
 
@@ -61,11 +62,12 @@ As a candidate, the platform allows you to:
 - Browse open job positions and internships
 - Apply to positions with one click
 - Track all your applications and their statuses
-- Take language assessments via secure magic links
+- Take **written** language assessments and **real-time AI interviews** via secure magic links
+- Complete per-skill verifications (role-play Q&A graded by AI)
 - Receive notifications about new jobs, status updates, and announcements
 - Manage your profile and notification preferences
 
-> **Note:** There is currently no authentication system — the platform uses a role-based demo mode. A full login/authentication system is planned for a future release.
+> **Note:** Authentication is enforced at the middleware layer — unauthenticated requests to `/api/*` return `401`, and HR-only endpoints return `403` for non-HR users.
 
 ---
 
@@ -250,28 +252,44 @@ Navigate to **Internship Applications** for a filtered view showing only interns
 
 ## 8. Language Assessments
 
+The platform supports **two assessment modes**. HR chooses the mode when inviting you; you take them both through a magic link.
+
 ### How Assessments Work
 
-The platform supports AI-powered language verification assessments. When HR invites you for an assessment, you'll receive:
+When HR invites you for an assessment, you'll receive:
 
 1. A **notification** in the Notifications panel.
 2. A **magic link** — a unique, time-limited URL sent to your email.
 
-### Assessment Types
+### Mode 1: Written Assessment (async, LLM-graded)
 
 | Type | Duration | What You Do |
 |------|----------|-------------|
-| **Listening & Written** | ~30 min | Listen to audio prompts, provide written responses. |
-| **Speaking** | ~20 min | Read and respond to prompts verbally (recorded). |
-| **Reading Aloud** | ~15 min | Read a text passage aloud (recorded). |
-| **Combined** | ~45 min | Multi-section assessment covering listening, writing, and speaking. |
+| **Written Response** | ~30 min | Read prompts and provide written answers. Auto-graded by LLM against a rubric. |
+
+Submit when complete and the system scores the response immediately, producing a CEFR estimate plus sub-scores.
+
+### Mode 2: AI Interview (real-time, voice)
+
+A live conversational interview powered by a FastAPI sidecar service.
+
+- **Whisper STT** transcribes your voice turn-by-turn.
+- **GPT-4o-mini** plays the interviewer role and follows a scripted rubric.
+- Each turn is scored as it happens; a final verdict (PASS / FAIL) is issued at the end with an **evidence array** justifying the decision.
+- **Guardrail:** If the model returns a FAIL with no evidence, the system auto-promotes it to PASS to avoid silent hallucinated rejections.
+- Typical duration: ~15–20 minutes, ~6–8 turns.
+
+### Per-Skill Verification (role-play)
+
+For specific skills listed on your CV, HR can request a short role-play Q&A. You'll be prompted with scenario-based questions and your answers are graded by an LLM against the skill's expected competencies. Results are stored in the `skill_verifications` table and visible on your profile.
 
 ### Taking an Assessment
 
 1. Click the magic link from your email or notification.
-2. The assessment page loads — no login required.
-3. Follow the on-screen instructions for each section.
-4. Submit when complete.
+2. The assessment page loads — no login required; the token itself authorises access.
+3. For the **interview mode**, grant microphone access when prompted.
+4. Follow the on-screen instructions.
+5. Submit when complete.
 
 > **Important:** Magic links expire after **48 hours** by default. A countdown shows time remaining. Once expired, the assessment becomes unavailable.
 
@@ -280,16 +298,10 @@ The platform supports AI-powered language verification assessments. When HR invi
 After scoring, your assessment results page shows:
 - **Overall score** (out of 100)
 - **CEFR level** (A1 Beginner → C2 Proficient)
-- **Detailed dimension scores:**
-  - Grammar (0–100)
-  - Vocabulary (0–100)
-  - Clarity (0–100)
-  - Fluency (0–100)
-  - Customer Handling (0–100)
+- **Detailed dimension scores** (Grammar, Vocabulary, Clarity, Fluency, and for interviews: Pronunciation, Coherence)
 - **AI-generated feedback** summary
-- **Borderline indicator** — if your score falls between 45–60, you may be offered an improvement track
-
-> **🚧 Partially Implemented:** The assessment results display is functional, but the full candidate-facing assessment taking experience (audio recording, speech-to-text, timed sections) is still under development. Currently, assessments are demonstrated with mock data.
+- **Evidence trail** (for interview mode) — the specific turns that justified the verdict
+- **Borderline indicator** — if your score falls between 45–60, HR may offer an improvement track
 
 ---
 
@@ -374,11 +386,12 @@ Changes are saved automatically when you toggle a preference.
 
 ## 11. Getting Started (HR)
 
-### Accessing the HR Dashboard
+### Signing In as HR
 
 1. Open the platform URL.
-2. On the landing page, click **"I'm an HR Manager"** to enter the HR dashboard.
-3. Your role is stored locally for future visits.
+2. Click **"Sign in with Google"** on the landing page.
+3. If your account's `app_metadata.role` is `hr` (assigned server-side by the platform administrator), you'll land on the HR dashboard automatically.
+4. HR-only API endpoints (rescore, rerank, scoring, export, campaigns, job sync, bulk upload, analytics) are protected at the middleware layer — `403` is returned for non-HR users.
 
 ### What You Can Do
 
@@ -386,16 +399,16 @@ As an HR manager, the platform provides:
 
 - Create, edit, and manage job openings and internships
 - Bulk-sync jobs from the adidas careers website
-- Upload and AI-parse candidate CVs (single or bulk)
+- Upload and AI-parse candidate CVs (single or bulk with async processing)
 - Evaluate candidates with AI-powered scoring
 - Review and manage all received applications
-- Invite candidates for language assessments
-- View analytics on recruitment pipeline and performance
+- Invite candidates for written assessments, real-time AI interviews, or skill verification
+- View analytics on the recruitment pipeline and performance
 - Create and send targeted promotional campaigns
 - Manage notifications for all recruitment events
 - Export candidate data to CSV
 
-> **Note:** The platform currently uses a demo role-selection model without authentication. A full login system with role-based access control is planned for a future release.
+> **Note:** Role assignment (HR vs candidate) is controlled by the platform administrator through Supabase's `app_metadata` and cannot be escalated by users.
 
 ---
 
@@ -568,7 +581,14 @@ Score colors: 🟢 Green (≥70), 🟡 Yellow (≥45), 🔴 Red (<45).
 
 ### Bulk Upload
 
-> **🚧 Partially Implemented:** The bulk upload interface exists with a route at `POST /api/upload`, but async processing with progress tracking is not yet functional. Currently, CVs should be uploaded one at a time. Future releases will support batch upload of multiple CVs (including ZIP archives) with a real-time progress tracker.
+Bulk upload is fully functional via `POST /api/upload/bulk` (HR-only, middleware-enforced). The endpoint:
+
+1. Accepts a ZIP or multiple files and immediately creates a `parsing_jobs` row.
+2. Returns a **`202 Accepted`** response with `{ parsingJobId }`.
+3. Uses Next.js **`after()`** to run the parsing pipeline asynchronously — extraction → LLM parse → dedup → upsert → score — after the HTTP response has been sent.
+4. The UI polls `GET /api/parsing-jobs/[id]` for progress and displays a live counter of `parsedFiles` / `failedFiles`.
+
+> ZIP archive extraction is supported; scanned/image-based PDFs are flagged for manual review in the job's `errorLog`.
 
 ---
 
@@ -636,15 +656,15 @@ Select from built-in presets for common scenarios:
 
 ### Candidate Detail Page
 
-> **🚧 Placeholder:** The candidate detail page exists but currently has limited functionality. Future releases will include a comprehensive candidate profile view with: full CV data, assessment history, scoring breakdown, application history, collaborative notes, and tagging capability.
+The candidate detail page displays the full parsed CV (personal info, experiences, education, languages, skills) plus application history, assessment results with evidence trails (for interview mode), skill verification outcomes, CV score breakdown, and collaborative notes.
 
 ### Collaborative Notes
 
-> **🚧 Partially Implemented:** The API endpoint for adding notes to candidate profiles (`POST /api/candidates/[id]/notes`) is functional, but the UI component to display and manage notes is not yet built.
+Notes are fully functional: use the rich-text editor (powered by TipTap) on the candidate detail page to add timestamped notes. All notes are persisted via `POST /api/candidates/[id]/notes` (Zod-validated) and render in reverse chronological order.
 
 ### Candidate Tagging
 
-> **🚧 Partially Implemented:** The database model for candidate tags exists, but the API endpoints and UI for creating and managing tags is not yet completed.
+> **🚧 Partially Implemented:** The database model for candidate tags exists, but the API endpoints and UI for creating and managing tags are not yet completed.
 
 ---
 
@@ -701,16 +721,32 @@ This view is identical to job applications but:
 
 ### Assessment Overview
 
-The **Assessments** page lets you manage language verification assessments for candidates.
+The **Assessments** page lets you manage language verification assessments. The platform supports **two modes** and a complementary **skill verification** flow.
 
-#### Assessment Types
+### Mode A — Written Assessment (async, LLM-graded)
 
-| Type | Icon Color | Duration | Purpose |
-|------|-----------|----------|---------|
-| Listening & Written | Blue | 30 min | Written comprehension and response |
-| Speaking | Green | 20 min | Verbal response evaluation |
-| Reading Aloud | Purple | 15 min | Pronunciation and fluency |
-| Combined | Amber | 45 min | Multi-section comprehensive test |
+| Aspect | Detail |
+|--------|--------|
+| Duration | ~30 min |
+| Inputs | Text prompts + written answers |
+| Scoring | LLM-graded against a rubric; Zod-validated output |
+| Turnaround | Scored immediately on submission |
+
+### Mode B — AI Interview (real-time, voice)
+
+Backed by a FastAPI sidecar (`ai_interviewer_backend/`) running Whisper STT + GPT-4o-mini.
+
+| Aspect | Detail |
+|--------|--------|
+| Endpoint flow | `/api/interview/realtime/session` → `/turn` (per exchange) → `/complete` |
+| Persistence | `evaluation_rationale` JSONB column stores `turn_count` + `evidence` array |
+| Guardrails | `evaluator.py` enforces non-empty evidence, turn-count threshold, `max_tokens=500` |
+| Anti-hallucination | Empty-evidence FAIL verdicts are auto-promoted to PASS |
+| Sub-scores | Pronunciation, Fluency, Grammar, Vocabulary, Coherence |
+
+### Per-Skill Verification
+
+Stored in the `skill_verifications` table. For any skill on a candidate's profile you can launch a short **role-play Q&A**: the LLM plays a scenario partner, the candidate answers, and the LLM grades the competency evidence. Results appear on the candidate profile.
 
 #### Assessment Statuses
 
@@ -726,17 +762,18 @@ The **Assessments** page lets you manage language verification assessments for c
 ### Creating an Assessment
 
 1. Select a candidate and a job.
-2. Choose an assessment type (or use a template).
+2. Choose a mode (**Written** or **Interview**) — or use a saved template.
 3. The system generates a **magic link** — a unique, time-limited URL.
-4. The magic link is sent to the candidate via email (uses Resend integration).
+4. The magic link is sent to the candidate via email (Resend integration) with a copy-link fallback in the UI.
 5. The link expires after 48 hours by default.
 
 ### Reviewing Results
 
 For scored assessments, the results panel shows:
 - **Overall score** (0–100) with CEFR level estimation
-- **Five dimension scores:** Grammar, Vocabulary, Clarity, Fluency, Customer Handling
+- **Dimension scores** (mode-dependent)
 - **AI-generated feedback** text
+- **Evidence trail** (interview mode): the specific user turns and interviewer prompts that justified the verdict
 - **Borderline indicator:** Candidates scoring 45–60 are flagged for potential improvement track
 
 #### CEFR Level Guide
@@ -749,8 +786,6 @@ For scored assessments, the results panel shows:
 | B2 | Upper Intermediate | 60–74 |
 | C1 | Advanced | 75–89 |
 | C2 | Proficient | 90–100 |
-
-> **🚧 Partially Implemented:** Assessment creation, magic link generation, and email delivery are functional. The candidate-facing assessment execution UI (audio recording, speech-to-text via Whisper, timed sections) is still under development. Currently, the assessments page displays mock data to demonstrate the scoring and results visualization.
 
 ---
 
@@ -939,56 +974,66 @@ Export includes:
 
 | Feature | Description |
 |---------|-------------|
+| **Authentication** | Supabase Auth + Google OAuth; role stored in `app_metadata.role` (server-only writes) |
+| **Authorization / RBAC** | Middleware-level gating: `PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES`; `401`/`403` at the edge; RLS on candidate-owned tables |
 | **Role-based dashboard** | Separate candidate and HR views with tailored navigation |
 | **AI-powered CV parsing** | Groq Llama 3.3 70B (primary) + OpenAI GPT-4o (fallback) extract structured data |
 | **CV scoring engine** | Deterministic 4-factor scoring: experience (35%), years (25%), education (20%), location (20%) |
+| **Scoring weights & presets** | Configurable 5-dimension scoring with real-time re-ranking, built-in quick presets, custom preset save/delete |
 | **Duplicate detection** | 3-tier matching (email → name+location → name only) |
 | **Job management** | Full CRUD for jobs with search, filter, pagination |
 | **Job scraping** | Cheerio-based scraper for adidas careers (1,019 jobs, 50+ countries, 16 departments) |
 | **Internship management** | Full CRUD with Erasmus+ support, mentor info, date ranges, stipend |
 | **Job applications** | Apply, withdraw, status tracking with one-application-per-job constraint |
 | **Job-candidate matching** | 4-criteria engine: location, language+CEFR, experience, education |
-| **Notification system** | 16 notification types, preference-aware targeting, read/unread management |
-| **Promotional campaigns** | Rich text campaigns with targeting (country, field, education, email), lifecycle (Draft→Sent→Terminated→Archived), read statistics, pinning |
+| **HR bulk CV upload** | 202-Accepted + Next.js `after()` async pipeline + `parsing_jobs` progress polling (ZIP supported) |
+| **Written assessments** | Async, LLM-graded, CEFR estimation, rubric sub-scores |
+| **AI Interview assessments** | Real-time FastAPI sidecar, Whisper STT + GPT-4o-mini, evidence-array guardrails, auto-PASS on empty-evidence FAIL |
+| **Per-skill verification** | LLM role-play Q&A graded against skill rubric; stored in `skill_verifications` |
+| **Magic link assessments** | Token generation, email delivery via Resend, 48h expiry, public `/assess/[token]` portal |
+| **Candidate detail page** | Full CV data, application history, assessment + interview results (with evidence), skill verifications, scoring breakdown, notes |
+| **Collaborative notes** | TipTap rich text editor, timestamped history, Zod-validated API |
+| **Notification system** | 16+ notification types, preference-aware targeting, read/unread management |
+| **Promotional campaigns** | Rich text campaigns, targeting (country/field/education/email), lifecycle (Draft→Sent→Terminated→Archived), read statistics, pinning |
 | **Candidate profile** | Personal info, career preferences (availability, work model, relocation), nationality, bio |
-| **File storage** | Local (dev) and Vercel Blob (prod) dual-mode storage |
-| **Magic link assessments** | Token generation, email delivery via Resend, 48h expiry |
-| **CSV export** | Filter-aware candidate data export |
-| **Scoring weights & presets** | Configurable 5-dimension scoring with real-time re-ranking, built-in quick presets, custom preset save/delete |
-| **Analytics dashboard** | 7-metric dashboard: pipeline, country distribution, skills, applications per job, trends, score distribution |
-| **Unit test suite** | 65 tests across 6 files (scoring, matching, CV validation, text extraction, upload pipeline, storage) |
-| **Cloud deployment** | Vercel + Neon PostgreSQL (serverless), fully operational |
+| **Analytics dashboard** | Recharts-powered: pipeline, country distribution, top skills, top languages, applications per job, trends, score distribution (HR-only, middleware-enforced) |
+| **File storage** | `LocalStorageService` (dev) and `SupabaseStorageService` (prod) — conditional binding on `SUPABASE_SERVICE_ROLE_KEY` |
+| **CSV export** | Filter-aware candidate data export via papaparse |
+| **Candidate activation + invitation** | HR invitations + activation tokens flow into the magic-link portal |
+| **Unit test suite** | **101 tests across 6 files** (cv-validation, scoring, matching, text-extraction, upload pipeline, interview runtime) |
+| **Cloud deployment** | Vercel (Next.js) + Supabase (Postgres + Auth + Storage) + separate host for FastAPI sidecar |
 
 ### ⚠️ Partially Implemented
 
 | Feature | What Works | What's Missing |
 |---------|------------|----------------|
-| **HR bulk CV upload** | Upload route exists | Async processing, progress tracking, `ParsingJob` queue |
-| **Assessment execution** | Magic link page, token validation, template system | Audio recording UI, speech-to-text (Whisper), timed sections, candidate submission flow |
-| **Assessment results display** | Data model and scoring rubric | UI not wired to live data (currently shows mock data) |
-| **Candidate detail view** | Page exists, basic data | Full profile view, CV viewer, assessment history, scoring breakdown |
-| **Collaborative notes** | API endpoint functional | UI component to display/manage notes |
 | **Candidate tagging** | Database model exists | API endpoints and UI |
 | **Improvement tracks** | Database models, borderline detection algorithm | Daily content, progress logic, reassessment flow, UI |
+| **PDF export** | — | Profile reports, assessment results as PDF |
 
 ### 🔮 Planned (Not Yet Started)
 
 | Feature | Description |
 |---------|-------------|
-| **Authentication system** | Replace demo role-selection with real login (JWT / OAuth) |
-| **ZIP archive CV upload** | Extract and process multiple CVs from ZIP files |
 | **OCR for scanned PDFs** | Tesseract.js or external OCR API for image-based CVs |
-| **BullMQ async processing** | Queue-based background processing for large CV batches |
-| **Real-time updates** | WebSocket/SSE for live progress tracking and notifications |
-| **Ethical AI / bias detection** | Statistical fairness analysis, adverse impact ratio (4/5ths rule), score distribution by demographics |
-| **Blind review mode** | UI toggle to hide candidate name, location, institution during evaluation |
-| **Fairness report** | PDF/on-screen report with demographic analysis and flagged anomalies |
-| **PDF export** | Profile reports, assessment results, fairness reports |
 | **Synthetic demo dataset** | 200–500 generated CVs for demonstration purposes |
 | **E2E test suite** | Playwright tests for critical flows: upload → parse → match → invite → assess → export |
 | **Component tests** | React Testing Library + jsdom for UI component testing |
-| **API integration tests** | Test database setup and endpoint testing |
+| **API integration tests** | Supabase test project / `pg-mem` for route handler tests |
+| **Rate limiting + CSP headers** | Vercel Edge / Supabase-based throttling; production-grade security headers |
+| **Audit trail** | Dedicated `audit_log` table for HR actions |
+| **Real-time updates** | WebSocket/SSE for live progress tracking and notifications |
+
+### ❌ Removed from Scope
+
+| Feature | Reason |
+|---------|--------|
+| **Ethical AI / bias detection module** | Scope refocused on dual-mode assessment + AI interviewer; bias detection dropped from MVP |
+| **Blind review mode** | Tied to bias detection; dropped |
+| **BullMQ / Redis queue** | Replaced by Next.js `after()` for async bulk CV processing |
+| **Vercel Blob storage** | Replaced by Supabase Storage during consolidation onto Supabase |
+| **Prisma ORM + Neon** | Replaced by `@supabase/supabase-js` + `@supabase/ssr` against Supabase Postgres |
 
 ---
 
-> **Last updated:** March 18, 2026
+> **Last updated:** April 22, 2026

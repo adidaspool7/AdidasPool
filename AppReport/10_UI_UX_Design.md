@@ -83,10 +83,11 @@ Fonts are loaded via `next/font/google` with `latin` subset for optimal performa
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `Sidebar` | `components/layout/sidebar.tsx` | Role-aware navigation with sections |
-| `RoleProvider` | `components/providers/role-provider.tsx` | Context provider for role state |
+| `RoleProvider` | `components/providers/role-provider.tsx` | Reads `user.app_metadata.role` from Supabase Auth and exposes role/session context |
 | `Providers` | `components/providers/providers.tsx` | Composition root for client providers |
 | `RichTextEditor` | `components/ui/rich-text-editor.tsx` | TipTap wrapper with toolbar |
 | `FieldMultiSelect` | `notifications/page.tsx` (inline) | Combobox-based multi-select for departments |
+| Analytics charts | `dashboard/analytics/page.tsx` | Recharts-based funnel, pipeline, top skills, top languages, score distribution, trend, country breakdown |
 
 ---
 
@@ -164,7 +165,7 @@ The sidebar dynamically renders different navigation items based on the selected
 - **Active state:** Current path highlighted with `bg-accent text-accent-foreground`
 - **Icons:** Each item has a Lucide icon (LayoutDashboard, Users, Briefcase, etc.)
 - **Role badge:** Shows "HR Manager" or "Candidate" below the brand logo
-- **Role switching:** "Switch Role" button at sidebar bottom calls `clearRole()` → redirects to landing
+- **Role switching:** \"Switch Role\" button at sidebar bottom calls `clearRole()` which signs the user out of Supabase and redirects to the landing page for re-authentication under a different account
 - **Loading state:** Sidebar returns `null` during hydration to prevent flash
 
 ---
@@ -294,7 +295,7 @@ Pattern:
 | Tailwind CSS 4 over CSS Modules | Utility-first enables rapid iteration; v4 uses native CSS features |
 | Lucide over Font Awesome | Tree-shakable, consistent design, React-native components |
 | TipTap over Quill/Draft.js | Extensible, headless, modern API, better React integration |
-| Client-side role switching | Enables demo without auth; both roles testable in one session |
+| Client-side role state | Driven by Supabase Auth (`user.app_metadata.role`); HR vs candidate UI renders from the same session. Role cannot be spoofed because the server trusts `app_metadata.role` enforced by middleware |
 | Inline FieldMultiSelect | Built on Popover+Command pattern from shadcn/ui; Combobox with multi-select |
 | oklch() color space | Perceptually uniform; better dark mode transitions than hex/hsl |
 | Geist font | Modern, clean, designed for developer tools — matches professional aesthetic |

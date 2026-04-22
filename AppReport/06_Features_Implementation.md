@@ -20,13 +20,16 @@
 | 10 | Promotional Campaigns (Rich Text) | ✅ Complete | High |
 | 11 | Notification Preferences | ✅ Complete | Medium |
 | 12 | Fields of Work (Department Filters) | ✅ Complete | Low |
-| 13 | Language Assessment Framework | ⚠️ Partial | High |
+| 13 | Language Assessment Framework | ✅ Complete (dual mode) | High |
 | 14 | Candidate Deduplication | ✅ Complete | Medium |
 | 15 | CSV Export | ✅ Complete | Low |
 | 16 | Analytics Dashboard | ✅ Complete | High |
 | 17 | Improvement Tracks | ❌ Placeholder | Medium |
 | 18 | Bias Detection Module | ❌ Not Started | High |
 | 19 | Scoring Weights & Presets | ✅ Complete | Medium |
+| 20 | AI Interviewer (real-time voice) | ✅ Complete | High |
+| 21 | Per-Skill Verification | ✅ Complete | Medium |
+| 22 | Authentication & RBAC (Supabase + middleware) | ✅ Complete | Medium |
 
 ---
 
@@ -112,13 +115,14 @@ The system processes CV files (PDF, DOCX, TXT) into structured candidate records
 3. Check total ≤ 500 files (`MAX_BULK_FILES`)
 4. Create `ParsingJob` record for tracking
 
-**Phase 2 — Processing:**
-1. Set job status to `PROCESSING`
-2. Process each file through the 9-stage pipeline
-3. 500ms throttle between files (LLM rate limit protection)
-4. Track progress: `parsedFiles`, `failedFiles`, error log
-5. **Cancellation support:** Check in-memory `cancelledJobs` Set before each file
-6. Final status: `COMPLETED` (if any success) or `FAILED` (all failed)
+**Phase 2 — Processing (async via Next.js `after()`):**
+1. Return `202 Accepted` with `{ parsingJobId }` immediately
+2. Inside `after()`: set job status to `PROCESSING`
+3. Process each file through the 9-stage pipeline
+4. 500ms throttle between files (LLM rate limit protection)
+5. Track progress: `parsedFiles`, `failedFiles`, error log
+6. **Cancellation support:** Check in-memory `cancelledJobs` Set before each file
+7. Final status: `COMPLETED` (if any success) or `FAILED` (all failed)
 
 ### Error Handling
 - Per-file errors are logged but don't halt the batch
@@ -321,7 +325,7 @@ When a user searches "Berlin Marketing":
 1. Split into tokens: ["Berlin", "Marketing"]
 2. Each token must match at least one of: title, location, department (case-insensitive)
 3. Combined with AND: both tokens must match
-4. Prisma query: nested `AND[OR[contains title, contains location, contains department]]`
+4. Supabase query: multiple chained `.or('title.ilike.%token%,location.ilike.%token%,department.ilike.%token%')` filters combined with AND at the builder level
 
 ### Notification Side-Effects on Job Creation
 
@@ -587,29 +591,33 @@ Defined in `src/client/lib/constants.ts` as `FIELDS_OF_WORK` — a sorted array 
 
 ---
 
-## 6.14 Feature 13: Language Assessment Framework
+## 6.14 Feature 13: Language Assessment Framework (Dual Mode)
 
-### Status: Partially Built
+### Status: Complete
 
-The assessment data model and API infrastructure are complete, but the actual assessment execution flow is not fully implemented.
+The assessment system supports two complementary modes, chosen by HR at invitation time:
+
+| Mode | Delivery | Scoring |
+|------|----------|---------|
+| **WRITTEN** | Magic link → text prompts answered in browser | Rubric-based Zod-validated JSON output from LLM |
+| **INTERVIEW** | Magic link → real-time voice call with the AI Interviewer (FastAPI backend) | Whisper STT + GPT-4o mini rubric scoring, per-turn evidence |
 
 ### What's Built
 
-- **Assessment creation:** HR creates assessment → generates magic token → updates candidate status to INVITED
-- **Magic link system:** `/assess/[token]` public page validates token and loads assessment context
+- **Assessment creation:** HR creates assessment with `mode` (`WRITTEN` \| `INTERVIEW`) → generates magic token → updates candidate status to `INVITED`
+- **Magic link system:** `/assess/[token]` public page validates token, expiry, and loads assessment context
 - **Assessment types:** LISTENING_WRITTEN, SPEAKING, READING_ALOUD, COMBINED
 - **Assessment status lifecycle:** PENDING → IN_PROGRESS → SUBMITTED → SCORED → REVIEWED / EXPIRED
 - **Result model:** 5 sub-scores + overall score + CEFR estimation + borderline flag
 - **Template system:** Reusable assessment configurations with custom weights
 - **Email delivery:** Magic link sent via Resend with candidate name and expiry info
+- **Real-time interview pipeline:** Next.js `/api/interview/*` routes proxy to the FastAPI backend (`ai_interviewer_backend/`); per-turn transcripts and evidence arrays are persisted in the `evaluation_rationale` JSONB column
+- **Rubric enforcement:** `evaluator.py` enforces `_count_user_turns()`, requires non-empty `evidence` arrays to downgrade to FAIL, and caps response length at `max_tokens=500`
 
-### What's Not Yet Implemented
+### Deferred (not required for dual-mode operation)
 
-- Audio recording for speaking assessments
-- Whisper STT integration for transcript generation
-- AI scoring of written/spoken responses
-- Real-time assessment timer
-- Assessment result review workflow
+- Advanced speaking assessments with synthetic audio playback prompts
+- Assessment result review workflow (currently HR reviews inline on the candidate page)
 
 ---
 
@@ -657,10 +665,10 @@ The analytics dashboard provides HR managers with real-time aggregate statistics
 ### Architecture
 
 The analytics feature follows the same Onion Architecture as all other features:
-- **Domain port:** `IAnalyticsRepository` defines 7 query methods
-- **Infrastructure:** `PrismaAnalyticsRepository` implements all queries using Prisma `groupBy`, `count`, and `findMany`
-- **Application:** `AnalyticsUseCases.getDashboardAnalytics()` orchestrates all 7 queries in parallel via `Promise.all()`
-- **API route:** `GET /api/analytics` delegates to the use-case and returns JSON
+- **Domain port:** `IAnalyticsRepository` defines the query methods
+- **Infrastructure:** `SupabaseAnalyticsRepository` implements all queries using the Supabase SQL builder and RPC calls
+- **Application:** `AnalyticsUseCases.getDashboardAnalytics()` orchestrates all queries in parallel via `Promise.all()`
+- **API route:** `GET /api/analytics` delegates to the use-case and returns JSON (middleware restricts this route to HR via `HR_ONLY_API_PREFIXES`)
 
 ### Dashboard Metrics (7 Data Sections)
 
@@ -751,7 +759,107 @@ HR users can **save custom weight configurations** as named presets:
 
 ---
 
-## 6.20 Cross-Cutting Feature: Dual-Role System
+## 6.20 Feature 20: AI Interviewer (Real-Time Voice Assessment)
+
+### Overview
+
+An alternative to the written assessment, the AI Interviewer conducts a live spoken CEFR interview with the candidate. It is delivered via a FastAPI sidecar (`ai_interviewer_backend/`) and proxied through Next.js routes under `/api/interview/*`.
+
+### Components
+
+| File | Role |
+|------|------|
+| `ai_interviewer_backend/main.py` | FastAPI entry point, request routing |
+| `ai_interviewer_backend/ai_interviewer.py` | Turn orchestration, prompt construction, LLM calls |
+| `ai_interviewer_backend/audio_handlers.py` | Whisper STT + audio ingestion |
+| `ai_interviewer_backend/evaluator.py` | Rubric-based CEFR scoring with evidence arrays |
+| `ai_interviewer_backend/models.py` | Pydantic schemas |
+
+### Guardrails Enforced in `evaluator.py`
+
+- `_count_user_turns()` ensures scoring never fires before the candidate has produced enough speech
+- `evidence` arrays must be non-empty for any FAIL verdict; empty-evidence FAILs are auto-reverted to PASS
+- `max_tokens=500` keeps rationale concise and bounded
+- Structured JSON output validated before returning to Next.js
+
+### Persistence
+
+`POST /api/interview/realtime/turn` (Next.js) writes `turn_count` and the `evidence` array into the `evaluation_rationale` JSONB column on the `assessments` row, preserving an auditable trail of every turn.
+
+### Why a Separate Python Backend?
+
+- Native support for Whisper + streaming audio
+- Isolation from the Next.js edge runtime (long-lived connections, heavier CPU workloads)
+- Enables independent scaling and deployment of the interview pipeline
+
+---
+
+## 6.21 Feature 21: Per-Skill Verification
+
+### Overview
+
+When reviewing a candidate's CV skills, HR can trigger a lightweight verification interaction for a specific skill. The system runs a focused AI interaction and records a PASS / FAIL / INCONCLUSIVE outcome.
+
+### Data Model
+
+Stored in the `skill_verifications` table (migration `20260415000000_add_skill_verification.sql`):
+
+| Field | Purpose |
+|-------|---------|
+| `candidate_id` | FK to `candidates` |
+| `skill_id` | FK to the CV skill being verified |
+| `outcome` | `PASS` / `FAIL` / `INCONCLUSIVE` |
+| `rationale` | Human-readable AI rationale |
+| `verified_at` | Timestamp |
+
+### API Route
+
+`POST /api/candidates/[id]/skills/[skillId]/verification` — requires the caller to be HR (`user.app_metadata?.role === "hr"` check inside the route, complementing middleware-level gating).
+
+### UI
+
+Verification outcomes are rendered as badges next to each skill on the candidate detail page, with the rationale available on hover.
+
+---
+
+## 6.22 Feature 22: Authentication & Role-Based Access Control
+
+### Overview
+
+The application is gated by Supabase Auth with Google OAuth as the identity provider. Authorization is enforced at the **middleware layer** to keep route handlers focused on business logic.
+
+### Flow
+
+1. Unauthenticated user hits the landing page (`/`) \u2192 sees "Sign in with Google" button
+2. OAuth redirect \u2192 Supabase callback \u2192 session cookies set by `@supabase/ssr`
+3. `middleware.ts` refreshes the session on each request and evaluates:
+   - `/dashboard/**` \u2192 must be authenticated
+   - `/api/**` (outside `PUBLIC_API_PREFIXES`) \u2192 must be authenticated (401 otherwise)
+   - HR-only `/api/**` paths \u2192 must have `app_metadata.role === "hr"` (403 otherwise)
+4. Client-side `RoleProvider` reads `user.app_metadata.role` and drives navigation
+
+### Role Assignment
+
+Role is written to `auth.users.app_metadata.role` by server-side code using the service-role key. Users **cannot** modify their own role via `supabase.auth.updateUser()`, which only touches `user_metadata`. This is the security foundation of the RBAC model.
+
+### HR-Only API Prefixes (Middleware)
+
+```
+/api/candidates/rescore
+/api/candidates/rerank
+/api/scoring/
+/api/export/
+/api/notifications/campaigns
+/api/jobs/sync
+/api/upload/bulk
+/api/analytics
+```
+
+All other authenticated endpoints are accessible to both roles; per-row RLS policies in Supabase restrict candidates to their own data.
+
+---
+
+## 6.23 Cross-Cutting Feature: Dual-Role System
 
 The entire application serves two user personas through a single codebase:
 
@@ -763,4 +871,4 @@ The entire application serves two user personas through a single codebase:
 | Jobs | Full management (CRUD) + matching | Browse + apply |
 | CV Upload | Bulk upload for talent pool | Self-upload with inline editing |
 
-Role selection happens client-side via a context provider (`role-provider.tsx`). The sidebar navigation and dashboard layout adapt based on the selected role.
+Role selection and session live behind Supabase Auth. The sidebar navigation and dashboard layout adapt based on `user.app_metadata.role`; middleware enforces server-side access control (see Feature 22).

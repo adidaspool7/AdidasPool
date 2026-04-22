@@ -1,10 +1,10 @@
 # Claude AI - Project Tracker & Orientation Guide
 > **Project:** Talent Intelligence & Communication Verification Platform  
 > **Context:** Academic project for a multinational (adidas-like context)  
-> **Timeline:** ~4 months  
-> **Tech Stack:** Next.js (confirmed by user)  
+> **Timeline:** ~5 months (Month 5 — hardening phase, in progress)  
+> **Tech Stack:** Next.js 16 App Router + Supabase (Postgres + Auth + Storage) + FastAPI sidecar  
 > **Primary Spec:** `docs/talent_intelligence_language_verification_platform_spec.md`  
-| **Repo:** `github_repo/` (scaffolded S4 → Onion Architecture S5 → server/client split S6 → audit & fixes S7 → role nav S8 → job apps & scraper S9 → HR notifications S10 — deployed to Vercel ✅)
+> **Repo:** `new_repo/` (scaffolding S4 → Onion S5 → server/client split S6 → audit S7 → role nav S8 → scraper + applications S9 → HR notifications + Vercel deploy S10 → CV pipeline S11 → CV editing S12 → internships S13-S15 → CEFR dual-mode + AI Interviewer S16 → skill verification S17 → analytics + Recharts wired S18 → **Supabase migration** S19 → **middleware auth + RBAC + Zod hardening + N+1 fixes** S20 → docs sync S21)
 
 ---
 
@@ -27,31 +27,40 @@ A standalone web app for early-stage recruitment screening that:
 
 ### Architecture Snapshot
 ```
-Frontend (Next.js + shadcn/ui + Tailwind)
-  ├── HR Dashboard (main interface)
-  ├── Candidate Assessment Portal (magic link, no login)
-  ├── Analytics Dashboard
-  └── Admin Panel
+Frontend (Next.js 16 App Router + React 19 + shadcn/ui + Tailwind 4)
+  ├── HR Dashboard (candidates, jobs, internships, analytics, notifications)
+  ├── Candidate Portal (profile, CV upload, applications, assessments, AI interview)
+  ├── Magic-link Assessment (public /assess/[token])
+  └── Recharts-powered Analytics (funnel, pipeline, top skills/languages, trends)
 
-Backend (Next.js API Routes)
-  ├── CV Ingestion (bulk upload, async)
-  ├── Parsing & Classification (LLM-based extraction)
-  ├── Language Assessment (STT + rubric scoring)
-  ├── Matching Engine
-  ├── Deduplication Engine
-  ├── Improvement Track Manager
-  └── Export Service (CSV/PDF)
+Backend (Next.js API Routes + middleware.ts auth gate)
+  ├── Supabase Auth session refresh (@supabase/ssr)
+  ├── PUBLIC_API_PREFIXES / HR_ONLY_API_PREFIXES gating (401/403 at middleware layer)
+  ├── CV ingestion (single + bulk async via Next.js after())
+  ├── CV parsing (Groq primary + OpenAI fallback, Zod-validated)
+  ├── Matching + scoring engines (pure domain services)
+  ├── Dual-mode assessment (WRITTEN auto-graded, INTERVIEW via FastAPI)
+  ├── Per-skill verification (role-play Q&A, LLM-graded)
+  ├── Analytics aggregations (SupabaseAnalyticsRepository)
+  └── CSV export
 
-Database (PostgreSQL + Prisma)
-  └── Candidates, Experiences, Education, Languages, Skills, Jobs, 
-      Assessments, Results, Tracks, Notes, AssessmentTemplates
+Database (Supabase-managed PostgreSQL, no ORM)
+  ├── 23 tables, 4 SQL migrations under supabase/migrations/
+  ├── RLS policies on candidate-owned tables (keyed on auth.uid())
+  └── Access via @supabase/supabase-js (server = service-role, client = anon)
 
-AI Layer
-  ├── LLM for CV extraction (schema-enforced JSON)
-  ├── Experience relevance classification
-  ├── Speech-to-text + rubric evaluation
-  ├── Feedback generation
-  └── Bias detection analytics
+Storage (dual-mode)
+  ├── SupabaseStorageService (when SUPABASE_SERVICE_ROLE_KEY set)
+  └── LocalStorageService (dev fallback → public/uploads/)
+
+AI Interviewer Sidecar (Python FastAPI — ai_interviewer_backend/)
+  ├── Whisper STT + GPT-4o / GPT-4o-mini
+  ├── Turn-by-turn rubric scoring with evidence-array guardrails
+  └── Deployed separately; URL via INTERVIEW_BACKEND_URL
+
+Auth
+  ├── Supabase Auth + Google OAuth (only IdP)
+  └── Role stored in auth.users.app_metadata.role ("hr" | "candidate")
 ```
 
 ---
@@ -73,9 +82,18 @@ AI Layer
 ### DEFERRED — Not for MVP
 | Feature | Reason |
 |---------|--------|
-| Auth + RBAC | Internal-only tool, prototype/MVP — revisit later if needed |
-| Audit Trail | Internal use only, not critical for MVP |
+| Audit Trail | Internal use only, not critical for prototype |
 | PWA Support | Not a priority |
+| Rate limiting / CSP headers | Prototype scope; relies on Vercel baseline |
+| Bias detection module | Removed from MVP scope — effort refocused on dual-mode assessment + interviewer |
+
+### REINSTATED — Implemented after initial "deferred" label
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Auth + RBAC | ✅ Implemented (Session 20) | Supabase Auth + Google OAuth; middleware-level role gating; `app_metadata.role` is the single source of truth |
+| Analytics dashboard | ✅ Implemented (Session 18) | Recharts wired against `SupabaseAnalyticsRepository` |
+| AI Interviewer | ✅ Implemented (Session 16-17) | FastAPI sidecar with rubric + evidence guardrails |
+| Per-skill verification | ✅ Implemented (Session 17) | `skill_verifications` table + LLM role-play grading |
 
 ---
 
@@ -197,29 +215,38 @@ This is a **strong differentiator** for the presentation:
 
 ---
 
-## 5. Confirmed Tech Stack
+## 5. Confirmed Tech Stack (Current)
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| **Framework** | Next.js 16 (App Router) | Full-stack, SSR, API routes, confirmed by user |
+| **Framework** | Next.js 16.1.6 (App Router) + React 19.2.3 | Full-stack, SSR, API routes |
 | **UI Library** | shadcn/ui + Tailwind CSS 4 | Fast, accessible, great DX |
-| **Database** | PostgreSQL 17.2 (Neon in prod) | Relational, JSON support, proven |
-| **ORM** | Prisma 6.19.2 | Type-safe, auto-migrations, great Next.js integration |
-| **Queue** | BullMQ (Redis) | Installed but not yet active — planned for async bulk CV processing |
-| **AI/LLM (Primary)** | Groq (Llama 3.3 70B) via OpenAI SDK | Free tier, fast inference, JSON mode — auto-detected when `GROQ_API_KEY` is set |
-| **AI/LLM (Fallback)** | OpenAI GPT-4o via OpenAI SDK | Fallback when Groq unavailable |
-| **STT** | Whisper API (OpenAI) | Planned — same provider as LLM fallback, excellent multilingual |
-| **PDF Extraction** | unpdf 1.4 | Replaced originally planned pdf-parse — better serverless compat |
-| **DOCX Extraction** | mammoth 1.11 | Lightweight, zero native deps |
-| **File Storage (Dev)** | LocalStorageService → `public/uploads/` | No cloud dependency needed for dev |
-| **File Storage (Prod)** | Vercel Blob 2.3.1 | Native Vercel integration, S3-compatible |
-| **Hosting** | Vercel | User confirmed — confirmed |
-| **Email** | Resend 6.9.2 (+ copy-link fallback) | Free 100/day, Vercel ecosystem, hybrid approach — confirmed |
-| **Validation** | Zod 4.3.6 | TypeScript-first, strict mode, LLM output validation |
-| **Charts** | Recharts 3.7 | Installed, not yet wired — analytics dashboard planned |
-| **CSV Export** | papaparse | Candidate list export |
-| **Testing** | Vitest 4.0.18 (unit) + Playwright (E2E planned) | 56 tests across 6 files |
-| **Auth** | Deferred | Not needed for MVP (internal tool) — client-side role via localStorage |
+| **Rich text** | TipTap | Notification campaign composer |
+| **Database & Platform** | Supabase (managed PostgreSQL) | Replaces Neon + Prisma — includes Auth and Storage in one provider |
+| **Data Access** | `@supabase/supabase-js` ^2.49.4 + `@supabase/ssr` ^0.5.2 | Cookie-aware server client, no ORM; repositories use query builders directly |
+| **Migrations** | Plain SQL under `supabase/migrations/` (4 files) | Managed by Supabase CLI |
+| **Authentication** | Supabase Auth + Google OAuth | Role in `app_metadata.role` (server-only writes); cookie sessions |
+| **Authorization** | `middleware.ts` — `PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES` | 401/403 enforced at edge; RLS on candidate-owned tables |
+| **Async Processing** | Next.js `after()` | Replaced BullMQ/ioredis — bulk CV parsing returns 202 + `parsingJobId` |
+| **AI/LLM (Primary)** | Groq (Llama 3.3 70B) via OpenAI SDK | Free tier, fast inference, JSON mode |
+| **AI/LLM (Fallback)** | OpenAI GPT-4o / GPT-4o-mini | Fallback + interview scoring |
+| **STT** | Whisper API (inside FastAPI sidecar) | Multilingual, consumed by AI Interviewer |
+| **AI Interviewer** | FastAPI sidecar (`ai_interviewer_backend/`) — Python | Real-time turn-by-turn interview with Whisper + GPT-4o; rubric + evidence guardrails |
+| **PDF Extraction** | unpdf 1.4 | Serverless-friendly |
+| **DOCX Extraction** | mammoth 1.11 | Zero native deps |
+| **File Storage (Dev)** | `LocalStorageService` → `public/uploads/` | No cloud dep in dev |
+| **File Storage (Prod)** | `SupabaseStorageService` (buckets) | Selected when `SUPABASE_SERVICE_ROLE_KEY` present — Vercel Blob removed |
+| **Hosting** | Vercel (Next.js) + Supabase (DB/Auth/Storage) + separate host for FastAPI | |
+| **Email** | Resend 6.9.2 (+ copy-link fallback) | Free 100/day |
+| **Validation** | Zod 4.3.6 | `.strict()` on update schemas; LLM output validation |
+| **Charts** | Recharts 3.7 | ✅ Wired to analytics dashboard |
+| **CSV Export** | papaparse | |
+| **Testing** | Vitest 4.0.18 — **101 tests across 6 files** | `interview-runtime.test.ts` replaces `vercel-blob-storage.test.ts` |
+
+### Removed during Supabase migration
+- `@prisma/client`, `prisma` → replaced by `@supabase/supabase-js`
+- `@vercel/blob` → replaced by `SupabaseStorageService`
+- `bullmq`, `ioredis` → replaced by Next.js `after()`
 
 ---
 
@@ -265,40 +292,55 @@ This is a **strong differentiator** for the presentation:
 ### Month 2 — Intelligence Layer
 - [x] CV structured scoring model (deterministic formula) ✅ Session 4
 - [x] Job-candidate matching engine ✅ Session 4
+- [x] Candidate detail view + notes API + notes UI ✅ Session 16
+- [x] Advanced candidate filtering (country/CEFR/experience/applied-job) ✅ Session 16
+- [x] Rescore endpoint (`/api/candidates/rescore`) ✅ Session 16
+- [x] Rerank endpoint with weighted formula ✅ Session 16
 - [ ] Experience relevance classification (LLM-based — port exists, not wired to UI)
-- [ ] Job opening CRUD enhanced — ✅ basic CRUD done, advanced filters pending
-- [ ] Recruiter filtering dashboard (advanced filters)
-- [ ] Candidate detail view + manual edit + notes — notes API exists, UI placeholder
-- [ ] Candidate tagging system
-- [ ] Candidate contact quick-view button
-- [ ] API integration tests
-- [ ] First E2E test (upload → parse → list flow)
+- [ ] Candidate tagging system (model exists, UI deferred)
+- [ ] E2E tests (Playwright — not yet wired)
 
-### Month 3 — Language Assessment
-- [ ] Assessment configuration + templates (CRUD + reusable presets)
-- [ ] Audio recording component (frontend)
-- [ ] Speech-to-text integration
-- [ ] Listening + written response assessment
-- [ ] Structured scoring rubric evaluation
-- [ ] CEFR level estimation
-- [ ] Feedback generation (LLM)
-- [ ] Borderline candidate detection logic
-- [ ] Candidate assessment portal (magic link, no login)
-- [ ] Assessment E2E test
-- [ ] AI output validation tests
+### Month 3 — Language Assessment ✅ COMPLETE
+- [x] Assessment configuration + templates (CRUD + reusable presets) ✅ Session 16
+- [x] WRITTEN mode: auto-graded LLM evaluation with CEFR estimation ✅ Session 16
+- [x] INTERVIEW mode: real-time FastAPI interviewer with Whisper STT ✅ Session 16-17
+- [x] Structured rubric scoring (pronunciation, fluency, grammar, vocabulary, coherence) ✅ Session 17
+- [x] CEFR level estimation from sub-scores ✅ Session 16
+- [x] Feedback generation (LLM) ✅ Session 16
+- [x] Borderline candidate detection logic ✅ Session 16
+- [x] Candidate assessment portal (magic link, no login) ✅ Session 16
+- [x] Evidence-array guardrails + auto-PASS-on-empty-evidence-FAIL in `evaluator.py` ✅ Session 17
+- [x] `evaluation_rationale` JSONB persistence (turn_count + evidence) ✅ Session 17
+- [x] Interview runtime unit tests (49 tests) ✅ Session 20
+- [x] AI output validation tests (CV extraction — 15 tests) ✅ Session 11
 
-### Month 4 — Finalization & Polish
-- [ ] Improvement track logic & content
-- [ ] Reassessment flow
-- [ ] Internal mobility extension
-- [ ] Recruitment analytics dashboard (funnels, distributions, time metrics)
-- [ ] Bias detection module (statistical analysis + blind mode)
-- [ ] Export: CSV/PDF (candidate lists, profiles, assessment results, fairness report)
-- [ ] Synthetic dataset generation (200-500 CVs)
-- [ ] Final E2E test suite (demo flows)
-- [ ] Performance optimization
-- [ ] Demo preparation
-- [ ] Documentation & architecture diagrams
+### Month 4 — Finalization, Skill Verification & Analytics ✅ COMPLETE
+- [x] Per-skill verification via LLM role-play Q&A (`skill_verifications` table) ✅ Session 17
+- [x] Recruitment analytics dashboard — funnel, pipeline, top skills/languages, score dist, trend, country breakdown ✅ Session 18
+- [x] `SupabaseAnalyticsRepository` with aggregation queries ✅ Session 18
+- [x] Export: CSV (candidate lists, applications) ✅ Session 18
+- [x] Candidate activation + invitation flow (migration `20260419`) ✅ Session 18
+- [x] HR-only middleware gating for analytics / rescore / rerank / export / campaigns ✅ Session 20
+- [ ] Synthetic dataset generation (deferred — manual testing)
+- [ ] Bias detection module (dropped from scope)
+- [ ] Improvement track logic (model exists, UI deferred)
+
+### Month 5 — Supabase Migration & Hardening (IN PROGRESS)
+- [x] Full migration Prisma/Neon → Supabase Postgres ✅ Session 19
+- [x] Replaced `@vercel/blob` with `SupabaseStorageService` ✅ Session 19
+- [x] Replaced BullMQ/ioredis with Next.js `after()` ✅ Session 19
+- [x] Rewrote all 10 repositories as `Supabase*Repository` ✅ Session 19
+- [x] 4 SQL migrations under `supabase/migrations/` ✅ Session 19
+- [x] Supabase Auth + Google OAuth integration ✅ Session 20
+- [x] `middleware.ts` session refresh + 401/403 RBAC ✅ Session 20
+- [x] `RoleProvider` reads `user.app_metadata.role` ✅ Session 20
+- [x] N+1 query fixes in analytics + candidate list ✅ Session 20
+- [x] Zod validation added to notes + applications routes ✅ Session 20
+- [x] Dead code removal pass ✅ Session 20
+- [x] AppReport documentation sync (10 files) ✅ Session 21
+- [x] `CLAUDE_PROJECT_TRACKER.md` sync ✅ Session 21
+- [ ] Final demo preparation
+- [ ] Architecture diagrams refresh
 
 ---
 
@@ -324,6 +366,16 @@ This is a **strong differentiator** for the presentation:
 | 2026-03-09 | **JobType + InternshipStatus enums** | Separate internships from regular jobs, lifecycle management | ✅ Implemented |
 | 2026-03-09 | **Erasmus learning agreement per application** | Per-application (not per-candidate), stored on JobApplication model | ✅ Implemented |
 | 2026-03-09 | **Candidate-only-ACTIVE filter** | Candidates should only see active internships | ✅ Implemented |
+| 2026-03-22 | **Dual-mode assessment (WRITTEN + INTERVIEW)** | WRITTEN = async, LLM-graded; INTERVIEW = real-time, FastAPI sidecar | ✅ Implemented (S16) |
+| 2026-03-22 | **FastAPI sidecar for AI Interviewer** | Whisper STT + streaming conversation requires Python ecosystem; kept separate from Next.js | ✅ Implemented (S16-17) |
+| 2026-03-29 | **Evidence-array guardrail** | `evaluator.py` auto-passes a FAIL verdict with empty `evidence[]` and enforces turn count — prevents silent hallucinated rejections | ✅ Implemented (S17) |
+| 2026-03-29 | **Per-skill verification via LLM role-play** | `skill_verifications` table + role-play Q&A scored by LLM rubric | ✅ Implemented (S17) |
+| 2026-04-05 | **Analytics wired to Supabase** | `SupabaseAnalyticsRepository` + Recharts on `/dashboard/analytics` | ✅ Implemented (S18) |
+| 2026-04-12 | **Full migration to Supabase** | Consolidate DB + Auth + Storage under one provider; drop Prisma, Neon, Vercel Blob, BullMQ | ✅ Implemented (S19) |
+| 2026-04-12 | **Next.js `after()` replaces BullMQ** | Bulk CV parsing runs after response in the same serverless function — simpler, no Redis ops | ✅ Implemented (S19) |
+| 2026-04-19 | **Supabase Auth + Google OAuth as only IdP** | Role in `app_metadata.role` (server-only writes); candidates cannot escalate via client APIs | ✅ Implemented (S20) |
+| 2026-04-19 | **Middleware-level RBAC** | `PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES` in `middleware.ts` — 401/403 at edge, route handlers stay thin | ✅ Implemented (S20) |
+| 2026-04-19 | **Bias detection dropped** | Scope refocused on dual-mode assessment + interviewer; bias module removed from MVP | ✅ Confirmed |
 
 ---
 
@@ -576,145 +628,177 @@ This is a **strong differentiator** for the presentation:
   - Missing: unpdf, mammoth, internship features, Erasmus, learning agreements
 - **All documentation files updated** to reflect actual codebase state
 
+### Session 16 — Dual-Mode Assessment + CEFR Framework
+- **Assessment templates** — CRUD + reusable presets per role/language combo
+- **WRITTEN mode** — Async LLM-graded assessment with rubric evaluation and CEFR sub-score aggregation
+- **INTERVIEW mode (scaffold)** — Introduced interview session lifecycle, proxy routes, UI shell
+- **Candidate assessment portal** — Magic link `/assess/[token]` fully functional for both modes
+- **Rescore + Rerank** — `POST /api/candidates/rescore` and `POST /api/candidates/rerank` with weighted formula
+- **Advanced candidate filters** — country, CEFR, experience band, applied-job filtering on candidate list
+- **Notes UI** — Wired up collaborative notes with TipTap rich text + timestamped history
+- **Borderline detection** — Threshold logic in domain service
+
+### Session 17 — AI Interviewer Sidecar + Skill Verification
+- **FastAPI sidecar** (`ai_interviewer_backend/`):
+  - `main.py` — FastAPI app with `/realtime/session`, `/realtime/turn`, `/realtime/complete`
+  - `audio_handlers.py` — Whisper STT integration
+  - `ai_interviewer.py` — Turn orchestration + GPT-4o-mini calls
+  - `evaluator.py` — Rubric scoring with **evidence-array guardrails**:
+    - `_count_user_turns()` enforces non-trivial conversation before verdict
+    - Auto-PASS when verdict=FAIL but `evidence[]` is empty (anti-hallucination)
+    - `max_tokens=500` cap on evaluation response
+  - `models.py` / `config.py` — Pydantic models + env config
+- **Next.js ↔ FastAPI bridge** — `/api/interview/realtime/{session,turn,complete}` proxy routes; `turn` persists `turn_count` + `evidence` into `evaluation_rationale` JSONB
+- **Skill verification** — New `skill_verifications` table (migration `20260415`), LLM role-play Q&A, per-skill grading
+- **DB migration** — `20260414_add_interview_mode.sql` + `20260415_add_skill_verification.sql`
+
+### Session 18 — Analytics Dashboard (Recharts Wired)
+- **`SupabaseAnalyticsRepository`** — Aggregation queries for funnel, pipeline, top skills, top languages, score distribution, trend over time, country breakdown
+- **Analytics page** — `/dashboard/analytics` with Recharts (bar, line, pie, funnel)
+- **HR-only access** — Page + API routes gated (later enforced at middleware in S20)
+- **Activation + invitation flow** — Migration `20260419_add_activation_and_invitation.sql`; HR can invite candidates; activation tokens flow into the magic-link portal
+- **CSV export** — Candidate list + applications export via papaparse
+
+### Session 19 — Supabase Migration
+- **Dropped Prisma entirely** — Deleted `prisma/` schema/client, removed `@prisma/client` + `prisma` deps
+- **New data access layer** — `@supabase/supabase-js` + `@supabase/ssr`; created `src/server/infrastructure/database/supabase-client.ts` + `db-utils.ts`
+- **Rewrote 10 repositories** as `Supabase*Repository`:
+  - analytics, application, assessment, candidate, dedup, job, notification, parsing-job, scoring-preset, scoring-weights
+- **4 SQL migrations** consolidated under `supabase/migrations/`:
+  - `20260413000000_initial_schema.sql` — 23 tables baseline
+  - `20260414000000_add_interview_mode.sql`
+  - `20260415000000_add_skill_verification.sql`
+  - `20260419000000_add_activation_and_invitation.sql`
+- **Storage** — Replaced `VercelBlobStorageService` with `SupabaseStorageService`; conditional binding on `SUPABASE_SERVICE_ROLE_KEY`
+- **Async processing** — Dropped BullMQ + ioredis, moved bulk CV parsing into Next.js `after()` (returns 202 + `parsingJobId`)
+- **RLS** — Policies on candidate-owned tables keyed on `auth.uid()`
+- **Onion architecture preserved** — Only the Infrastructure layer changed; Domain + Application untouched
+
+### Session 20 — Middleware Auth + RBAC + Hardening
+- **`middleware.ts`** — Session refresh via `@supabase/ssr`, plus:
+  ```ts
+  const PUBLIC_API_PREFIXES = ["/api/auth/"];
+  const HR_ONLY_API_PREFIXES = [
+    "/api/candidates/rescore", "/api/candidates/rerank",
+    "/api/scoring/", "/api/export/",
+    "/api/notifications/campaigns", "/api/jobs/sync",
+    "/api/upload/bulk", "/api/analytics",
+  ];
+  ```
+  — Unauthenticated `/api/*` → 401; authenticated non-HR on HR-only prefixes → 403.
+- **Google OAuth** — Only configured IdP; callback at `/api/auth/callback`
+- **`RoleProvider`** — Now reads `user.app_metadata.role` (no more localStorage role toggle)
+- **`clearRole()`** — Signs the user out of Supabase and redirects to landing
+- **N+1 fixes** — Analytics + candidate list queries batched via Supabase `.in()` + single round-trips
+- **Zod validation** — Added schemas for notes creation + applications routes; `.strict()` on update schemas
+- **Dead code removal** — Dropped unused exports; deleted `vercel-blob-storage.test.ts`
+- **Interview runtime tests** — Added `interview-runtime.test.ts` (49 tests): session creation, turn_count + evidence persistence, auto-PASS on empty-evidence-FAIL, max_tokens cap, completion status transitions
+- **Test count: 101 total** across 6 files:
+  - `cv-validation.test.ts` (15), `scoring.test.ts` (9), `matching.test.ts` (4), `text-extraction.test.ts` (8), `upload-use-cases.test.ts` (16), `interview-runtime.test.ts` (49)
+
+### Session 21 — Documentation Sync (AppReport + Tracker)
+- **AppReport sync** — Aligned all 10 `AppReport/*.md` files with current Supabase-based state:
+  - `01_Project_Overview.md`, `02_Requirements_Analysis.md`, `03_Technology_Stack.md`, `04_Architecture_Design.md`, `05_Database_Design.md`, `06_Features_Implementation.md`, `07_API_Documentation.md`, `08_Testing_Strategy.md`, `09_Security_Infrastructure.md`, `10_UI_UX_Design.md`
+  - Key rewrites: Supabase (DB/Auth/Storage), FastAPI interviewer, middleware RBAC, 101 tests, 23 tables, 4 migrations, dual-mode assessment, skill verification, analytics complete
+- **This tracker** — Updated header, architecture snapshot, feature decisions, tech stack, progress tracker (Months 2-5), decisions log, session notes, file map, open questions
+
 ---
 
 ## 9. File/Folder Reference Map
-*Updated as the project grows — Last updated: Session 15 (Documentation review)*
+*Updated as the project grows — Last updated: Session 21 (Supabase migration + middleware auth + docs sync)*
 
 ```
-github_repo/                                                      # Project root
-    ├── .env.example                                              # Environment variable template
-    ├── vitest.config.ts                                          # Test configuration (Vitest 4.0.18)
-    ├── docs/                                                     # Project documentation
-    │   ├── architecture.md                                       #   System architecture docs
-    │   ├── Tech Stack.md                                         #   Technology descriptions
-    │   ├── CV_PARSER_PLAN.md                                     #   CV parser pipeline plan
-    │   └── talent_intelligence_...platform_spec.md               #   Original project spec
-    ├── claude-docs/                                              # Claude session tracking
-    │   └── CLAUDE_PROJECT_TRACKER.md                             #   THIS FILE
-    ├── prisma/
-    │   └── schema.prisma                                         # 16 models, 14 enums
+new_repo/                                                         # Project root
+    ├── middleware.ts                                             # Supabase session refresh + PUBLIC/HR_ONLY prefix RBAC (401/403)
+    ├── vitest.config.ts                                          # Test config (Vitest 4.0.18)
+    ├── AppReport/                                                # Academic report (10 synced docs)
+    ├── ai_interviewer_backend/                                   # FastAPI sidecar (Python)
+    │   ├── main.py                                               #   /realtime/{session,turn,complete}
+    │   ├── ai_interviewer.py                                     #   Turn orchestration + GPT-4o-mini
+    │   ├── audio_handlers.py                                     #   Whisper STT
+    │   ├── evaluator.py                                          #   Rubric + evidence-array guardrails
+    │   ├── config.py / models.py                                 #   Env config + Pydantic models
+    │   └── requirements.txt / runtime.txt                        #   Python deps + runtime pin
+    ├── supabase/                                                 # Supabase SQL migrations
+    │   └── migrations/
+    │       ├── 20260413000000_initial_schema.sql                 #   23 tables baseline
+    │       ├── 20260414000000_add_interview_mode.sql             #   Assessment mode + interview fields
+    │       ├── 20260415000000_add_skill_verification.sql         #   skill_verifications table
+    │       └── 20260419000000_add_activation_and_invitation.sql  #   HR invitations + activation tokens
+    ├── docs/                                                     # Internal docs (spec, architecture, plans)
+    ├── claude-docs/
+    │   └── CLAUDE_PROJECT_TRACKER.md                             # THIS FILE
     ├── src/
-    │   ├── server/                                               # BACKEND (all server-side code)
-    │   │   ├── container.ts                                      #   Composition root (11 DI bindings)
-    │   │   ├── domain/                                           #   LAYER 1: Domain (innermost)
-    │   │   │   ├── value-objects.ts                              #     CEFR, weights, thresholds
-    │   │   │   ├── services/
-    │   │   │   │   ├── scoring.service.ts                        #     Pure CV scoring engine
-    │   │   │   │   └── matching.service.ts                       #     Pure job-candidate matching
-    │   │   │   └── ports/
-    │   │   │       ├── repositories.ts                           #     6 repository interfaces
-    │   │   │       └── services.ts                               #     5 external service interfaces
-    │   │   ├── application/                                      #   LAYER 2: Application
-    │   │   │   ├── dtos.ts                                       #     Zod 4 validation schemas
-    │   │   │   ├── index.ts                                      #     Use case factory
-    │   │   │   └── use-cases/
-    │   │   │       ├── candidate.use-cases.ts                    #     Candidate CRUD + notes
-    │   │   │       ├── job.use-cases.ts                          #     Job + internship CRUD + matching + scraper
-    │   │   │       ├── assessment.use-cases.ts                   #     Assessment lifecycle
-    │   │   │       ├── upload.use-cases.ts                       #     CV upload pipeline (extract → parse → validate → store)
-    │   │   │       ├── export.use-cases.ts                       #     CSV export
-    │   │   │       ├── application.use-cases.ts                  #     Job applications + notifications
-    │   │   │       └── notification.use-cases.ts                 #     HR notification feed
-    │   │   └── infrastructure/                                   #   LAYER 3: Infrastructure
-    │   │       ├── database/
-    │   │       │   ├── prisma-client.ts                          #     Prisma singleton
-    │   │       │   ├── candidate.repository.ts                   #     ICandidateRepository impl
-    │   │       │   ├── job.repository.ts                         #     IJobRepository impl (multi-word search, type/status filters)
-    │   │       │   ├── assessment.repository.ts                  #     IAssessmentRepository impl
-    │   │       │   ├── dedup.repository.ts                       #     IDeduplicationRepository impl
-    │   │       │   ├── application.repository.ts                 #     IJobApplicationRepository impl
-    │   │       │   └── notification.repository.ts                #     INotificationRepository impl
-    │   │       ├── ai/
-    │   │       │   ├── openai-client.ts                          #     LLM client: Groq primary / OpenAI fallback
-    │   │       │   └── cv-parser.service.ts                      #     ICvParserService impl (LLM + JSON mode + Zod)
-    │   │       ├── extraction/
-    │   │       │   └── text-extraction.service.ts                #     ITextExtractionService impl (unpdf + mammoth)
-    │   │       ├── storage/
-    │   │       │   ├── local-storage.service.ts                  #     IStorageService impl (public/uploads/ — dev)
-    │   │       │   └── vercel-blob-storage.service.ts            #     IStorageService impl (Vercel Blob — prod)
-    │   │       ├── email/
-    │   │       │   └── resend.service.ts                         #     IEmailService impl
-    │   │       └── scraping/
-    │   │           └── adidas-job-scraper.service.ts             #     IJobScraperService impl (Cheerio)
-    │   ├── client/                                               # FRONTEND (all client-side code)
-    │   │   ├── components/
-    │   │   │   ├── layout/sidebar.tsx                            #   Role-based sidebar (candidate: 8, HR: 9 items)
-    │   │   │   ├── providers/
-    │   │   │   │   ├── role-provider.tsx                         #   Role context (candidate/hr) + localStorage
-    │   │   │   │   └── providers.tsx                             #   Root providers wrapper
-    │   │   │   └── ui/                                           #   20+ shadcn/ui components
-    │   │   └── lib/
-    │   │       └── utils.ts                                      #   cn(), formatDate(), truncate()
-    │   └── app/                                                  # NEXT.JS ROUTING (glue layer)
-    │       ├── layout.tsx                                        #   Root layout
-    │       ├── page.tsx                                          #   Landing page
-    │       ├── assess/[token]/page.tsx                           #   Candidate assessment portal
-    │       ├── dashboard/
-    │       │   ├── layout.tsx                                    #   Dashboard shell (sidebar)
-    │       │   ├── page.tsx                                      #   Dashboard home (role-aware)
-    │       │   ├── jobs/page.tsx                                 #   Job openings (scraper + create + apply + filters)
-    │       │   ├── internships/page.tsx                          #   Internships (create/edit/apply + Erasmus + learning agreement)
-    │       │   ├── upload/page.tsx                               #   CV Upload (drag-and-drop + parse + edit + save)
-    │       │   ├── settings/page.tsx                             #   Profile settings (personal info, nationality)
-    │       │   ├── applications/page.tsx                         #   Candidate "My Applications"
-    │       │   ├── received-applications/page.tsx                #   HR "Received Applications"
-    │       │   ├── notifications/page.tsx                        #   HR notification feed
-    │       │   ├── assessments/page.tsx                          #   Assessment management
-    │       │   ├── candidates/page.tsx                           #   Candidate list (placeholder)
-    │       │   ├── candidates/[id]/page.tsx                      #   Candidate detail (placeholder)
-    │       │   ├── analytics/page.tsx                            #   Analytics (placeholder)
-    │       │   └── improvement/page.tsx                          #   Improvement tracks (placeholder)
-    │       └── api/                                              #   REST API (18 route files, ~25 handlers)
-    │           ├── me/route.ts                                   #     GET/PATCH — candidate profile
-    │           ├── candidates/route.ts                           #     GET — candidate list
-    │           ├── candidates/[id]/route.ts                      #     GET/PATCH — candidate detail
-    │           ├── candidates/[id]/notes/route.ts                #     POST — collaborative notes
-    │           ├── jobs/route.ts                                 #     GET/POST — job list + create
-    │           ├── jobs/[id]/route.ts                            #     GET/PATCH — job detail + update
-    │           ├── jobs/[id]/match/route.ts                      #     POST — matching engine
-    │           ├── jobs/sync/route.ts                            #     POST — job scraper trigger
-    │           ├── applications/route.ts                         #     POST/GET — apply + list
-    │           ├── applications/[id]/route.ts                    #     PATCH — withdraw
-    │           ├── applications/all/route.ts                     #     GET — HR: all applications
-    │           ├── assessments/route.ts                          #     GET/POST — assessments
-    │           ├── notifications/route.ts                        #     GET/PATCH — notifications
-    │           ├── upload/route.ts                               #     POST — HR CV upload
-    │           ├── upload/candidate/route.ts                     #     POST — candidate self-upload
-    │           ├── upload/motivation-letter/route.ts             #     POST — motivation letter
-    │           ├── upload/learning-agreement/route.ts            #     POST — Erasmus learning agreement
-    │           └── export/candidates/route.ts                    #     GET — CSV export
-    └── tests/
-        ├── scoring.test.ts                                       #   CV scoring (10 tests)
-        ├── matching.test.ts                                      #   Matching engine (4 tests)
-        ├── cv-validation.test.ts                                 #   CV extraction validation (17 tests)
-        ├── text-extraction.test.ts                               #   Text extraction (10 tests)
-        ├── upload-use-cases.test.ts                              #   Upload pipeline (12 tests)
-        └── vercel-blob-storage.test.ts                           #   Storage service (3 tests)
+    │   ├── server/                                               # BACKEND
+    │   │   ├── container.ts                                      #   Composition root (Supabase bindings)
+    │   │   ├── domain/                                           #   Pure domain (unchanged by Supabase migration)
+    │   │   │   ├── value-objects.ts
+    │   │   │   ├── services/{scoring,matching}.service.ts
+    │   │   │   └── ports/{repositories,services}.ts
+    │   │   ├── application/                                      #   Use cases (unchanged)
+    │   │   │   ├── dtos.ts / index.ts
+    │   │   │   └── use-cases/{candidate,job,assessment,upload,export,application,notification,interview,skill-verification}.use-cases.ts
+    │   │   └── infrastructure/
+    │   │       ├── database/                                     #   All Supabase-backed repos
+    │   │       │   ├── supabase-client.ts                        #     Server + browser client factories
+    │   │       │   ├── db-utils.ts                               #     Row mapping helpers
+    │   │       │   ├── supabase-analytics.repository.ts
+    │   │       │   ├── supabase-application.repository.ts
+    │   │       │   ├── supabase-assessment.repository.ts
+    │   │       │   ├── supabase-candidate.repository.ts
+    │   │       │   ├── supabase-dedup.repository.ts
+    │   │       │   ├── supabase-job.repository.ts
+    │   │       │   ├── supabase-notification.repository.ts
+    │   │       │   ├── supabase-parsing-job.repository.ts
+    │   │       │   ├── supabase-scoring-preset.repository.ts
+    │   │       │   └── supabase-scoring-weights.repository.ts
+    │   │       ├── ai/{openai-client,cv-parser.service}.ts
+    │   │       ├── extraction/text-extraction.service.ts
+    │   │       ├── storage/{local,supabase}-storage.service.ts     #   Vercel Blob removed
+    │   │       ├── email/resend.service.ts
+    │   │       └── scraping/adidas-job-scraper.service.ts
+    │   ├── client/                                               # FRONTEND
+    │   │   ├── components/{layout,providers,ui}/
+    │   │   │   └── providers/role-provider.tsx                   #   Reads user.app_metadata.role
+    │   │   └── lib/utils.ts
+    │   └── app/                                                  # Next.js routing
+    │       ├── assess/[token]/page.tsx                           # Magic link portal (WRITTEN + INTERVIEW)
+    │       ├── dashboard/                                        # HR + candidate pages (analytics wired)
+    │       └── api/                                              # ~30 route files (incl. /api/interview/realtime/*)
+    └── tests/                                                    # 101 tests across 6 files
+        ├── cv-validation.test.ts                                 #   15 tests
+        ├── scoring.test.ts                                       #    9 tests
+        ├── matching.test.ts                                      #    4 tests
+        ├── text-extraction.test.ts                               #    8 tests
+        ├── upload-use-cases.test.ts                              #   16 tests
+        └── interview-runtime.test.ts                             #   49 tests (replaces vercel-blob-storage.test.ts)
 ```
 
 ---
 
 ## 10. Open Questions for User
 
-**All questions resolved as of Session 3 (2026-02-22).** No pending decisions.
+**All questions resolved.** No pending decisions.
 
 | # | Question | Answer | Date |
 |---|----------|--------|------|
 | 1 | LLM Provider | Groq (Llama 3.3 70B) primary + OpenAI GPT-4o fallback | 2026-03-09 |
-| 2 | Speech-to-Text | Whisper API (OpenAI) — planned | 2026-02-22 |
-| 3 | Hosting | Vercel | 2026-02-22 |
-| 4 | File Storage | LocalStorageService (dev) + Vercel Blob (prod) | 2026-03-09 |
+| 2 | Speech-to-Text | Whisper (inside FastAPI sidecar) | 2026-03-22 |
+| 3 | Hosting | Vercel (Next.js) + Supabase (DB/Auth/Storage) + separate host for FastAPI | 2026-04-12 |
+| 4 | File Storage | `LocalStorageService` (dev) + `SupabaseStorageService` (prod) — Vercel Blob removed | 2026-04-12 |
 | 5 | Email for magic links | Resend + copy-link fallback | 2026-02-22 |
-| 6 | PDF Extraction | unpdf (replaced pdf-parse) | 2026-03-09 |
+| 6 | PDF Extraction | unpdf | 2026-03-09 |
 | 7 | Validation Library | Zod 4.3.6 | 2026-03-09 |
+| 8 | Authentication | Supabase Auth + Google OAuth (only IdP); role in `app_metadata.role` | 2026-04-19 |
+| 9 | Authorization | Middleware-level (`PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES`) + RLS on candidate-owned tables | 2026-04-19 |
+| 10 | Async bulk CV processing | Next.js `after()` — BullMQ/Redis dropped | 2026-04-12 |
 
 ---
 
 > **Note to future Claude sessions:** Always read this file FIRST when resuming work on this project. Check:
 > 1. Section 6 (Progress Tracker) — what's done, what's next
-> 2. Section 7 (Decisions Log) — what's been decided
-> 3. Section 8 (Session Notes) — latest context
-> 4. Section 10 (Open Questions) — unresolved items
-> 
-> The user has confirmed Next.js stack, no auth for MVP, and wants magic links for candidate assessments.
+> 2. Section 7 (Decisions Log) — what's been decided (including Supabase migration + auth)
+> 3. Section 8 (Session Notes) — latest context (through Session 21)
+> 4. Section 10 (Open Questions) — all resolved
+>
+> Current state: Next.js 16 + Supabase (Postgres + Auth + Storage) + FastAPI sidecar for AI Interviewer. Supabase Auth + Google OAuth is the only sign-in path. Role is stored in `app_metadata.role` and enforced by `middleware.ts`. 101 tests pass. 23 tables across 4 SQL migrations. All 10 AppReport docs were synced in Session 21.

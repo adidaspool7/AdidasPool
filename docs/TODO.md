@@ -2,6 +2,7 @@
 
 > Tracks all planned work. Status legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ❌ Blocked
 > Keep this file updated after every session. Do not delete completed items — move them to the bottom "Completed" section.
+> Last audited: 2026-04-22 — synced status flags with actual codebase state.
 
 ---
 
@@ -46,11 +47,11 @@
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 4b.1 | Pass `turn_count` (user turns only) to evaluator context | ⬜ | Count non-system, non-opening messages from role=user in transcript |
-| 4b.2 | Require explicit evidence to justify FAIL | ⬜ | Prompt: FAIL requires `evidence` array with ≥1 cited factual error; vague impression is not sufficient |
-| 4b.3 | Increase evaluator `max_tokens` 200 → 500 | ⬜ | Allow full reasoning output |
-| 4b.4 | Add `evidence` array to evaluator JSON output | ⬜ | `["candidate stated X which is wrong because Y"]`; empty array on PASS is fine |
-| 4b.5 | Persist `turn_count` in `evaluation_rationale` JSONB | ⬜ | Stored alongside existing rationale fields for future reference |
+| 4b.1 | Pass `turn_count` (user turns only) to evaluator context | ✅ | `_count_user_turns()` in `evaluator.py`; value interpolated into technical + language prompts |
+| 4b.2 | Require explicit evidence to justify FAIL | ✅ | Prompt requires `evidence` array with ≥1 cited error; FAIL with empty evidence is auto-gated back to PASS |
+| 4b.3 | Increase evaluator `max_tokens` 200 → 500 | ✅ | `max_tokens=500` in `evaluator.py` OpenAI call |
+| 4b.4 | Add `evidence` array to evaluator JSON output | ✅ | Schema updated; `evidence: list[str]` parsed + validated |
+| 4b.5 | Persist `turn_count` in `evaluation_rationale` JSONB | ✅ | `rationaleWithMeta.turn_count` + `rationaleWithMeta.evidence` saved in `interview/realtime/turn/route.ts` |
 
 ### 4b.2 — Skill verification status (requires DB migration)
 
@@ -81,13 +82,13 @@
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 6.1 | Async parsing pipeline for HR bulk upload | ⬜ | BullMQ + Redis — deferred since session 11 |
-| 6.2 | ZIP extraction for bulk upload | ⬜ | Unzip → batch-parse each CV |
-| 6.3 | Experience relevance classification (LLM) | ⬜ | Port exists (`ICvParserService`), not wired to UI |
-| 6.4 | Advanced recruiter filtering dashboard | ⬜ | Language level, business area, score range filters in HR candidate list |
-| 6.5 | Candidate tagging system | ⬜ | `candidate_tags` table exists; UI missing |
+| 6.1 | Async parsing pipeline for HR bulk upload | ✅ | Implemented with Next.js `after()` (no BullMQ/Redis needed); `/api/upload/bulk` returns 202 + jobId, then `processBulkUpload()` runs in background |
+| 6.2 | ZIP extraction for bulk upload | ✅ | `prepareBulkUpload()` handles `.zip` entries and flattens to `fileEntries` before batch parsing |
+| 6.3 | Experience relevance classification (LLM) | 🔄 | `classifyExperienceRelevance()` implemented in `cv-parser.service.ts`; "Experience Relevance" column shown in HR list. Still needs per-experience display on candidate detail page |
+| 6.4 | Advanced recruiter filtering dashboard | 🔄 | Done: search, status, business-area, location, sort, custom weights. Still missing: language-level filter + score-range slider |
+| 6.5 | Candidate tagging system | ⬜ | `candidate_tags` table exists and joined in repo; UI (create/assign/filter by tag) missing |
 | 6.6 | Candidate contact quick-view button | ⬜ | Small popover on candidate list row |
-| 6.7 | Candidate detail manual edit + notes UI | ⬜ | Notes API exists; full edit UI missing |
+| 6.7 | Candidate detail manual edit + notes UI | 🔄 | Notes API + read-only display done; add-note form + inline profile edit missing |
 
 ---
 
@@ -95,7 +96,7 @@
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 7.1 | Recruitment analytics dashboard (funnels, score distributions, time metrics) | ⬜ | `SupabaseAnalyticsRepository` exists; UI page needed |
+| 7.1 | Recruitment analytics dashboard (funnels, score distributions, time metrics) | ✅ | `/dashboard/analytics/page.tsx` with funnel, pipeline, top skills, top languages, score distribution, application trend, country breakdown |
 | 7.2 | Bias detection — score distribution by location/gender | ⬜ | Statistical analysis; use `simple-statistics` npm package |
 | 7.3 | Adverse impact ratio (4/5ths rule) | ⬜ | EEOC standard calculation |
 | 7.4 | Blind mode toggle (hide name, location, institution) | ⬜ | HR dashboard toggle |
@@ -154,3 +155,6 @@
 | C.17 | Supabase full migration — Auth, DB, Storage (Steps 1–7) | 2026-04-13 |
 | C.18 | Prisma fully removed from codebase | 2026-04-13 |
 | C.19 | Google OAuth wired into candidate dashboard (user_id → candidate) | 2026-04-13 |
+| C.20 | Evaluator hardening: `turn_count`, `evidence`-gated FAIL, `max_tokens=500` | 2026-04 |
+| C.21 | Async bulk CV upload via Next.js `after()` + ZIP extraction | 2026-04 |
+| C.22 | HR analytics dashboard (funnel, pipeline, skills, languages, scores) | 2026-04 |

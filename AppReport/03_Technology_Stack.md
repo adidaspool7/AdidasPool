@@ -82,67 +82,63 @@ In a project with an Onion Architecture and 19 database models, type safety is n
 
 ---
 
-## 3.4 Database — PostgreSQL + Neon
+## 3.4 Database & Backend Platform — Supabase (PostgreSQL)
 
 | Attribute | Detail |
 |-----------|--------|
-| Engine | PostgreSQL 17.2 (local) / Neon Serverless (production) |
-| Hosting | Neon free tier via Vercel integration |
-| Project | `neon-citron-school` |
+| Engine | PostgreSQL managed by Supabase |
+| Hosting | Supabase free tier (500 MB DB, 1 GB storage, 50k monthly active users) |
+| Schema management | Plain SQL migrations under `supabase/migrations/` |
+| Access | `@supabase/supabase-js` (server + client) and `@supabase/ssr` (Next.js cookie-aware client) |
+| Row-Level Security | Enabled on all candidate-owned tables |
 
-### Why PostgreSQL?
+### Why Supabase?
 
-The data model is inherently relational: Candidates **have many** Experiences, Education entries, and Languages. Jobs **have many** Applications. Notifications **belong to** Candidates or HR users. A document database (MongoDB) would require denormalization or manual joins.
+The project originally prototyped with Prisma + Neon, but was migrated to Supabase once Auth, Storage, and Realtime needs materialized. Supabase bundles DB, Auth, and Storage behind a single tenant and reduces the number of third-party integrations.
 
 **Alternatives considered:**
 
 | Alternative | Why Rejected |
 |-------------|-------------|
-| MongoDB | No relational integrity for candidate→experience→education hierarchy; manual joins needed |
-| SQLite | Single-file DB doesn't support concurrent writes in serverless environment |
-| MySQL | Viable, but PostgreSQL has better JSON support (for future flexibility) and is the default for Neon/Vercel |
-| Supabase | Full BaaS adds unnecessary abstraction layer; we want direct DB control through Prisma |
+| Neon + Prisma + NextAuth + Vercel Blob | Four distinct services to wire, secret, and monitor; mass-migration friction for auth rules |
+| Firebase | NoSQL model conflicts with the inherently relational candidate / experience / education / language graph |
+| Raw PostgreSQL on Render/Railway | No integrated Auth or Storage; would still need a separate auth solution |
+| AWS RDS + Cognito + S3 | Enterprise-grade, academic-project overkill, non-trivial IAM setup |
 
-### Why Neon?
+**Supabase advantages in this project:**
 
-1. **Serverless-native** — Scales to zero when idle (important for free tier cost)
-2. **Vercel-integrated** — Connection strings auto-injected as env variables
-3. **Free tier** — Sufficient for academic project (0.5 GB storage, 190 hours compute)
-4. **PostgreSQL-compatible** — Standard Prisma connection string; no vendor lock-in
+1. **Single source of auth, data, and files** — one dashboard, one connection string, one set of secrets
+2. **SQL-first migrations** — `supabase/migrations/*.sql` files are explicit, reviewable, and version-controlled
+3. **Row-Level Security** — enforcement co-located with the data, complementing route-level middleware
+4. **Free tier fits the prototype** — covers demo-scale traffic comfortably
 
 ---
 
-## 3.5 ORM — Prisma 6
+## 3.5 Data Access — `@supabase/supabase-js` + `@supabase/ssr`
 
 | Attribute | Detail |
 |-----------|--------|
-| Version | 6.19.2 |
-| Schema | `prisma/schema.prisma` (19 models, 14 enums) |
-| Client | `@prisma/client` (generated, type-safe) |
+| Versions | `@supabase/supabase-js` ^2.49.4, `@supabase/ssr` ^0.5.2 |
+| Schema source of truth | `supabase/migrations/*.sql` |
+| Repository location | `src/server/infrastructure/database/*.repository.ts` |
 
-### Why Prisma?
+A single `getSupabaseServerClient()` helper in `src/server/infrastructure/database/supabase-client.ts` returns a server-side Supabase client (service-role for privileged mutations, cookie-aware anon client via `@supabase/ssr` for request-scoped reads).
 
-**Alternatives considered:**
+Repositories (Supabase-backed, not Prisma-backed):
 
-| Alternative | Why Rejected |
-|-------------|-------------|
-| Raw SQL queries | No type safety, manual result mapping, migration fragility |
-| Drizzle ORM | Excellent alternative, but Prisma has more mature migration tooling and broader documentation |
-| TypeORM | Decorator-heavy, class-based approach conflicts with our functional port/adapter design |
-| Knex.js | Query builder only (not full ORM), still requires manual type mapping |
-| Sequelize | Poor TypeScript support, older API design |
+- `candidate.repository.ts`
+- `job.repository.ts`
+- `assessment.repository.ts`
+- `application.repository.ts`
+- `notification.repository.ts`
+- `parsing-job.repository.ts`
+- `dedup.repository.ts`
+- `analytics.repository.ts`
+- `scoring-weights.repository.ts` + `scoring-preset.repository.ts`
 
-**Prisma advantages in this project:**
+Each implements a port declared in `src/server/domain/ports/repositories.ts`. The Application and Domain layers never import `@supabase/*` directly — only the infrastructure layer is Supabase-aware.
 
-1. **Declarative schema** — `schema.prisma` is the single source of truth for database structure. Models, relations, enums, and defaults defined in one file.
-2. **Generated types** — `prisma generate` creates TypeScript types matching every model. `Prisma.CandidateCreateInput` enforces correct field types at compile time.
-3. **Migration tooling** — `prisma migrate dev` generates SQL migrations automatically from schema changes. `prisma db push` for rapid prototyping.
-4. **Nested writes** — `prisma.candidate.create({ data: { ..., experiences: { create: [...] } } })` handles the full object graph in one transaction.
-5. **Relation loading** — `include: { experiences: true, education: true, languages: true }` replaces manual JOINs.
-
-### Prisma in our Architecture
-
-Prisma lives **exclusively** in the Infrastructure layer. Domain ports define abstract interfaces (e.g., `findMany(filters): Promise<Job[]>`), and infrastructure repositories (`PrismaJobRepository`) implement them using the Prisma client. The Application and Domain layers never import from `@prisma/client`.
+**Why no ORM?** Supabase's `from(table).select()` builder already provides type hints via generated types, and the repository boundary fully insulates the rest of the codebase from storage concerns. Adding Prisma (or Drizzle) on top of Supabase would duplicate schema management without adding meaningful value.
 
 ---
 
@@ -412,14 +408,14 @@ The notification system requires HR users to compose rich promotional campaigns 
 
 ---
 
-## 3.13 File Storage — Dual Backend
+## 3.13 File Storage — Dual Backend (Supabase Storage + Local)
 
 ### Architecture: Conditional Storage Selection
 
 ```typescript
 // container.ts — composition root
-if (process.env.BLOB_READ_WRITE_TOKEN) {
-  container.storageService = new VercelBlobStorageService();
+if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  container.storageService = new SupabaseStorageService();
 } else {
   container.storageService = new LocalStorageService();
 }
@@ -432,16 +428,18 @@ if (process.env.BLOB_READ_WRITE_TOKEN) {
 - Zero configuration required
 - Files served by Next.js static file server
 
-### Vercel Blob (Production)
+### SupabaseStorageService (Production)
 
-- S3-compatible object storage
-- Files uploaded via `@vercel/blob` SDK (v2.3.1)
-- Returns signed URLs with CDN delivery
-- Free tier: 250MB storage
+- Supabase Storage buckets (S3-compatible under the hood)
+- Files uploaded via `supabase.storage.from(bucket).upload(...)`
+- Access controlled by RLS policies on the `storage.objects` table
+- Returns signed or public URLs depending on bucket configuration
 
 ### Why This Pattern?
 
-Developers don't need cloud credentials to work on the project. Running `npm run dev` stores files locally. Production deployments automatically use cloud storage when the environment variable is present. The `IStorageService` port ensures all business logic is storage-backend-agnostic.
+Developers don't need cloud credentials to work on the project. Running `npm run dev` stores files locally. Production deployments automatically use Supabase Storage when the service-role key is present. The `IStorageService` port ensures all business logic is storage-backend-agnostic.
+
+> The earlier prototype used Vercel Blob; it was dropped when the project consolidated on Supabase. The `@vercel/blob` dependency and its test file were removed.
 
 ---
 
@@ -469,7 +467,7 @@ Developers don't need cloud credentials to work on the project. Running `npm run
 |-----------|--------|
 | Version | 4.0.18 |
 | Test Files | 6 |
-| Test Cases | 63 passing |
+| Test Cases | 101 passing |
 | Configuration | `vitest.config.ts` with path aliases |
 
 ### Why Vitest over Jest?
@@ -503,73 +501,127 @@ Developers don't need cloud credentials to work on the project. Running `npm run
 
 ---
 
-## 3.17 Installed but Not Yet Active
+## 3.17 Async Processing — Next.js `after()`
 
-| Library | Version | Planned Use | Why Installed Early |
-|---------|---------|-------------|-------------------|
-| `bullmq` | 5.70.0 | Async job queue for bulk CV processing | Architecture designed for it; synchronous processing is a bottleneck |
-| `ioredis` | 5.9.3 | Redis client (BullMQ dependency) | Required by BullMQ |
-| `recharts` | 3.7.0 | Analytics dashboard charts | Analytics page placeholder exists; will wire when data aggregation is ready |
+Bulk CV uploads are processed asynchronously via the Next.js `after()` primitive instead of an external queue.
+
+| Aspect | Detail |
+|--------|--------|
+| Mechanism | `import { after } from "next/server"` inside `/api/upload/bulk` |
+| Trigger | HTTP request returns `202 Accepted` immediately with a `parsingJobId`; `after()` continues parsing post-response |
+| Progress | Client polls `GET /api/upload/bulk/[jobId]` which reads the `parsing_jobs` row |
+| Cancellation | In-memory `cancelledJobs` Set checked before each file |
+| Stale recovery | `recoverStaleJobs(10)` marks `PROCESSING` jobs older than 10 minutes as `FAILED` |
+
+This was evaluated against BullMQ + Redis (originally installed, later removed) and found to be simpler, cheaper, and sufficient for demo-scale batches. The BullMQ (`bullmq`) and Redis (`ioredis`) dependencies were uninstalled during the Supabase consolidation.
 
 ---
 
-## 3.18 Development & Deployment Tools
+## 3.18 Real-Time AI Interviewer — FastAPI Sidecar (Python)
+
+| Attribute | Detail |
+|-----------|--------|
+| Location | `ai_interviewer_backend/` |
+| Framework | FastAPI (Python) |
+| Deps | OpenAI SDK (Whisper STT + GPT-4o mini scoring) |
+| Integration | Next.js proxies `/api/interview/*` to `INTERVIEW_BACKEND_URL` |
+| Evaluator | `evaluator.py` enforces rubric-based CEFR scoring with evidence arrays |
+| Turn tracking | `/api/interview/realtime/turn` persists `turn_count` + `evidence` into `evaluation_rationale` JSONB |
+
+Python was chosen for the interview backend because it better suits streaming audio + OpenAI Whisper workflows, and isolates long-lived connections from the Next.js edge runtime.
+
+---
+
+## 3.19 Development & Deployment Tools
 
 | Tool | Purpose |
 |------|---------|
 | **ESLint 9** | Code linting with Next.js config (flat config format) |
 | **Git + GitHub** | Version control; repo: `github.com/Frsoul7/adidas-talent-pool` |
 | **Vercel Platform** | Hosting with automatic deployments, preview URLs, env management |
+| **Supabase CLI** | Schema management: `supabase migration new`, `supabase db push` |
 | **PostCSS** | CSS transform pipeline for Tailwind CSS |
 | **shadcn CLI** | Component scaffolding: `npx shadcn@latest add <component>` |
-| **Prisma CLI** | Schema management: `prisma migrate dev`, `prisma generate`, `prisma db push` |
 
 ---
 
-## 3.19 Full Dependency Inventory
+## 3.20 Authentication — Supabase Auth + Google OAuth
 
-### Production Dependencies (29 packages)
+| Attribute | Detail |
+|-----------|--------|
+| Provider | Supabase Auth |
+| Identity provider | Google OAuth |
+| Role storage | `auth.users.app_metadata.role` — either `"hr"` or `"candidate"` |
+| Server sessions | Cookie-based via `@supabase/ssr` |
+| Enforcement | `middleware.ts` refreshes the session and gates `/dashboard/**` + `/api/**` |
+
+### Middleware-Level Authorization
+
+```typescript
+// middleware.ts
+const PUBLIC_API_PREFIXES = ["/api/auth/"];
+const HR_ONLY_API_PREFIXES = [
+  "/api/candidates/rescore",
+  "/api/candidates/rerank",
+  "/api/scoring/",
+  "/api/export/",
+  "/api/notifications/campaigns",
+  "/api/jobs/sync",
+  "/api/upload/bulk",
+  "/api/analytics",
+];
+```
+
+- Unauthenticated requests to `/api/*` (outside `PUBLIC_API_PREFIXES`) → `401`
+- Authenticated non-HR requests to an `HR_ONLY_API_PREFIXES` path → `403`
+
+This single-point enforcement keeps route handlers focused on business logic. `app_metadata.role` is used as the source of truth because users cannot modify it via `auth.updateUser()` — only the service role can set it.
+
+---
+
+## 3.21 Full Dependency Inventory
+
+### Production Dependencies
 
 | # | Package | Version | Category |
 |---|---------|---------|----------|
-| 1 | `@prisma/client` | ^6.19.2 | Database |
-| 2 | `@tiptap/extension-color` | ^3.20.1 | Rich Text |
-| 3 | `@tiptap/extension-image` | ^3.20.1 | Rich Text |
-| 4 | `@tiptap/extension-link` | ^3.20.1 | Rich Text |
-| 5 | `@tiptap/extension-placeholder` | ^3.20.1 | Rich Text |
-| 6 | `@tiptap/extension-superscript` | ^3.20.1 | Rich Text |
-| 7 | `@tiptap/extension-text-align` | ^3.20.1 | Rich Text |
-| 8 | `@tiptap/extension-text-style` | ^3.20.1 | Rich Text |
-| 9 | `@tiptap/extension-underline` | ^3.20.1 | Rich Text |
-| 10 | `@tiptap/pm` | ^3.20.1 | Rich Text |
-| 11 | `@tiptap/react` | ^3.20.1 | Rich Text |
-| 12 | `@tiptap/starter-kit` | ^3.20.1 | Rich Text |
-| 13 | `@vercel/blob` | ^2.3.1 | Storage |
-| 14 | `bullmq` | ^5.70.0 | Queue (planned) |
-| 15 | `cheerio` | ^1.0.0 | Scraping |
-| 16 | `class-variance-authority` | ^0.7.1 | UI |
-| 17 | `clsx` | ^2.1.1 | UI |
-| 18 | `cmdk` | ^1.1.1 | UI |
-| 19 | `date-fns` | ^4.1.0 | Utility |
-| 20 | `ioredis` | ^5.9.3 | Queue (planned) |
-| 21 | `jszip` | ^3.10.1 | File Processing |
-| 22 | `lucide-react` | ^0.575.0 | Icons |
-| 23 | `mammoth` | ^1.11.0 | Text Extraction |
-| 24 | `next` | 16.1.6 | Framework |
-| 25 | `next-themes` | ^0.4.6 | Theming |
-| 26 | `openai` | ^6.22.0 | AI |
-| 27 | `papaparse` | ^5.5.3 | CSV Export |
-| 28 | `prisma` | ^6.19.2 | ORM CLI |
-| 29 | `radix-ui` | ^1.4.3 | UI Primitives |
-| 30 | `react` | 19.2.3 | UI |
-| 31 | `react-dom` | 19.2.3 | UI |
-| 32 | `recharts` | ^3.7.0 | Charts (planned) |
-| 33 | `resend` | ^6.9.2 | Email |
-| 34 | `sonner` | ^2.0.7 | Toasts |
-| 35 | `tailwind-merge` | ^3.5.0 | CSS |
-| 36 | `unpdf` | ^1.4.0 | Text Extraction |
-| 37 | `uuid` | ^13.0.0 | Utility |
-| 38 | `zod` | ^4.3.6 | Validation |
+| 1 | `@supabase/ssr` | ^0.5.2 | Auth / DB / Storage |
+| 2 | `@supabase/supabase-js` | ^2.49.4 | Auth / DB / Storage |
+| 3 | `@tiptap/extension-color` | ^3.20.1 | Rich Text |
+| 4 | `@tiptap/extension-image` | ^3.20.1 | Rich Text |
+| 5 | `@tiptap/extension-link` | ^3.20.1 | Rich Text |
+| 6 | `@tiptap/extension-placeholder` | ^3.20.1 | Rich Text |
+| 7 | `@tiptap/extension-superscript` | ^3.20.1 | Rich Text |
+| 8 | `@tiptap/extension-text-align` | ^3.20.1 | Rich Text |
+| 9 | `@tiptap/extension-text-style` | ^3.20.1 | Rich Text |
+| 10 | `@tiptap/extension-underline` | ^3.20.1 | Rich Text |
+| 11 | `@tiptap/pm` | ^3.20.1 | Rich Text |
+| 12 | `@tiptap/react` | ^3.20.1 | Rich Text |
+| 13 | `@tiptap/starter-kit` | ^3.20.1 | Rich Text |
+| 14 | `cheerio` | ^1.0.0 | Scraping |
+| 15 | `class-variance-authority` | ^0.7.1 | UI |
+| 16 | `clsx` | ^2.1.1 | UI |
+| 17 | `cmdk` | ^1.1.1 | UI |
+| 18 | `date-fns` | ^4.1.0 | Utility |
+| 19 | `jszip` | ^3.10.1 | File Processing |
+| 20 | `lucide-react` | ^0.575.0 | Icons |
+| 21 | `mammoth` | ^1.11.0 | Text Extraction |
+| 22 | `next` | 16.1.6 | Framework |
+| 23 | `next-themes` | ^0.4.6 | Theming |
+| 24 | `openai` | ^6.22.0 | AI |
+| 25 | `papaparse` | ^5.5.3 | CSV Export |
+| 26 | `radix-ui` | ^1.4.3 | UI Primitives |
+| 27 | `react` | 19.2.3 | UI |
+| 28 | `react-dom` | 19.2.3 | UI |
+| 29 | `recharts` | ^3.7.0 | Charts (analytics dashboard) |
+| 30 | `resend` | ^6.9.2 | Email |
+| 31 | `sonner` | ^2.0.7 | Toasts |
+| 32 | `tailwind-merge` | ^3.5.0 | CSS |
+| 33 | `unpdf` | ^1.4.0 | Text Extraction |
+| 34 | `uuid` | ^13.0.0 | Utility |
+| 35 | `zod` | ^4.3.6 | Validation |
+
+**Removed during Supabase consolidation:** `@prisma/client`, `prisma`, `@vercel/blob`, `bullmq`, `ioredis`.
 
 ### Dev Dependencies (11 packages)
 

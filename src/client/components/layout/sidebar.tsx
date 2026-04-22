@@ -219,10 +219,10 @@ export function Sidebar() {
   const { role, clearRole, isLoading, userName, userEmail } = useRole();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Redirect to login if not authenticated (after hydration)
+  // Redirect to landing if not authenticated (after hydration)
   useEffect(() => {
     if (!isLoading && !role) {
-      router.push("/auth/login");
+      router.push("/");
     }
   }, [isLoading, role, router]);
 
@@ -292,7 +292,7 @@ export function MobileSidebar() {
 
   useEffect(() => {
     if (!isLoading && !role) {
-      router.push("/auth/login");
+      router.push("/");
     }
   }, [isLoading, role, router]);
 
