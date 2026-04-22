@@ -341,6 +341,7 @@ export class JobUseCases {
     };
 
     const results: any[] = [];
+    const upsertPromises: Promise<any>[] = [];
     for (const job of eligible) {
       const matchResult = matchCandidateToJob({
         candidate: candidateMatchInput,
@@ -356,17 +357,19 @@ export class JobUseCases {
         },
       });
 
-      // Persist for audit
-      try {
-        await this.jobRepo.upsertMatch(
-          job.id,
-          candidateId,
-          matchResult.overallScore,
-          matchResult.breakdown
-        );
-      } catch {
-        // Non-fatal — audit row failure shouldn't block the UX
-      }
+      // Persist for audit — fire in parallel, don't block per-job
+      upsertPromises.push(
+        this.jobRepo
+          .upsertMatch(
+            job.id,
+            candidateId,
+            matchResult.overallScore,
+            matchResult.breakdown
+          )
+          .catch(() => {
+            // Non-fatal — audit row failure shouldn't block the UX
+          })
+      );
 
       results.push({
         jobId: job.id,
@@ -381,6 +384,9 @@ export class JobUseCases {
         ...matchResult,
       });
     }
+
+    // Wait for audit writes (all in parallel) so serverless function can cleanly exit
+    await Promise.allSettled(upsertPromises);
 
     results.sort((a, b) => b.overallScore - a.overallScore);
 
