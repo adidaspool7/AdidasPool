@@ -983,7 +983,7 @@ function MatchJobsDialog({
           <Sparkles className="h-4 w-4 mr-1" /> Match Jobs to this Candidate
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[95vw] sm:max-w-5xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[min(1200px,95vw)] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Match jobs to {candidateName}</DialogTitle>
           <DialogDescription>

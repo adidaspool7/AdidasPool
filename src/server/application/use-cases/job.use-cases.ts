@@ -14,7 +14,10 @@ import type {
   IJobApplicationRepository,
 } from "@server/domain/ports/repositories";
 import type { IJobScraperService } from "@server/domain/ports/services";
-import { matchCandidateToJob } from "@server/domain/services/matching.service";
+import {
+  matchCandidateToJob,
+  normalizeCountry,
+} from "@server/domain/services/matching.service";
 import type { CreateJobInput } from "@server/application/dtos";
 import type { UpdateJobInput } from "@server/application/dtos";
 import { NotFoundError } from "./candidate.use-cases";
@@ -307,8 +310,27 @@ export class JobUseCases {
     });
 
     const eligible = (jobs as any[]).filter((j) => {
-      if (j.type === "INTERNSHIP") return j.internshipStatus === "ACTIVE";
-      return j.status === "OPEN";
+      // Status filter — open jobs and active internships only
+      if (j.type === "INTERNSHIP") {
+        if (j.internshipStatus !== "ACTIVE") return false;
+      } else if (j.status !== "OPEN") {
+        return false;
+      }
+
+      // Hard country filter — both sides must have a country, and they must
+      // match (or the candidate must be willing to relocate). Jobs or
+      // candidates without a country are excluded entirely per product
+      // requirement ("All jobs and candidates must have a country").
+      const candidateCountry = normalizeCountry(
+        (candidate as any).country || (candidate as any).location
+      );
+      const jobCountry = normalizeCountry(j.country || j.location);
+      if (!candidateCountry || !jobCountry) return false;
+      if (candidateCountry !== jobCountry && !(candidate as any).willingToRelocate) {
+        return false;
+      }
+
+      return true;
     });
 
     // Highest education once per candidate (same heuristic as matchCandidatesToJob)
@@ -338,6 +360,10 @@ export class JobUseCases {
       })),
       skills: (candidate.skills ?? []).map((s: any) => s.name),
       experienceScore: candidate.experienceScore,
+      primaryBusinessArea: (candidate as any).primaryBusinessArea ?? null,
+      secondaryBusinessAreas: (candidate as any).secondaryBusinessAreas ?? [],
+      candidateCustomArea: (candidate as any).candidateCustomArea ?? null,
+      willingToRelocate: (candidate as any).willingToRelocate ?? false,
     };
 
     const results: any[] = [];
@@ -348,6 +374,7 @@ export class JobUseCases {
         job: {
           location: job.location,
           country: job.country,
+          department: job.department,
           requiredLanguage: job.requiredLanguage,
           requiredLanguageLevel: job.requiredLanguageLevel,
           requiredExperienceType: job.requiredExperienceType,
