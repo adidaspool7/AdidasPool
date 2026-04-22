@@ -159,6 +159,7 @@ interface InternshipFormData {
   requiredExperienceType: string;
   minYearsExperience: string;
   requiredEducationLevel: string;
+  requiredSkills: string;
 }
 
 const EMPTY_FORM: InternshipFormData = {
@@ -179,6 +180,7 @@ const EMPTY_FORM: InternshipFormData = {
   requiredExperienceType: "",
   minYearsExperience: "",
   requiredEducationLevel: "",
+  requiredSkills: "",
 };
 
 // ============================================
@@ -423,6 +425,21 @@ function InternshipFormFields({
           </Select>
         </div>
       </div>
+
+      {/* Row 9: Required Skills */}
+      <div className="space-y-2">
+        <Label htmlFor="intern-skills">Required Skills</Label>
+        <Input
+          id="intern-skills"
+          placeholder="Comma-separated, e.g. Python, Excel, Communication"
+          value={form.requiredSkills}
+          onChange={(e) => setField("requiredSkills", e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Used by the matching engine to rank candidates. Separate multiple
+          skills with commas.
+        </p>
+      </div>
     </div>
   );
 }
@@ -487,6 +504,11 @@ function CreateInternshipDialog({ onCreated }: { onCreated: () => void }) {
       if (form.minYearsExperience.trim())
         body.minYearsExperience = parseInt(form.minYearsExperience, 10);
       if (form.requiredEducationLevel) body.requiredEducationLevel = form.requiredEducationLevel;
+      const skillsArr = form.requiredSkills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (skillsArr.length > 0) body.requiredSkills = skillsArr;
 
       const res = await fetch("/api/jobs", {
         method: "POST",
@@ -597,6 +619,9 @@ function EditInternshipDialog({
       minYearsExperience:
         internship.minYearsExperience != null ? String(internship.minYearsExperience) : "",
       requiredEducationLevel: internship.requiredEducationLevel || "",
+      requiredSkills: Array.isArray((internship as any).requiredSkills)
+        ? (internship as any).requiredSkills.join(", ")
+        : "",
     });
     setError(null);
   };
@@ -650,6 +675,11 @@ function EditInternshipDialog({
         ? parseInt(form.minYearsExperience, 10)
         : null;
       body.requiredEducationLevel = form.requiredEducationLevel || null;
+      const skillsArr = form.requiredSkills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      body.requiredSkills = skillsArr;
 
       const res = await fetch(`/api/jobs/${internship.id}`, {
         method: "PATCH",

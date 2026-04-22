@@ -32,6 +32,15 @@ import {
   AlertDialogTrigger,
 } from "@client/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@client/components/ui/dialog";
+import {
   ArrowLeft,
   Mail,
   Phone,
@@ -487,6 +496,12 @@ export default function CandidateDetailPage({
               {c.rawCvUrl ? "Replace Candidate CV" : "Upload Candidate CV"}
             </Button>
 
+            <MatchJobsDialog
+              candidateId={c.id}
+              candidateName={`${c.firstName} ${c.lastName}`}
+              disabled={deleting || replacing}
+            />
+
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -860,3 +875,237 @@ function DetailSkeleton() {
     </div>
   );
 }
+
+// ── Match Jobs dialog (HR → Invite candidate) ─────────────────────
+
+interface MatchJobRow {
+  jobId: string;
+  title: string;
+  department: string | null;
+  location: string | null;
+  country: string | null;
+  type: string | null;
+  sourceUrl: string | null;
+  status: string;
+  internshipStatus: string | null;
+  overallScore: number;
+  isEligible: boolean;
+  breakdown: {
+    criterion: string;
+    met: boolean;
+    score: number;
+    details: string;
+  }[];
+}
+
+type InviteStatus = "idle" | "sending" | "sent" | "already_invited" | "already_applied";
+
+function MatchJobsDialog({
+  candidateId,
+  candidateName,
+  disabled,
+}: {
+  candidateId: string;
+  candidateName: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [matches, setMatches] = useState<MatchJobRow[]>([]);
+  const [inviteState, setInviteState] = useState<Record<string, InviteStatus>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/candidates/${candidateId}/match-jobs`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error ?? `Server error (${r.status})`);
+        return body;
+      })
+      .then((data: { matches: MatchJobRow[] }) => {
+        if (cancelled) return;
+        setMatches(data.matches ?? []);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to load matches");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, candidateId]);
+
+  async function handleInvite(jobId: string) {
+    setInviteState((s) => ({ ...s, [jobId]: "sending" }));
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        status?: InviteStatus;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error ?? `Server error (${res.status})`);
+      }
+      const status = (body.status ?? "sent") as InviteStatus;
+      setInviteState((s) => ({ ...s, [jobId]: status }));
+      if (status === "sent" || status === "idle") {
+        toast.success(`${candidateName} invited — notification sent.`);
+      } else if (status === "already_invited") {
+        toast.info("Already invited to this job.");
+      } else if (status === "already_applied") {
+        toast.info("Candidate already applied to this job.");
+      }
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Failed to send invitation"
+      );
+      setInviteState((s) => ({ ...s, [jobId]: "idle" }));
+    }
+  }
+
+  const eligibleOnly = matches.filter((m) => m.overallScore > 0);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" disabled={disabled}>
+          <Sparkles className="h-4 w-4 mr-1" /> Match Jobs to this Candidate
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Match jobs to {candidateName}</DialogTitle>
+          <DialogDescription>
+            Jobs ranked by how well they match this candidate&apos;s location,
+            language, experience, education and skills. Only OPEN positions and
+            ACTIVE internships are shown.
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading && (
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            Running matching engine…
+          </div>
+        )}
+
+        {!loading && error && (
+          <p className="text-sm text-destructive py-4">{error}</p>
+        )}
+
+        {!loading && !error && eligibleOnly.length === 0 && (
+          <div className="py-6 text-sm text-muted-foreground text-center">
+            No open positions matched this candidate. Either there are no open
+            jobs or the candidate&apos;s profile doesn&apos;t overlap with any
+            of them.
+          </div>
+        )}
+
+        {!loading && !error && eligibleOnly.length > 0 && (
+          <div className="space-y-2 py-2">
+            {eligibleOnly.map((m) => {
+              const state = inviteState[m.jobId] ?? "idle";
+              const scoreColor =
+                m.overallScore >= 75
+                  ? "text-emerald-600"
+                  : m.overallScore >= 50
+                  ? "text-amber-600"
+                  : "text-muted-foreground";
+              return (
+                <div
+                  key={m.jobId}
+                  className="rounded-md border p-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{m.title}</p>
+                      {m.type === "INTERNSHIP" && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Internship
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {[m.department, m.location, m.country]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
+                    </p>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {m.breakdown.map((b) => (
+                        <Badge
+                          key={b.criterion}
+                          variant={b.met ? "secondary" : "outline"}
+                          title={b.details}
+                          className={`text-[10px] ${
+                            b.met
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {b.criterion} {b.score}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Progress
+                        value={m.overallScore}
+                        className="h-2 w-24"
+                      />
+                      <span
+                        className={`text-sm font-bold tabular-nums ${scoreColor}`}
+                      >
+                        {m.overallScore}%
+                      </span>
+                    </div>
+                    {state === "sent" || state === "already_invited" ? (
+                      <Button size="sm" variant="secondary" disabled>
+                        ✓ Invited
+                      </Button>
+                    ) : state === "already_applied" ? (
+                      <Button size="sm" variant="secondary" disabled>
+                        Already applied
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleInvite(m.jobId)}
+                        disabled={state === "sending"}
+                      >
+                        {state === "sending" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Invite to this position"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

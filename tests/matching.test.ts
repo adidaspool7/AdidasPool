@@ -29,7 +29,7 @@ describe("matchCandidateToJob", () => {
 
     expect(result.overallScore).toBe(100);
     expect(result.isEligible).toBe(true);
-    expect(result.breakdown).toHaveLength(4);
+    expect(result.breakdown).toHaveLength(5);
   });
 
   it("should return low score for a poor match", () => {

@@ -45,7 +45,7 @@ export { NotFoundError, ValidationError };
 
 export const candidateUseCases = new CandidateUseCases(candidateRepository, storageService);
 
-export const jobUseCases = new JobUseCases(jobRepository, candidateRepository, jobScraperService, notificationRepository);
+export const jobUseCases = new JobUseCases(jobRepository, candidateRepository, jobScraperService, notificationRepository, jobApplicationRepository);
 
 export const assessmentUseCases = new AssessmentUseCases(
   assessmentRepository,

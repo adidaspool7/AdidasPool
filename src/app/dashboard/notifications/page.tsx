@@ -52,6 +52,7 @@ interface NotificationJob {
   location: string | null;
   country: string | null;
   type?: string | null;
+  sourceUrl?: string | null;
 }
 
 interface NotificationCandidate {
@@ -90,6 +91,7 @@ interface NotificationPreferences {
 
 function getNotificationIcon(type: string) {
   if (type === "PROMOTIONAL") return <Megaphone className="h-4 w-4 text-purple-500" />;
+  if (type === "JOB_INVITATION") return <Briefcase className="h-4 w-4 text-emerald-600" />;
   if (type.includes("INTERNSHIP")) return <GraduationCap className="h-4 w-4 text-blue-500" />;
   if (type.includes("APPLICATION")) return <FileText className="h-4 w-4 text-green-500" />;
   if (type.includes("ASSESSMENT")) return <AlertCircle className="h-4 w-4 text-orange-500" />;
@@ -101,6 +103,7 @@ function getNotificationLabel(type: string): string {
   const labels: Record<string, string> = {
     JOB_POSTED: "New Job",
     INTERNSHIP_POSTED: "New Internship",
+    JOB_INVITATION: "You're Invited",
     JOB_STATE_CHANGED: "Job Update",
     APPLICATION_RECEIVED: "Application Confirmed",
     APPLICATION_STATUS_CHANGED: "Application Update",
@@ -290,6 +293,16 @@ function NotificationCard({
                 {notification.job.title}
                 {notification.job.location && ` - ${notification.job.location}`}
               </p>
+            )}
+            {notification.type === "JOB_INVITATION" && notification.job?.sourceUrl && (
+              <a
+                href={notification.job.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-0.5"
+              >
+                Check more on adidas Careers <ExternalLink className="h-3 w-3" />
+              </a>
             )}
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />

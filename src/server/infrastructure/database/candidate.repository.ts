@@ -224,11 +224,21 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
   async findForMatching() {
     const { data, error } = await db
       .from("candidates")
-      .select(`*, languages:candidate_languages(*), education(*)`)
+      .select(`*, languages:candidate_languages(*), education(*), skills(*)`)
       .neq("status", "NEW")
       .eq("is_duplicate", false);
     assertNoError(error, "candidate.findForMatching");
     return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
+  }
+
+  async findByIdForMatching(candidateId: string) {
+    const { data, error } = await db
+      .from("candidates")
+      .select(`*, languages:candidate_languages(*), education(*), skills(*)`)
+      .eq("id", candidateId)
+      .single();
+    if (error) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
   async findForNotifications() {

@@ -222,6 +222,7 @@ export const CreateJobSchema = z.object({
   requiredEducationLevel: z
     .enum(["HIGH_SCHOOL", "BACHELOR", "MASTER", "PHD", "VOCATIONAL", "OTHER"])
     .optional(),
+  requiredSkills: z.array(z.string().min(1)).optional(),
 });
 
 export type CreateJobInput = z.infer<typeof CreateJobSchema>;
@@ -248,6 +249,7 @@ export const UpdateJobSchema = z.object({
   requiredExperienceType: z.string().optional().nullable(),
   minYearsExperience: z.number().int().min(0).optional().nullable(),
   requiredEducationLevel: z.enum(["HIGH_SCHOOL", "BACHELOR", "MASTER", "PHD", "VOCATIONAL", "OTHER"]).optional().nullable(),
+  requiredSkills: z.array(z.string().min(1)).optional().nullable(),
 });
 
 export type UpdateJobInput = z.infer<typeof UpdateJobSchema>;

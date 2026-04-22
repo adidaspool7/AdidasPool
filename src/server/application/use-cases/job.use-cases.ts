@@ -11,6 +11,7 @@ import type {
   IJobRepository,
   ICandidateRepository,
   INotificationRepository,
+  IJobApplicationRepository,
 } from "@server/domain/ports/repositories";
 import type { IJobScraperService } from "@server/domain/ports/services";
 import { matchCandidateToJob } from "@server/domain/services/matching.service";
@@ -23,7 +24,8 @@ export class JobUseCases {
     private readonly jobRepo: IJobRepository,
     private readonly candidateRepo: ICandidateRepository,
     private readonly jobScraperService?: IJobScraperService,
-    private readonly notificationRepo?: INotificationRepository
+    private readonly notificationRepo?: INotificationRepository,
+    private readonly applicationRepo?: IJobApplicationRepository
   ) {}
 
   /**
@@ -238,6 +240,7 @@ export class JobUseCases {
             language: l.language,
             level: l.selfDeclaredLevel,
           })),
+          skills: (candidate.skills ?? []).map((s: any) => s.name),
           experienceScore: candidate.experienceScore,
         },
         job: {
@@ -248,6 +251,7 @@ export class JobUseCases {
           requiredExperienceType: job.requiredExperienceType,
           minYearsExperience: job.minYearsExperience,
           requiredEducationLevel: job.requiredEducationLevel,
+          requiredSkills: job.requiredSkills ?? [],
         },
       });
 
@@ -276,6 +280,180 @@ export class JobUseCases {
       matches: results,
     };
   }
+
+  /**
+   * Run matching engine for a single candidate against all currently-open
+   * eligible jobs.
+   *
+   * "Eligible" = OPEN regular jobs + ACTIVE internships (drafts / closed
+   * are filtered out so invitations can never target a non-applicable role).
+   *
+   * Results are persisted to `job_matches` for audit, sorted by score desc,
+   * and returned enriched with the job metadata so the UI can render them
+   * directly.
+   */
+  async matchJobsForCandidate(candidateId: string) {
+    const candidate = await this.candidateRepo.findByIdForMatching(candidateId);
+    if (!candidate) {
+      throw new NotFoundError(`Candidate ${candidateId} not found`);
+    }
+
+    // All jobs — we filter in app-layer to keep the Supabase query simple
+    // (single table scan, small app) and because internship eligibility has
+    // two-part logic (type + internship_status).
+    const { data: jobs } = await this.jobRepo.findMany({
+      page: 1,
+      pageSize: 1000,
+    });
+
+    const eligible = (jobs as any[]).filter((j) => {
+      if (j.type === "INTERNSHIP") return j.internshipStatus === "ACTIVE";
+      return j.status === "OPEN";
+    });
+
+    // Highest education once per candidate (same heuristic as matchCandidatesToJob)
+    const eduRank: Record<string, number> = {
+      HIGH_SCHOOL: 1,
+      VOCATIONAL: 2,
+      BACHELOR: 3,
+      MASTER: 4,
+      PHD: 5,
+    };
+    const highestEdu = candidate.education?.length
+      ? candidate.education.reduce((best: any, e: any) => {
+          const bestRank = eduRank[best?.level] ?? 0;
+          const curRank = eduRank[e?.level] ?? 0;
+          return curRank > bestRank ? e : best;
+        }, candidate.education[0])
+      : null;
+
+    const candidateMatchInput = {
+      location: candidate.location,
+      country: candidate.country,
+      yearsOfExperience: candidate.yearsOfExperience,
+      educationLevel: highestEdu?.level || null,
+      languages: (candidate.languages ?? []).map((l: any) => ({
+        language: l.language,
+        level: l.selfDeclaredLevel,
+      })),
+      skills: (candidate.skills ?? []).map((s: any) => s.name),
+      experienceScore: candidate.experienceScore,
+    };
+
+    const results: any[] = [];
+    for (const job of eligible) {
+      const matchResult = matchCandidateToJob({
+        candidate: candidateMatchInput,
+        job: {
+          location: job.location,
+          country: job.country,
+          requiredLanguage: job.requiredLanguage,
+          requiredLanguageLevel: job.requiredLanguageLevel,
+          requiredExperienceType: job.requiredExperienceType,
+          minYearsExperience: job.minYearsExperience,
+          requiredEducationLevel: job.requiredEducationLevel,
+          requiredSkills: job.requiredSkills ?? [],
+        },
+      });
+
+      // Persist for audit
+      try {
+        await this.jobRepo.upsertMatch(
+          job.id,
+          candidateId,
+          matchResult.overallScore,
+          matchResult.breakdown
+        );
+      } catch {
+        // Non-fatal — audit row failure shouldn't block the UX
+      }
+
+      results.push({
+        jobId: job.id,
+        title: job.title,
+        department: job.department,
+        location: job.location,
+        country: job.country,
+        type: job.type,
+        sourceUrl: job.sourceUrl,
+        status: job.status,
+        internshipStatus: job.internshipStatus,
+        ...matchResult,
+      });
+    }
+
+    results.sort((a, b) => b.overallScore - a.overallScore);
+
+    return {
+      candidateId,
+      totalJobs: eligible.length,
+      matches: results,
+    };
+  }
+
+  /**
+   * HR invites a candidate (already on the platform) to apply for a job.
+   *
+   * Emits a single JOB_INVITATION notification to the candidate. Idempotent:
+   * a second invite for the same (candidate, job) returns the previous one
+   * rather than spamming. If the candidate already applied (non-withdrawn),
+   * the invite is skipped and the caller is informed.
+   */
+  async inviteCandidateToJob(
+    candidateId: string,
+    jobId: string,
+    invitedByName?: string
+  ): Promise<{
+    status: "created" | "already_invited" | "already_applied";
+    notificationId?: string;
+  }> {
+    if (!this.notificationRepo) {
+      throw new Error("Notification repository not configured");
+    }
+
+    const job = await this.jobRepo.findById(jobId);
+    if (!job) throw new NotFoundError(`Job ${jobId} not found`);
+
+    const candidate = await this.candidateRepo.findById(candidateId);
+    if (!candidate) throw new NotFoundError(`Candidate ${candidateId} not found`);
+
+    // Skip if the candidate already has an active (non-withdrawn) application
+    if (this.applicationRepo) {
+      const existingApp = await this.applicationRepo.findByJobAndCandidate(
+        jobId,
+        candidateId
+      );
+      if (existingApp && existingApp.status !== "WITHDRAWN") {
+        return { status: "already_applied" };
+      }
+    }
+
+    // Dedupe: any non-archived prior invitation for this pair?
+    const existingInvites = await this.notificationRepo.findForCandidate(
+      candidateId,
+      { type: "JOB_INVITATION", archived: false, limit: 200 }
+    );
+    const prior = (existingInvites ?? []).find(
+      (n: any) => n.jobId === jobId || n.job?.id === jobId
+    );
+    if (prior) {
+      return { status: "already_invited", notificationId: prior.id };
+    }
+
+    const byLabel = invitedByName ? `${invitedByName} from HR` : "Our HR team";
+    const message = `${byLabel} thinks you could be a great fit for "${job.title}". Check it out on adidas Careers and apply if you're interested.`;
+
+    const created = await this.notificationRepo.create({
+      type: "JOB_INVITATION",
+      message,
+      targetRole: "CANDIDATE",
+      jobId,
+      candidateId,
+    });
+
+    return { status: "created", notificationId: created.id };
+  }
+
 
   /**
    * Sync jobs from the external adidas careers portal.

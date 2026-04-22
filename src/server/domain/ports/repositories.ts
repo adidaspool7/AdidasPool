@@ -71,6 +71,7 @@ export interface ICandidateRepository {
   addNote(candidateId: string, author: string, content: string): Promise<any>;
   updateStatus(candidateId: string, status: string): Promise<void>;
   findForMatching(): Promise<any[]>;
+  findByIdForMatching(candidateId: string): Promise<any | null>;
   findForNotifications(): Promise<any[]>;
   findInternshipCandidateIds(): Promise<Set<string>>;
   findForExport(): Promise<any[]>;

@@ -145,6 +145,7 @@ interface CreateJobForm {
   requiredExperienceType: string;
   minYearsExperience: string;
   requiredEducationLevel: string;
+  requiredSkills: string;
 }
 
 const EMPTY_FORM: CreateJobForm = {
@@ -159,6 +160,7 @@ const EMPTY_FORM: CreateJobForm = {
   requiredExperienceType: "",
   minYearsExperience: "",
   requiredEducationLevel: "",
+  requiredSkills: "",
 };
 
 function CreateJobDialog({ onCreated }: { onCreated: () => void }) {
@@ -191,6 +193,11 @@ function CreateJobDialog({ onCreated }: { onCreated: () => void }) {
       if (form.requiredExperienceType.trim()) body.requiredExperienceType = form.requiredExperienceType.trim();
       if (form.minYearsExperience.trim()) body.minYearsExperience = parseInt(form.minYearsExperience, 10);
       if (form.requiredEducationLevel) body.requiredEducationLevel = form.requiredEducationLevel;
+      const skillsArr = form.requiredSkills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (skillsArr.length > 0) body.requiredSkills = skillsArr;
 
       const res = await fetch("/api/jobs", {
         method: "POST",
@@ -361,6 +368,21 @@ function CreateJobDialog({ onCreated }: { onCreated: () => void }) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Row 6: Required Skills (comma-separated) */}
+          <div className="space-y-2">
+            <Label htmlFor="job-skills">Required Skills</Label>
+            <Input
+              id="job-skills"
+              placeholder="Comma-separated, e.g. React, TypeScript, SQL"
+              value={form.requiredSkills}
+              onChange={(e) => set("requiredSkills", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used by the matching engine to rank candidates. Separate multiple
+              skills with commas.
+            </p>
           </div>
 
           {error && (

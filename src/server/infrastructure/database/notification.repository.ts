@@ -15,7 +15,7 @@ import type {
 
 const NOTIFICATION_SELECT = `
   *,
-  job:jobs(id, title, department, location, country, type),
+  job:jobs(id, title, department, location, country, type, source_url),
   candidate:candidates(id, first_name, last_name, email)
 ` as const;
 

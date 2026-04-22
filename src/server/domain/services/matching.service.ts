@@ -20,6 +20,7 @@ export interface MatchInput {
     yearsOfExperience?: number | null;
     educationLevel?: string | null;
     languages: { language: string; level: string | null }[];
+    skills?: string[] | null;
     experienceScore?: number | null;
   };
   job: {
@@ -30,6 +31,7 @@ export interface MatchInput {
     requiredExperienceType?: string | null;
     minYearsExperience?: number | null;
     requiredEducationLevel?: string | null;
+    requiredSkills?: string[] | null;
   };
 }
 
@@ -60,6 +62,7 @@ export function matchCandidateToJob(input: MatchInput): MatchResult {
   breakdown.push(matchLanguage(candidate, job));
   breakdown.push(matchExperience(candidate, job));
   breakdown.push(matchEducation(candidate, job));
+  breakdown.push(matchSkills(candidate, job));
 
   const overallScore = Math.round(
     breakdown.reduce((sum, b) => sum + b.score, 0) / breakdown.length
@@ -249,4 +252,67 @@ function matchEducation(
     score: Math.max(0, Math.round((candidateIdx / requiredIdx) * 100)),
     details: `${candidate.educationLevel || "Unknown"} below ${job.requiredEducationLevel} requirement`,
   };
+}
+
+function normalizeSkill(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/\.js$/, "js")
+    .replace(/[\s._-]+/g, "");
+}
+
+function matchSkills(
+  candidate: MatchInput["candidate"],
+  job: MatchInput["job"]
+) {
+  const required = (job.requiredSkills ?? []).filter(
+    (s) => s && s.trim().length > 0
+  );
+
+  // No skill requirement → neutral pass
+  if (required.length === 0) {
+    return {
+      criterion: "Skills",
+      met: true,
+      score: 100,
+      details: "No skill requirement",
+    };
+  }
+
+  const candidateSkills = (candidate.skills ?? [])
+    .filter((s) => s && s.trim().length > 0)
+    .map(normalizeSkill);
+
+  if (candidateSkills.length === 0) {
+    return {
+      criterion: "Skills",
+      met: false,
+      score: 0,
+      details: `Candidate has no declared skills (required: ${required.join(", ")})`,
+    };
+  }
+
+  const candidateSet = new Set(candidateSkills);
+  const matched: string[] = [];
+  const missing: string[] = [];
+  for (const r of required) {
+    if (candidateSet.has(normalizeSkill(r))) matched.push(r);
+    else missing.push(r);
+  }
+
+  const ratio = matched.length / required.length;
+  const score = Math.round(ratio * 100);
+  const met = ratio >= 0.5; // at least half of required skills present
+
+  let details: string;
+  if (matched.length === required.length) {
+    details = `All required skills present (${matched.join(", ")})`;
+  } else if (matched.length === 0) {
+    details = `Missing: ${missing.join(", ")}`;
+  } else {
+    details = `${matched.length}/${required.length} skills matched — missing: ${missing.join(", ")}`;
+  }
+
+  return { criterion: "Skills", met, score, details };
 }
