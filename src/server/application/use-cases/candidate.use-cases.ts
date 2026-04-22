@@ -9,10 +9,14 @@
  */
 
 import type { ICandidateRepository, CandidateRelationsInput } from "@server/domain/ports/repositories";
+import type { IStorageService } from "@server/domain/ports/services";
 import type { CandidateFilter } from "@server/application/dtos";
 
 export class CandidateUseCases {
-  constructor(private readonly candidateRepo: ICandidateRepository) {}
+  constructor(
+    private readonly candidateRepo: ICandidateRepository,
+    private readonly storageService?: IStorageService
+  ) {}
 
   /**
    * List candidates with filtering, search, and pagination.
@@ -99,6 +103,41 @@ export class CandidateUseCases {
       throw new ValidationError("Author and content are required");
     }
     return this.candidateRepo.addNote(candidateId, author, content);
+  }
+
+  /**
+   * Delete a candidate and all related data (experiences, education, languages,
+   * skills, applications, assessments, etc. cascade via FK). Also removes the
+   * stored CV + motivation letter blobs from storage (best-effort).
+   */
+  async deleteCandidate(id: string) {
+    const candidate = await this.candidateRepo.findById(id);
+    if (!candidate) {
+      throw new NotFoundError(`Candidate ${id} not found`);
+    }
+
+    // Best-effort: remove files from storage. Failures here must not block the
+    // DB delete — an orphaned blob is preferable to an orphaned DB row.
+    if (this.storageService) {
+      const urls = [
+        candidate.rawCvUrl,
+        candidate.motivationLetterUrl,
+        candidate.learningAgreementUrl,
+      ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+
+      await Promise.all(
+        urls.map(async (url) => {
+          try {
+            await this.storageService!.deleteFile(url);
+          } catch (err) {
+            console.warn(`[deleteCandidate] Failed to delete ${url}:`, err);
+          }
+        })
+      );
+    }
+
+    await this.candidateRepo.delete(id);
+    return { id, deleted: true };
   }
 }
 

@@ -77,9 +77,36 @@ export const CvExtractionSchema = z.object({
     z.object({
       language: z.string(),
       level: z
-        .enum(["A1", "A2", "B1", "B2", "C1", "C2"])
+        .union([z.string(), z.null()])
         .optional()
-        .nullable(),
+        .transform((val) => {
+          if (!val) return null;
+          const v = String(val).trim().toUpperCase();
+          // Already a CEFR code
+          if (["A1", "A2", "B1", "B2", "C1", "C2"].includes(v)) {
+            return v as "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+          }
+          // Map common free-text descriptors the LLM sometimes returns verbatim
+          if (["NATIVE", "MOTHER TONGUE", "MOTHERTONGUE", "BILINGUAL", "FLUENT", "PROFICIENT", "FULL PROFESSIONAL"].includes(v)) {
+            return "C2" as const;
+          }
+          if (["ADVANCED", "PROFESSIONAL", "PROFESSIONAL WORKING"].includes(v)) {
+            return "C1" as const;
+          }
+          if (["UPPER INTERMEDIATE", "UPPER-INTERMEDIATE"].includes(v)) {
+            return "B2" as const;
+          }
+          if (["INTERMEDIATE", "CONVERSATIONAL", "LIMITED WORKING"].includes(v)) {
+            return "B1" as const;
+          }
+          if (["PRE-INTERMEDIATE", "ELEMENTARY"].includes(v)) {
+            return "A2" as const;
+          }
+          if (["BASIC", "BEGINNER", "NOVICE"].includes(v)) {
+            return "A1" as const;
+          }
+          return null;
+        }),
     })
   ),
 

@@ -43,7 +43,7 @@ import { AnalyticsUseCases } from "@server/application/use-cases/analytics.use-c
 // Re-export error classes so API routes import from barrel, not deep paths
 export { NotFoundError, ValidationError };
 
-export const candidateUseCases = new CandidateUseCases(candidateRepository);
+export const candidateUseCases = new CandidateUseCases(candidateRepository, storageService);
 
 export const jobUseCases = new JobUseCases(jobRepository, candidateRepository, jobScraperService, notificationRepository);
 

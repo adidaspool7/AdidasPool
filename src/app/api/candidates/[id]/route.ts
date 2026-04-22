@@ -97,3 +97,33 @@ export async function PATCH(
     );
   }
 }
+
+/**
+ * DELETE /api/candidates/[id]
+ *
+ * Deletes a candidate and all related data (experiences, education, languages,
+ * skills, applications, assessments, interview sessions, notes, etc.).
+ * Also removes stored CV and motivation letter blobs from storage.
+ *
+ * ONION LAYER: Presentation (thin controller)
+ * Delegates to: CandidateUseCases.deleteCandidate
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const result = await candidateUseCases.deleteCandidate(id);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    console.error("Error deleting candidate:", error);
+    return NextResponse.json(
+      { error: "Failed to delete candidate" },
+      { status: 500 }
+    );
+  }
+}

@@ -594,7 +594,7 @@ export class UploadUseCases {
           })),
           languages: extraction.languages.map((lang) => ({
             language: lang.language,
-            selfDeclaredLevel: null,
+            selfDeclaredLevel: lang.level ?? null,
           })),
           skills: extraction.skills.map((skill) => ({
             name: skill.name,
@@ -631,7 +631,7 @@ export class UploadUseCases {
       })),
       languages: extraction.languages.map((lang) => ({
         language: lang.language,
-        selfDeclaredLevel: null,
+        selfDeclaredLevel: lang.level ?? null,
       })),
       skills: extraction.skills.map((skill) => ({
         name: skill.name,

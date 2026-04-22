@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -33,6 +34,9 @@ import {
   ExternalLink,
   AlertTriangle,
   Building2,
+  Upload,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
 // ── Status helpers ────────────────────────────────────────────────
@@ -284,6 +288,9 @@ export default function CandidateDetailPage({
   const [candidate, setCandidate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/candidates/${id}`)
@@ -295,6 +302,55 @@ export default function CandidateDetailPage({
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleDelete() {
+    if (!candidate) return;
+    const name = `${candidate.firstName} ${candidate.lastName}`.trim();
+    const confirmed = window.confirm(
+      `Delete ${name}?\n\nThis permanently removes the candidate, their CV file, experiences, education, languages, skills, notes, applications, assessments, and all other related data.\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
+      toast.success(`${name} deleted`);
+      router.push("/dashboard/candidates");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+      setDeleting(false);
+    }
+  }
+
+  async function handleReplaceCv(file: File) {
+    setReplacing(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("candidateId", id);
+      const res = await fetch("/api/upload/candidate", {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Upload failed (${res.status})`);
+      }
+      toast.success("CV replaced — reloading profile");
+      // Reload the candidate data
+      const refreshed = await fetch(`/api/candidates/${id}`).then((r) => r.json());
+      setCandidate(refreshed);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setReplacing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   if (loading) return <DetailSkeleton />;
   if (error || !candidate) {
@@ -386,9 +442,9 @@ export default function CandidateDetailPage({
             </div>
           </div>
 
-          {/* CV download */}
-          {c.rawCvUrl && (
-            <div className="mt-4">
+          {/* CV actions */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {c.rawCvUrl && (
               <a
                 href={`/api/upload/download?url=${encodeURIComponent(c.rawCvUrl)}`}
                 target="_blank"
@@ -398,8 +454,46 @@ export default function CandidateDetailPage({
                   <FileText className="h-4 w-4 mr-1" /> Download Original CV
                 </Button>
               </a>
-            </div>
-          )}
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleReplaceCv(f);
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={replacing || deleting}
+            >
+              {replacing ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-1" />
+              )}
+              {c.rawCvUrl ? "Replace Candidate CV" : "Upload Candidate CV"}
+            </Button>
+
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleting || replacing}
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Delete Candidate
+            </Button>
+          </div>
 
           {/* Business area + confidence badges */}
           {(c.primaryBusinessArea || c.needsReview) && (
