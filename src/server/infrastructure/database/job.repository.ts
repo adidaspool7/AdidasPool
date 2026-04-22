@@ -170,6 +170,7 @@ export class SupabaseJobRepository implements IJobRepository {
       country: string | null;
       sourceUrl: string;
       description?: string | null;
+      type?: string | null;
     }[]
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
@@ -201,6 +202,7 @@ export class SupabaseJobRepository implements IJobRepository {
       country: j.country,
       source_url: j.sourceUrl,
       description: j.description ?? null,
+      type: j.type ?? "FULL_TIME",
       status: "OPEN",
     }));
 

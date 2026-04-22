@@ -95,6 +95,67 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Detect whether a posting is an internship based on title and department.
+ * Adidas uses several languages across their regional careers sites, so we
+ * match a wide set of keywords. Matches are word-boundary-safe where possible
+ * to avoid false positives (e.g. "internal audit" must not match "intern").
+ */
+function detectIsInternship(title: string, department: string | null): boolean {
+  const haystack = `${title} ${department ?? ""}`.toLowerCase();
+
+  // Word-boundary matches — safe against substrings
+  const boundaryPatterns: RegExp[] = [
+    /\bintern\b/,              // English: "Intern"
+    /\binterns\b/,
+    /\binternship\b/,           // English: "Internship"
+    /\binternships\b/,
+    /\bpraktikant(?:in)?\b/,    // German: "Praktikant", "Praktikantin"
+    /\bpraktikum\b/,            // German: "Praktikum"
+    /\bwerkstudent(?:in)?\b/,   // German: working student
+    /\btrainee\b/,              // EN/DE trainee programs
+    /\btrainees\b/,
+    /\bstagista\b/,             // Italian
+    /\bstagisti\b/,
+    /\btirocinio\b/,            // Italian
+    /\bstagiaire\b/,            // French
+    /\bstage\b/,                // French "stage" (internship). Risk: English "stage manager" — department check below filters.
+    /\bbecario\b/,              // Spanish
+    /\bbecaria\b/,
+    /\bpasante\b/,              // Spanish
+    /\bpasantia\b/,
+    /\bprácticas\b/,            // Spanish "prácticas"
+    /\bpracticas\b/,
+    /\bestágio\b/,              // Portuguese
+    /\bestagio\b/,
+    /\bestagiário\b/,
+    /\bestagiaria\b/,
+    /\bapprentice\b/,
+    /\bapprenticeship\b/,
+    /\bco-?op\b/,               // "co-op" / "coop" student role
+  ];
+
+  for (const re of boundaryPatterns) {
+    if (re.test(haystack)) {
+      // Guard against the French "stage" false-positive: only count if no
+      // clearly non-internship qualifier sits next to it ("stage manager",
+      // "stage production"). If the word "stage" matched, require at least
+      // one other internship-signal token to coexist for confirmation.
+      if (re.source === "\\bstage\\b") {
+        const hasOtherSignal = boundaryPatterns.some(
+          (r) => r.source !== "\\bstage\\b" && r.test(haystack)
+        );
+        if (!hasOtherSignal && !/\b(étudiant|etudiant|stagiaire|alternance)\b/.test(haystack)) {
+          continue;
+        }
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export class AdidasJobScraperService implements IJobScraperService {
   /**
    * Scrape all job listings from the adidas careers portal.
@@ -262,6 +323,7 @@ export class AdidasJobScraperService implements IJobScraperService {
       const location = locationRaw ? cleanLocation(locationRaw) : null;
 
       const externalId = deriveExternalId(href, title);
+      const isInternship = detectIsInternship(title, department);
 
       jobs.push({
         externalId,
@@ -270,6 +332,7 @@ export class AdidasJobScraperService implements IJobScraperService {
         location,
         country,
         sourceUrl: href.startsWith("http") ? href : `${BASE_URL}${href}`,
+        type: isInternship ? "INTERNSHIP" : null,
       });
     });
 

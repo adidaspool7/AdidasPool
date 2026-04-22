@@ -139,6 +139,8 @@ export interface ScrapedJob {
   country: string | null;
   sourceUrl: string;        // Direct link to the job posting
   description?: string | null;
+  /** Employment type inferred from the posting (e.g. INTERNSHIP detected from title). */
+  type?: "FULL_TIME" | "PART_TIME" | "INTERNSHIP" | "CONTRACT" | null;
 }
 
 export interface IJobScraperService {

@@ -150,6 +150,7 @@ export interface IJobRepository {
       country: string | null;
       sourceUrl: string;
       description?: string | null;
+      type?: string | null;
     }[]
   ): Promise<{ created: number; updated: number }>;
   upsertMatch(

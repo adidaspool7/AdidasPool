@@ -305,6 +305,9 @@ export class JobUseCases {
         country: j.country,
         sourceUrl: j.sourceUrl,
         description: j.description ?? null,
+        // Preserve detected employment type (e.g. INTERNSHIP) so scraped
+        // internships land on the Internships page and not Job Openings.
+        type: j.type ?? "FULL_TIME",
       }))
     );
 

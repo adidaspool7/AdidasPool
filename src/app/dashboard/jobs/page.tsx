@@ -643,10 +643,9 @@ export default function JobsPage() {
         });
         if (search) params.set("search", search);
         if (department) params.set("department", department);
-        // Candidates see only non-internship jobs on this page
-        if (role === "candidate") {
-          params.set("excludeType", "INTERNSHIP");
-        }
+        // Job Openings page never shows internships — internships live on
+        // /dashboard/internships regardless of role (HR or candidate).
+        params.set("excludeType", "INTERNSHIP");
 
         const res = await fetch(`/api/jobs?${params}`);
         if (res.ok) {

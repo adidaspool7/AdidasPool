@@ -21,6 +21,17 @@ import {
   TabsTrigger,
 } from "@client/components/ui/tabs";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@client/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Mail,
   Phone,
@@ -306,10 +317,6 @@ export default function CandidateDetailPage({
   async function handleDelete() {
     if (!candidate) return;
     const name = `${candidate.firstName} ${candidate.lastName}`.trim();
-    const confirmed = window.confirm(
-      `Delete ${name}?\n\nThis permanently removes the candidate, their CV file, experiences, education, languages, skills, notes, applications, assessments, and all other related data.\n\nThis action cannot be undone.`
-    );
-    if (!confirmed) return;
 
     setDeleting(true);
     try {
@@ -480,19 +487,88 @@ export default function CandidateDetailPage({
               {c.rawCvUrl ? "Replace Candidate CV" : "Upload Candidate CV"}
             </Button>
 
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleting || replacing}
-            >
-              {deleting ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4 mr-1" />
-              )}
-              Delete Candidate
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={deleting || replacing}
+                >
+                  {deleting ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-1" />
+                  )}
+                  Delete Candidate
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <AlertDialogTitle>
+                      Delete {c.firstName} {c.lastName}?
+                    </AlertDialogTitle>
+                  </div>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3 pt-2">
+                      <p>
+                        This action is{" "}
+                        <span className="font-semibold text-foreground">
+                          permanent and cannot be undone
+                        </span>
+                        . The following data will be removed:
+                      </p>
+                      <ul className="list-disc space-y-1 pl-5 text-sm">
+                        <li>Candidate profile and contact details</li>
+                        <li>Uploaded CV file and motivation letter</li>
+                        <li>
+                          All experiences, education, languages and skills
+                        </li>
+                        <li>
+                          Job applications, matches and assessment results
+                        </li>
+                        <li>
+                          AI interview sessions, transcripts and proctoring
+                          events
+                        </li>
+                        <li>Notes, tags and improvement tracks</li>
+                      </ul>
+                      {c.email && (
+                        <p className="rounded-md bg-muted px-3 py-2 text-sm">
+                          <span className="text-muted-foreground">Email:</span>{" "}
+                          <span className="font-medium">{c.email}</span>
+                        </p>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
+                    {deleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Deleting…
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Yes, delete permanently
+                      </>
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           {/* Business area + confidence badges */}
