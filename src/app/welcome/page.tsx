@@ -43,7 +43,7 @@ const flags = [
 function ChatbotIcon() {
   return (
     <div className="group fixed top-6 right-6 z-50 flex items-center gap-3">
-      <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow-lg backdrop-blur-sm opacity-0 translate-y-[-4px] transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none">
+      <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow-lg backdrop-blur-sm opacity-0 translate-y-[-4px] transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none font-adihaus-regular">
         Your personal Porto assistant
       </div>
       <a
@@ -96,7 +96,7 @@ function ThreeStripes() {
 /* ── Stats bar ── */
 function StatsBar() {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-semibold tracking-wider text-white/90 sm:gap-8 md:text-base">
+    <div className="font-adihaus-bold flex flex-wrap items-center justify-center gap-4 text-sm tracking-wider text-white/90 sm:gap-8 md:text-base">
       <span>€30K+ avg salary</span>
       <span className="hidden sm:inline text-white/40">|</span>
       <span>300 sunny days</span>
@@ -212,7 +212,7 @@ export default function WelcomePage() {
           {/* Top bar */}
           <header className="flex items-center justify-between">
             <AdidasLogo className="h-10 w-auto text-white" />
-            <span className="text-lg font-black uppercase tracking-[0.3em]">
+            <span className="font-adihaus-cn text-lg uppercase tracking-[0.3em]">
               adidas GBS Porto
             </span>
             {/* Spacer for the chatbot icon */}
@@ -221,7 +221,7 @@ export default function WelcomePage() {
 
           {/* Hero copy */}
           <div className="my-auto max-w-3xl space-y-8 pt-12">
-            <h1 className="welcome-heading text-5xl font-black uppercase leading-[1.05] tracking-tight sm:text-7xl lg:text-8xl">
+            <h1 className="welcome-heading font-adineue-bold text-5xl uppercase leading-[1.05] tracking-tight sm:text-7xl lg:text-8xl">
               Launch your
               <br />
               career where
@@ -231,7 +231,7 @@ export default function WelcomePage() {
               vacation.
             </h1>
 
-            <p className="max-w-xl text-sm font-medium uppercase leading-relaxed tracking-wide text-white/80 sm:text-base">
+            <p className="font-adihaus-bold max-w-xl text-sm leading-relaxed tracking-wide text-white/80 sm:text-base">
               Join adidas GBS in Porto — where work meets Atlantic waves,
               European salaries meet Mediterranean prices, and your Monday
               morning starts with pastéis de nata.
@@ -240,7 +240,7 @@ export default function WelcomePage() {
             {/* CTA button — inverts on hover */}
             <Link
               href="/"
-              className="welcome-cta inline-block rounded-full border-2 border-white bg-transparent px-10 py-4 text-sm font-bold uppercase tracking-widest text-white transition-all duration-300 hover:bg-white hover:text-black"
+              className="welcome-cta font-adihaus-regular inline-block rounded-full border-2 border-white bg-transparent px-10 py-4 text-sm tracking-widest text-white transition-all duration-300 hover:bg-white hover:text-black"
             >
               See opportunities
             </Link>
@@ -249,7 +249,7 @@ export default function WelcomePage() {
           {/* Stats + tagline at bottom */}
           <div className="space-y-4">
             <StatsBar />
-            <p className="text-center text-xs tracking-wide text-white/60 sm:text-sm">
+            <p className="font-adihaus-regular text-center text-xs tracking-wide text-white/60 sm:text-sm">
               No relocation stress. No lonely start. Just your skills, our
               opportunities, and a city that feels like summer break — but pays
               like a career.

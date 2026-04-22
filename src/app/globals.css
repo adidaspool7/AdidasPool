@@ -228,3 +228,60 @@
 .welcome-page::-webkit-scrollbar {
   display: none;                  /* Chrome / Safari */
 }
+
+/* ── adidas brand fonts (welcome page only) ──
+   Files in /public/fonts/. Loaded with font-display:swap so the page
+   stays readable until the OTF/TTF lands. */
+@font-face {
+  font-family: "Adineue Pro";
+  src: url("/fonts/adineueprocyr_boldweb.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Adineue Pro";
+  src: url("/fonts/adineueprocyr_lightweb.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Adihaus DIN";
+  src: url("/fonts/adihausdin_bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Adihaus DIN";
+  src: url("/fonts/adihausdin_regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Adihaus DIN CN";
+  src: url("/fonts/adihausdin_cn.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Utility classes — match the designer's annotations on /welcome */
+.font-adineue-bold {
+  font-family: "Adineue Pro", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+}
+.font-adihaus-bold {
+  font-family: "Adihaus DIN", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+}
+.font-adihaus-regular {
+  font-family: "Adihaus DIN", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
+}
+.font-adihaus-cn {
+  font-family: "Adihaus DIN CN", "Adihaus DIN", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
+}
