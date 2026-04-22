@@ -16,6 +16,7 @@ import {
   ChevronUp,
   FileWarning,
   Ban,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@client/components/ui/button";
@@ -37,6 +38,17 @@ import {
   TableRow,
 } from "@client/components/ui/table";
 import { Skeleton } from "@client/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@client/components/ui/alert-dialog";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -79,6 +91,7 @@ export default function HrBulkUpload() {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [expandedErrorJob, setExpandedErrorJob] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -297,6 +310,30 @@ export default function HrBulkUpload() {
       toast.error("Failed to cancel job");
     } finally {
       setCancelling(null);
+    }
+  };
+
+  // ─── Delete job from history ──────────────────────────────────
+
+  const deleteJob = async (jobId: string) => {
+    setDeleting(jobId);
+    try {
+      const res = await fetch(
+        `/api/upload/bulk?jobId=${encodeURIComponent(jobId)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        toast.success("Entry removed from history");
+        if (expandedErrorJob === jobId) setExpandedErrorJob(null);
+        setRecentJobs((prev) => prev.filter((j) => j.id !== jobId));
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error || "Failed to delete entry");
+      }
+    } catch {
+      toast.error("Failed to delete entry");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -708,6 +745,51 @@ export default function HrBulkUpload() {
                               ? "Hide errors"
                               : `${job.errorLog.length} error${job.errorLog.length !== 1 ? "s" : ""}`}
                           </button>
+                        )}
+                        {(job.status === "COMPLETED" ||
+                          job.status === "FAILED") && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600"
+                                disabled={deleting === job.id}
+                                aria-label="Delete history entry"
+                              >
+                                {deleting === job.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Remove this upload from history?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This only deletes the history entry for{" "}
+                                  <span className="font-medium text-foreground">
+                                    {job.fileName || "bulk upload"}
+                                  </span>
+                                  {" "}({job.totalFiles} file
+                                  {job.totalFiles !== 1 ? "s" : ""},{" "}
+                                  {job.status.toLowerCase()}). The candidates
+                                  that were successfully parsed are not
+                                  affected.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteJob(job.id)}
+                                  className="bg-destructive text-white hover:bg-destructive/90"
+                                >
+                                  Delete entry
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </TableCell>

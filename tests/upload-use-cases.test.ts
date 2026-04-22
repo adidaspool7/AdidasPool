@@ -145,6 +145,7 @@ function createMockParsingJobRepo(): IParsingJobRepository {
     incrementFailed: vi.fn().mockResolvedValue(undefined),
     appendError: vi.fn().mockResolvedValue(undefined),
     recoverStaleJobs: vi.fn().mockResolvedValue(0),
+    delete: vi.fn().mockResolvedValue(undefined),
   };
 }
 

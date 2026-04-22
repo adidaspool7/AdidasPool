@@ -129,4 +129,9 @@ export class SupabaseParsingJobRepository implements IParsingJobRepository {
     }
     return count;
   }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await db.from("parsing_jobs").delete().eq("id", id);
+    assertNoError(error, "parsingJob.delete");
+  }
 }

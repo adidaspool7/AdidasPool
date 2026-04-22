@@ -63,11 +63,23 @@ export class SupabaseJobRepository implements IJobRepository {
 
     const total = count ?? 0;
 
-    // Count distinct countries from the full result set (not paginated)
-    const { data: allCountries } = await db
+    // Count distinct countries from the full result set (not paginated),
+    // filtered by the same type/excludeType/internshipStatus scope so the
+    // header stat matches the listing (e.g. Internships page shows only
+    // countries that actually have internships).
+    let countriesQuery = db
       .from("jobs")
       .select("country")
       .not("country", "is", null);
+    if (options?.type) countriesQuery = countriesQuery.eq("type", options.type);
+    if (options?.excludeType)
+      countriesQuery = countriesQuery.neq("type", options.excludeType);
+    if (options?.internshipStatus)
+      countriesQuery = countriesQuery.eq(
+        "internship_status",
+        options.internshipStatus
+      );
+    const { data: allCountries } = await countriesQuery;
     const distinctCountries = new Set(
       (allCountries ?? []).map((r: any) => r.country)
     ).size;

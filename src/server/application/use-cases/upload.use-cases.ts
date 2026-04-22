@@ -310,6 +310,25 @@ export class UploadUseCases {
     return this.parsingJobRepo.recoverStaleJobs(staleMinutes);
   }
 
+  /**
+   * Delete a parsing job history entry.
+   * Only allowed for terminal states (COMPLETED, FAILED). Running jobs must
+   * be cancelled first so the background pipeline can stop cleanly.
+   */
+  async deleteParsingJob(jobId: string): Promise<{ deleted: boolean }> {
+    const job = await this.parsingJobRepo.findById(jobId);
+    if (!job) throw new ValidationError("Parsing job not found");
+
+    if (job.status === "PROCESSING" || job.status === "QUEUED") {
+      throw new ValidationError(
+        "Cannot delete a running job — cancel it first."
+      );
+    }
+
+    await this.parsingJobRepo.delete(jobId);
+    return { deleted: true };
+  }
+
   // ─── Legacy bulk entry point (kept for backward compat) ──────
 
   async uploadCvFiles(files: File[]) {

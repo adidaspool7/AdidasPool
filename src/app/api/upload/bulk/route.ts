@@ -91,3 +91,29 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
+
+/**
+ * DELETE /api/upload/bulk?jobId=...
+ *
+ * Remove a completed/failed parsing job from history. Running jobs must be
+ * cancelled first (returns 400).
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const jobId = request.nextUrl.searchParams.get("jobId");
+    if (!jobId) {
+      return NextResponse.json(
+        { error: "Missing jobId query parameter" },
+        { status: 400 }
+      );
+    }
+
+    const result = await uploadUseCases.deleteParsingJob(jobId);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("[BulkUpload] Delete error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to delete job";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}

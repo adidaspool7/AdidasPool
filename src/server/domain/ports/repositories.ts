@@ -265,6 +265,7 @@ export interface IParsingJobRepository {
   incrementFailed(id: string): Promise<void>;
   appendError(id: string, entry: ParsingJobErrorEntry): Promise<void>;
   recoverStaleJobs(staleMinutes?: number): Promise<number>;
+  delete(id: string): Promise<void>;
 }
 
 // ============================================

@@ -294,6 +294,8 @@ export class JobUseCases {
     const startTime = Date.now();
     const scrapedJobs = await this.jobScraperService.scrapeJobs(maxPages);
 
+    const internships = scrapedJobs.filter((j) => j.type === "INTERNSHIP").length;
+
     // Bulk upsert all scraped jobs in batched HTTP calls instead of 1-by-1.
     // Supabase .upsert() with onConflict:"external_id" handles create/update.
     const { created, updated } = await this.jobRepo.bulkUpsertByExternalId(
@@ -316,6 +318,7 @@ export class JobUseCases {
     return {
       success: true,
       scraped: scrapedJobs.length,
+      internships,
       created,
       updated,
       failed: 0,

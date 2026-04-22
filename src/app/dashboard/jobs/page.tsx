@@ -92,6 +92,7 @@ interface JobsResponse {
 interface SyncResult {
   success: boolean;
   scraped: number;
+  internships?: number;
   created: number;
   updated: number;
   failed: number;
@@ -586,8 +587,11 @@ function SyncResultBanner({
         <span className="font-medium">Sync complete</span>
       </div>
       <p className="mt-1">
-        {result.scraped} jobs scanned &middot; {result.created} new &middot;{" "}
-        {result.updated} updated
+        {result.scraped} jobs scanned
+        {typeof result.internships === "number" &&
+          ` (incl. ${result.internships} internship${result.internships === 1 ? "" : "s"})`}
+        {" · "}
+        {result.created} new &middot; {result.updated} updated
         {result.failed > 0 && ` · ${result.failed} failed`}
         {" · "}
         {(result.durationMs / 1000).toFixed(1)}s
