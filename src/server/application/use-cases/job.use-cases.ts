@@ -301,13 +301,12 @@ export class JobUseCases {
       throw new NotFoundError(`Candidate ${candidateId} not found`);
     }
 
-    // All jobs — we filter in app-layer to keep the Supabase query simple
-    // (single table scan, small app) and because internship eligibility has
-    // two-part logic (type + internship_status).
-    const { data: jobs } = await this.jobRepo.findMany({
-      page: 1,
-      pageSize: 1000,
-    });
+    // Lean fetch — matching only needs a small column set and no joins.
+    const jobs = await this.jobRepo.findAllForMatching();
+
+    const candidateCountry = normalizeCountry(
+      (candidate as any).country || (candidate as any).location
+    );
 
     const eligible = (jobs as any[]).filter((j) => {
       // Status filter — open jobs and active internships only
@@ -321,9 +320,6 @@ export class JobUseCases {
       // match (or the candidate must be willing to relocate). Jobs or
       // candidates without a country are excluded entirely per product
       // requirement ("All jobs and candidates must have a country").
-      const candidateCountry = normalizeCountry(
-        (candidate as any).country || (candidate as any).location
-      );
       const jobCountry = normalizeCountry(j.country || j.location);
       if (!candidateCountry || !jobCountry) return false;
       if (candidateCountry !== jobCountry && !(candidate as any).willingToRelocate) {
@@ -367,7 +363,7 @@ export class JobUseCases {
     };
 
     const results: any[] = [];
-    const upsertPromises: Promise<any>[] = [];
+    const matchRows: { jobId: string; matchScore: number; breakdown: any }[] = [];
     for (const job of eligible) {
       const matchResult = matchCandidateToJob({
         candidate: candidateMatchInput,
@@ -384,19 +380,11 @@ export class JobUseCases {
         },
       });
 
-      // Persist for audit — fire in parallel, don't block per-job
-      upsertPromises.push(
-        this.jobRepo
-          .upsertMatch(
-            job.id,
-            candidateId,
-            matchResult.overallScore,
-            matchResult.breakdown
-          )
-          .catch(() => {
-            // Non-fatal — audit row failure shouldn't block the UX
-          })
-      );
+      matchRows.push({
+        jobId: job.id,
+        matchScore: matchResult.overallScore,
+        breakdown: matchResult.breakdown,
+      });
 
       results.push({
         jobId: job.id,
@@ -412,8 +400,13 @@ export class JobUseCases {
       });
     }
 
-    // Wait for audit writes (all in parallel) so serverless function can cleanly exit
-    await Promise.allSettled(upsertPromises);
+    // Single batched upsert for the whole candidate — replaces N roundtrips.
+    // Non-fatal: audit row failure shouldn't block the UX.
+    try {
+      await this.jobRepo.bulkUpsertMatches(candidateId, matchRows);
+    } catch {
+      /* audit-only */
+    }
 
     results.sort((a, b) => b.overallScore - a.overallScore);
 
