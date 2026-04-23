@@ -154,10 +154,10 @@ function TestimonialCarousel() {
         </div>
         {/* Quote */}
         <div className="max-w-md text-center sm:text-left">
-          <p className="text-lg font-bold uppercase tracking-wide text-white">
+          <p className="font-adineue-bold text-lg uppercase tracking-wide text-white">
             &ldquo;{t.quote}&rdquo;
           </p>
-          <p className="mt-4 text-sm font-semibold text-white/70">
+          <p className="font-adihaus-bold mt-4 text-sm text-white/70">
             — {t.name}, {t.country} {t.flag}
           </p>
         </div>
@@ -240,7 +240,7 @@ export default function WelcomePage() {
             {/* CTA button — inverts on hover */}
             <Link
               href="/"
-              className="welcome-cta font-adihaus-regular inline-block rounded-full border-2 border-white bg-transparent px-10 py-4 text-sm tracking-widest text-white transition-all duration-300 hover:bg-white hover:text-black"
+              className="welcome-cta font-adihaus-bold inline-block rounded-full border-2 border-white bg-transparent px-10 py-4 text-sm tracking-widest text-white transition-all duration-300 hover:bg-white hover:text-black"
             >
               See opportunities
             </Link>
@@ -260,7 +260,7 @@ export default function WelcomePage() {
         {/* ─── SOCIAL PROOF SECTION ─── */}
         <section className="relative bg-black/70 backdrop-blur-sm">
           <div className="mx-auto max-w-5xl space-y-10 px-6 py-20 text-center sm:px-12">
-            <h2 className="text-2xl font-bold tracking-wide sm:text-3xl">
+            <h2 className="font-adineue-bold text-2xl uppercase tracking-wide sm:text-3xl">
               Join 2,000+ young professionals from 40+ countries
             </h2>
 
