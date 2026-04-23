@@ -19,6 +19,11 @@ import type { IJobScraperService } from "@server/domain/ports/services";
 import type { CreateJobInput } from "@server/application/dtos";
 import type { UpdateJobInput } from "@server/application/dtos";
 import { NotFoundError } from "./candidate.use-cases";
+import {
+  JobRequirementsSchema,
+  JOB_REQUIREMENTS_SCHEMA_VERSION,
+  type JobRequirements,
+} from "@server/domain/services/job-requirements.schema";
 
 /**
  * Minimal port for the Phase-1 job requirements extractor.
@@ -342,5 +347,72 @@ export class JobUseCases {
       errors,
       durationMs: Date.now() - startedAt,
     };
+  }
+
+  /**
+   * Phase 3 lazy-parse wrapper.
+   *
+   * Returns the JD's structured requirements, parsing inline if the cache
+   * is missing or stale (older `parsed_requirements_version` than the
+   * current schema). The first HR call on a fresh job pays the ~2-4s LLM
+   * cost; subsequent calls hit the cache.
+   *
+   * Throws NotFoundError if the job does not exist.
+   * Throws Error if the job has no source_url and no on-file description.
+   */
+  async getOrParseRequirements(jobId: string): Promise<JobRequirements> {
+    const job = await this.jobRepo.findById(jobId);
+    if (!job) {
+      throw new NotFoundError(`Job ${jobId} not found`);
+    }
+
+    const cached = job.parsedRequirements;
+    const cachedVersion = job.parsedRequirementsVersion as number | null;
+    const isCacheFresh =
+      cached !== null &&
+      cached !== undefined &&
+      cachedVersion === JOB_REQUIREMENTS_SCHEMA_VERSION;
+
+    if (isCacheFresh) {
+      // Re-validate via Zod so the rest of the app can trust the shape
+      // even if the row was inserted by an older deploy.
+      const parsed = JobRequirementsSchema.safeParse(cached);
+      if (parsed.success) return parsed.data;
+      // Cache shape unexpected — fall through to re-parse.
+    }
+
+    if (!this.requirementsExtractor) {
+      throw new Error("Job requirements extractor is not configured");
+    }
+
+    let jdText = (job.description as string | null) ?? "";
+    if (!jdText || jdText.trim().length < 200) {
+      if (!this.jobScraperService) {
+        throw new Error(
+          `Job ${jobId} has no on-file description and the scraper is not configured`
+        );
+      }
+      const sourceUrl = job.sourceUrl as string | null;
+      if (!sourceUrl) {
+        throw new Error(
+          `Job ${jobId} has no source_url and no on-file description`
+        );
+      }
+      const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
+      if (!fetched) {
+        throw new Error(`Failed to fetch JD body for job ${jobId}`);
+      }
+      jdText = fetched;
+    }
+
+    const extracted = await this.requirementsExtractor.extract(jdText);
+    await this.jobRepo.updateParsedRequirements(
+      jobId,
+      extracted,
+      this.requirementsExtractor.schemaVersion
+    );
+
+    // Final validation before handing back.
+    return JobRequirementsSchema.parse(extracted);
   }
 }

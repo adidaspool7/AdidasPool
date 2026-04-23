@@ -187,36 +187,50 @@ export class SupabaseJobRepository implements IJobRepository {
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
 
-    // Get existing jobs (id + external_id) in chunked queries to avoid PostgREST row limits.
-    // We need the existing id to avoid overwriting PKs that have FK references.
+    // Get existing jobs (id + external_id + source_url) in chunked queries to avoid PostgREST row limits.
+    // We need the existing id to avoid overwriting PKs that have FK references,
+    // and the existing source_url to detect changes that should invalidate
+    // any cached parsed_requirements (Phase 1.5 sync invalidation).
     const externalIds = jobs.map((j) => j.externalId);
-    const existingMap = new Map<string, string>(); // external_id → id
+    const existingMap = new Map<string, { id: string; source_url: string | null }>();
     const ID_QUERY_CHUNK = 500;
     for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
       const idChunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
       const { data: existing } = await db
         .from("jobs")
-        .select("id, external_id")
+        .select("id, external_id, source_url")
         .in("external_id", idChunk);
       for (const r of existing ?? []) {
-        const row = r as { id: string; external_id: string };
-        existingMap.set(row.external_id, row.id);
+        const row = r as { id: string; external_id: string; source_url: string | null };
+        existingMap.set(row.external_id, { id: row.id, source_url: row.source_url });
       }
     }
 
-    // Build rows for upsert — reuse existing id to avoid FK violations
-    const rows = jobs.map((j) => ({
-      id: existingMap.get(j.externalId) ?? generateId(),
-      external_id: j.externalId,
-      title: j.title,
-      department: j.department,
-      location: j.location,
-      country: j.country,
-      source_url: j.sourceUrl,
-      description: j.description ?? null,
-      type: j.type ?? "FULL_TIME",
-      status: "OPEN",
-    }));
+    // Build rows for upsert — reuse existing id to avoid FK violations.
+    // When the source_url changed since the last sync, null out
+    // parsed_requirements so the next match request triggers a re-parse.
+    const rows = jobs.map((j) => {
+      const existing = existingMap.get(j.externalId);
+      const sourceUrlChanged =
+        existing !== undefined && existing.source_url !== j.sourceUrl;
+      const baseRow: Record<string, unknown> = {
+        id: existing?.id ?? generateId(),
+        external_id: j.externalId,
+        title: j.title,
+        department: j.department,
+        location: j.location,
+        country: j.country,
+        source_url: j.sourceUrl,
+        description: j.description ?? null,
+        type: j.type ?? "FULL_TIME",
+        status: "OPEN",
+      };
+      if (sourceUrlChanged) {
+        baseRow.parsed_requirements = null;
+        baseRow.parsed_requirements_version = null;
+      }
+      return baseRow;
+    });
 
     // Upsert in chunks (Supabase has payload limits)
     const CHUNK_SIZE = 500;
