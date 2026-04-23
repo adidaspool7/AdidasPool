@@ -47,12 +47,15 @@ describe("JobRequirementsSchema", () => {
     }
   });
 
-  it("rejects fieldsOfWork values outside the canonical 16", () => {
+  it("silently drops fieldsOfWork values outside the canonical 16 (tolerant to LLM invention)", () => {
     const result = JobRequirementsSchema.safeParse({
-      fieldsOfWork: ["Not A Real Field"],
+      fieldsOfWork: ["Not A Real Field", "Retail", "Also Not Real", "Sales"],
       ...minimalValid,
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.fieldsOfWork).toEqual(["Retail", "Sales"]);
+    }
   });
 
   it("rejects non-integer minYearsInField", () => {

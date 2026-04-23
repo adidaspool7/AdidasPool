@@ -49,12 +49,27 @@ const FieldOfWorkSchema = z.enum(
 );
 
 /**
+ * Tolerant fieldsOfWork: LLM occasionally invents a department name that
+ * isn't in the canonical 16. Rather than rejecting the whole extraction,
+ * silently drop unknown values. This is safe because downstream code only
+ * uses canonical values for matching anyway.
+ */
+const FieldsOfWorkArraySchema = z.preprocess(
+  (v) => {
+    if (!Array.isArray(v)) return v;
+    const allowed = new Set(FIELDS_OF_WORK as readonly string[]);
+    return v.filter((x) => typeof x === "string" && allowed.has(x));
+  },
+  z.array(FieldOfWorkSchema).default([])
+);
+
+/**
  * JD requirements as extracted by the LLM.
  * All numeric fields default to null — the extractor is forbidden from
  * inventing them.
  */
 export const JobRequirementsSchema = z.object({
-  fieldsOfWork: z.array(FieldOfWorkSchema).default([]),
+  fieldsOfWork: FieldsOfWorkArraySchema,
   seniorityLevel: SeniorityLevelSchema.nullable().default(null),
   minYearsInField: z.number().int().min(0).max(40).nullable().default(null),
   requiredSkills: z.array(z.string().min(1)).default([]),

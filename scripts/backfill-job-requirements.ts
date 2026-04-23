@@ -7,13 +7,12 @@
  * run it manually until the queue is empty.
  *
  * Usage:
- *   npx tsx scripts/backfill-job-requirements.ts [batchSize=20] [delayMs=1000]
+ *   npx tsx --env-file=.env.local scripts/backfill-job-requirements.ts [batchSize=20] [delayMs=1000]
  *
- * Env required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GROQ_API_KEY (or
- * OPENAI_API_KEY).
+ * Env required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ * GROQ_API_KEY (or OPENAI_API_KEY).
  */
 
-import "dotenv/config";
 import { SupabaseJobRepository } from "../src/server/infrastructure/database/job.repository";
 import { SupabaseCandidateRepository } from "../src/server/infrastructure/database/candidate.repository";
 import { AdidasJobScraperService } from "../src/server/infrastructure/scraping/adidas-job-scraper.service";
