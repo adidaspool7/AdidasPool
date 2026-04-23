@@ -22,7 +22,44 @@
 - [x] Persist parsed output via `parsePendingJobRequirements(limit, delayMs)` use case; skip jobs already parsed (via `findUnparsedJobs`).
 - [x] One-off backfill script (`scripts/backfill-job-requirements.ts`) for existing jobs.
 - [x] Unit tests for the schema (LLM calls deliberately not mocked — schema enforces the contract).
-- [ ] Smoke test against 3-4 real JD samples (manual; run backfill in dev against Supabase).
+- [x] Smoke test against 5 real JD samples — 5/5 valid output after tolerance fix (`73ae3d4`).
+- [x] **Tolerance fix**: `fieldsOfWork` now silently drops LLM-invented values outside the canonical 16 instead of rejecting the whole extraction (`73ae3d4`).
+
+### Decision — parsing strategy: **on-demand, not bulk** (2026-04-23)
+
+We deliberately do **NOT** run the full 1,300+ job backfill. Rationale:
+
+- **Cost waste.** Most scraped jobs are never opened by HR; parsing them all burns Groq/OpenAI quota for no value.
+- **Freshness.** Lazy parse reads the latest JD at the moment HR cares; bulk parse can go stale.
+- **Operational simplicity.** No cron, no half-finished batch state to reason about.
+
+**Chosen flow** (to be wired in Phase 3):
+
+1. HR syncs jobs the way they do today — scraper only writes the listing metadata.
+2. When HR opens a job's "Match candidates" view and `parsed_requirements IS NULL`
+   (or `parsed_requirements_version < current`), the matcher parses **that one job
+   inline** (~2-4 s first-click latency behind a spinner), caches the result in the
+   DB, and proceeds to score candidates.
+3. Subsequent opens are instant — served from cache.
+4. **Invalidation:** if `bulkUpsertByExternalId` updates an existing job and the
+   `source_url` changed, null out `parsed_requirements` so the next open re-parses.
+
+**Kept (not thrown away):**
+- `scripts/backfill-job-requirements.ts` — ops/dev tool for demo warming or re-parsing
+  after a schema-version bump. Not part of normal workflow.
+- `IJobRepository.findUnparsedJobs` + `updateParsedRequirements` — reused by Phase 3
+  "parse-if-missing" wrapper.
+
+### Phase 1.5 — Lazy-parse plumbing (folded into Phase 3)
+
+Deferred into Phase 3 where it fits naturally with the new matcher wiring:
+
+- [ ] `JobUseCases.getOrParseRequirements(jobId)` — returns the parsed JSON, parsing
+  inline if missing. Used by the job-anchored matcher.
+- [ ] In `bulkUpsertByExternalId`, detect `source_url` change on existing rows and
+  null `parsed_requirements` + `parsed_requirements_version`.
+- [ ] Schema-version gate: treat rows with `parsed_requirements_version <
+  JOB_REQUIREMENTS_SCHEMA_VERSION` as unparsed.
 
 ## Phase 2 — CV → per-experience Field of Work tags
 
@@ -34,6 +71,8 @@
 
 ## Phase 3 — Refactor match engine to job-anchored scoring
 
+- [ ] **Lazy-parse wrapper** (from Phase 1.5): `JobUseCases.getOrParseRequirements(jobId)` — parse inline if missing or stale schema version; cache in DB.
+- [ ] **Sync invalidation** (from Phase 1.5): `bulkUpsertByExternalId` nulls `parsed_requirements` when `source_url` changes on an existing job.
 - [ ] Replace `MatchInput.job` typing: inputs come from `parsed_requirements`, not raw scraped columns.
 - [ ] Replace `candidate.yearsOfExperience` with `candidate.experienceByField: Record<string, number>` in `MatchInput`.
 - [ ] Rewrite `matchField` to accept `job.fieldsOfWork[]` (multiple) and score as an intersection count against the candidate's field vector.

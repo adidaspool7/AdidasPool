@@ -103,7 +103,7 @@ Criteria (all driven by parsed JD requirements, not guesses):
 | Risk | Mitigation |
 |---|---|
 | LLM hallucination on JD parsing (invents "5 years required" when the JD says nothing) | Force structured JSON output with a strict Zod schema; require every numeric field to be nullable; store raw JD body alongside parsed output for audit. |
-| LLM cost on large job scrape runs | One-time per job, cached forever in `jobs.parsed_requirements`. Backfill is bounded (~200-500 rows total for adidas PT/DE/ES footprint). |
+| LLM cost on large job scrape runs | **Parsing is on-demand, not bulk.** When HR opens a job's match view, the matcher parses that one job inline (~2-4 s) and caches forever in `jobs.parsed_requirements`. 1,300 scraped jobs do NOT get parsed up front. Invalidated only when the scraper sees a changed `source_url`. Backfill script retained as an ops/demo tool. (Decided 2026-04-23.) |
 | CV re-parsing for existing candidates | Background job with a progress UI; existing candidates without field-tagged experiences fall back to today's `primaryBusinessArea` behavior (no regression). |
 | HR confusion during transition (two scores shown) | Clear labels: `Quality` (profile) vs `Fit (for role X)`. Changelog entry + one-line tooltip. |
 | Scraper rate limiting when fetching JD bodies | Reuse the existing `FETCH_DELAY_MS` throttle; JD fetch runs in the same scrape pass. |
@@ -127,7 +127,7 @@ The work splits into independent phases. Each phase is deployable on its own and
 Delete / hide UI that shows the universal candidate score as a hiring signal. Keep the match engine running but relabel.
 
 ### Phase 1 — JD body scraping + LLM extraction
-Fetch JD HTML during scrape; LLM-extract structured requirements; store on `jobs`. Backfill existing jobs. **Highest-leverage single change.**
+Add the plumbing to fetch a single JD's body and LLM-extract its structured requirements into `jobs.parsed_requirements`. **Parsing is invoked lazily** from Phase 3's matcher — NOT run in bulk over the whole job pool. The backfill script exists but is not part of the regular flow; it is kept for demo warming and schema-version migrations. **Highest-leverage single change.**
 
 ### Phase 2 — CV parsing → per-experience Field of Work tags
 Extend CV parser to tag each experience with one or more of the 16 fields. Backfill existing candidates. Candidate `experienceByField[]` derived view available for matcher.
