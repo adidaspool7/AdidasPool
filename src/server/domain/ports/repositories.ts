@@ -173,10 +173,10 @@ export interface IJobRepository {
   >;
   /**
    * Lightweight list of all jobs for searchable pickers/dropdowns.
-   * Returns only id, title, department — no joins, no pagination.
+   * Returns only id, title, department, country — no joins, no pagination.
    */
   findAllForPicker(): Promise<
-    Array<{ id: string; title: string; department: string | null }>
+    Array<{ id: string; title: string; department: string | null; country: string | null }>
   >;
   /** Persist the LLM-extracted structured requirements for a job. */
   updateParsedRequirements(

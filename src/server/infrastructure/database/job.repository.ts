@@ -102,14 +102,14 @@ export class SupabaseJobRepository implements IJobRepository {
    * Pages internally to bypass Supabase's default 1000-row cap.
    */
   async findAllForPicker() {
-    const out: Array<{ id: string; title: string; department: string | null }> = [];
+    const out: Array<{ id: string; title: string; department: string | null; country: string | null }> = [];
     const pageSize = 1000;
     let from = 0;
     // Cap at 50k rows defensively to avoid runaway loops.
     while (out.length < 50000) {
       const { data, error } = await db
         .from("jobs")
-        .select("id, title, department")
+        .select("id, title, department, country")
         .order("title", { ascending: true })
         .range(from, from + pageSize - 1);
       assertNoError(error, "job.findAllForPicker");
@@ -119,6 +119,7 @@ export class SupabaseJobRepository implements IJobRepository {
           id: String(r.id),
           title: String(r.title ?? ""),
           department: (r.department as string | null) ?? null,
+          country: (r.country as string | null) ?? null,
         });
       }
       if (rows.length < pageSize) break;

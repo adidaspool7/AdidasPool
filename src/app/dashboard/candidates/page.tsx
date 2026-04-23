@@ -327,7 +327,7 @@ function JobPicker({
   onChange,
 }: {
   value: string;
-  options: Array<{ id: string; title: string; department: string | null }>;
+  options: Array<{ id: string; title: string; department: string | null; country: string | null }>;
   onChange: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -347,14 +347,17 @@ function JobPicker({
   const q = search.trim().toLowerCase();
   const filtered = q
     ? options.filter((j) => {
-        const hay = `${j.title} ${j.department ?? ""}`.toLowerCase();
+        const hay = `${j.title} ${j.department ?? ""} ${j.country ?? ""}`.toLowerCase();
         return hay.includes(q);
       })
     : options;
 
   const selected = options.find((j) => j.id === value) ?? null;
+  const selectedMeta = selected
+    ? [selected.department, selected.country].filter(Boolean).join(" · ")
+    : "";
   const displayLabel = selected
-    ? `${selected.title}${selected.department ? ` · ${selected.department}` : ""}`
+    ? `${selected.title}${selectedMeta ? ` · ${selectedMeta}` : ""}`
     : "Select a job…";
   const shortLabel =
     displayLabel.length > 40 ? displayLabel.slice(0, 38) + "…" : displayLabel;
@@ -374,7 +377,7 @@ function JobPicker({
         <div className="absolute z-50 top-full mt-1 w-[420px] rounded-md border bg-popover shadow-lg">
           <div className="p-2 border-b">
             <Input
-              placeholder="Search by title or department…"
+              placeholder="Search by title, department or country…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-sm"
@@ -411,9 +414,9 @@ function JobPicker({
                   }}
                 >
                   <div className="truncate">{j.title}</div>
-                  {j.department && (
+                  {(j.department || j.country) && (
                     <div className="text-[11px] text-muted-foreground truncate">
-                      {j.department}
+                      {[j.department, j.country].filter(Boolean).join(" · ")}
                     </div>
                   )}
                 </button>
@@ -462,7 +465,7 @@ export default function CandidatesPage() {
   // Optional: HR picks a job to overlay job-specific Fit scores onto the
   // current candidate list. Quality stays as-is; Fit is a second column.
   const [jobOptions, setJobOptions] = useState<
-    Array<{ id: string; title: string; department: string | null }>
+    Array<{ id: string; title: string; department: string | null; country: string | null }>
   >([]);
   const [fitJobId, setFitJobId] = useState<string>("");
   const [fitJobTitle, setFitJobTitle] = useState<string | null>(null);
@@ -517,10 +520,11 @@ export default function CandidatesPage() {
       .then((data) => {
         if (Array.isArray(data?.jobs)) {
           setJobOptions(
-            data.jobs.map((j: { id: string; title: string; department: string | null }) => ({
+            data.jobs.map((j: { id: string; title: string; department: string | null; country: string | null }) => ({
               id: j.id,
               title: j.title,
               department: j.department,
+              country: j.country,
             }))
           );
         }
