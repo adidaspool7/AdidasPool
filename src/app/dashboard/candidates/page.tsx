@@ -511,13 +511,13 @@ export default function CandidatesPage() {
       .then((data) => setCustomPresets(data))
       .catch(() => {});
 
-    // Load open-job options for the Fit-for-job picker
-    fetch("/api/jobs?pageSize=200")
+    // Load ALL jobs for the Fit-for-job picker (lightweight endpoint)
+    fetch("/api/jobs/picker")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data?.data)) {
+        if (Array.isArray(data?.jobs)) {
           setJobOptions(
-            data.data.map((j: { id: string; title: string; department: string | null }) => ({
+            data.jobs.map((j: { id: string; title: string; department: string | null }) => ({
               id: j.id,
               title: j.title,
               department: j.department,

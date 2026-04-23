@@ -171,6 +171,13 @@ export interface IJobRepository {
   findUnparsedJobs(limit: number): Promise<
     Array<{ id: string; sourceUrl: string | null; description: string | null }>
   >;
+  /**
+   * Lightweight list of all jobs for searchable pickers/dropdowns.
+   * Returns only id, title, department — no joins, no pagination.
+   */
+  findAllForPicker(): Promise<
+    Array<{ id: string; title: string; department: string | null }>
+  >;
   /** Persist the LLM-extracted structured requirements for a job. */
   updateParsedRequirements(
     id: string,

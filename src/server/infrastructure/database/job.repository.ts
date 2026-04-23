@@ -96,6 +96,37 @@ export class SupabaseJobRepository implements IJobRepository {
     };
   }
 
+  /**
+   * Lightweight list of all jobs for searchable pickers.
+   * Returns only id, title, department \u2014 no joins, no pagination.
+   * Pages internally to bypass Supabase's default 1000-row cap.
+   */
+  async findAllForPicker() {
+    const out: Array<{ id: string; title: string; department: string | null }> = [];
+    const pageSize = 1000;
+    let from = 0;
+    // Cap at 50k rows defensively to avoid runaway loops.
+    while (out.length < 50000) {
+      const { data, error } = await db
+        .from("jobs")
+        .select("id, title, department")
+        .order("title", { ascending: true })
+        .range(from, from + pageSize - 1);
+      assertNoError(error, "job.findAllForPicker");
+      const rows = data ?? [];
+      for (const r of rows as Array<Record<string, unknown>>) {
+        out.push({
+          id: String(r.id),
+          title: String(r.title ?? ""),
+          department: (r.department as string | null) ?? null,
+        });
+      }
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+    return out;
+  }
+
   async findById(id: string) {
     const { data, error } = await db
       .from("jobs")

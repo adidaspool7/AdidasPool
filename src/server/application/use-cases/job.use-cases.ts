@@ -66,6 +66,13 @@ export class JobUseCases {
   }
 
   /**
+   * Lightweight list of all jobs (id/title/department) for searchable pickers.
+   */
+  async listJobsForPicker() {
+    return this.jobRepo.findAllForPicker();
+  }
+
+  /**
    * Create a new job opening.
    */
   async createJob(data: CreateJobInput) {
