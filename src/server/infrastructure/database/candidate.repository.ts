@@ -379,8 +379,66 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     const { error } = await db.from("candidates").delete().eq("id", id);
     assertNoError(error, "candidate.delete");
   }
+
+  async findExperienceVectorByField(candidateId: string): Promise<Record<string, number>> {
+    const { data, error } = await db
+      .from("experiences")
+      .select("start_date, end_date, is_current, fields_of_work")
+      .eq("candidate_id", candidateId);
+    assertNoError(error, "candidate.findExperienceVectorByField");
+
+    const vector: Record<string, number> = {};
+    for (const row of (data ?? []) as Array<{
+      start_date: string | null;
+      end_date: string | null;
+      is_current: boolean;
+      fields_of_work: string[] | null;
+    }>) {
+      const fields = Array.isArray(row.fields_of_work) ? row.fields_of_work : [];
+      if (fields.length === 0) continue;
+      const years = experienceDurationYears(row.start_date, row.end_date, row.is_current);
+      if (years <= 0) continue;
+      for (const field of fields) {
+        vector[field] = (vector[field] ?? 0) + years;
+      }
+    }
+    // Round each field to 1 decimal
+    for (const k of Object.keys(vector)) {
+      vector[k] = Math.round(vector[k] * 10) / 10;
+    }
+    return vector;
+  }
 }
 
 function toSnakeCase(s: string): string {
   return s.replace(/([A-Z])/g, (c) => `_${c.toLowerCase()}`);
+}
+
+/**
+ * Phase 2: duration of a single experience in (fractional) years.
+ * Accepts ISO-ish strings the CV parser emits ("YYYY-MM", "YYYY-MM-DD", "YYYY").
+ * Returns 0 if dates are unusable.
+ */
+function experienceDurationYears(
+  startDate: string | null,
+  endDate: string | null,
+  isCurrent: boolean
+): number {
+  const start = parseLooseDate(startDate);
+  if (!start) return 0;
+  const end = isCurrent || !endDate ? new Date() : parseLooseDate(endDate) ?? new Date();
+  const ms = end.getTime() - start.getTime();
+  if (ms <= 0) return 0;
+  return ms / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+function parseLooseDate(s: string | null): Date | null {
+  if (!s) return null;
+  const trimmed = s.trim();
+  // YYYY
+  if (/^\d{4}$/.test(trimmed)) return new Date(`${trimmed}-01-01`);
+  // YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return new Date(`${trimmed}-01`);
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
 }

@@ -89,6 +89,14 @@ export interface ICandidateRepository {
     relations: CandidateRelationsInput
   ): Promise<void>;
 
+  /**
+   * Phase 2: compute a candidate's years-of-experience vector, keyed by
+   * canonical Field of Work. Each experience contributes its duration to
+   * every field it is tagged with. Experiences with empty `fields_of_work`
+   * are ignored.
+   */
+  findExperienceVectorByField(candidateId: string): Promise<Record<string, number>>;
+
   delete(id: string): Promise<void>;
 }
 
@@ -101,6 +109,7 @@ export interface CandidateRelationsInput {
     endDate: string | null;
     isCurrent: boolean;
     description: string | null;
+    fieldsOfWork?: string[];
   }[];
   education: {
     institution: string | null;

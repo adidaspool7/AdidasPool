@@ -29,6 +29,7 @@ import {
   extractRetryAfterMs,
 } from "./openai-client";
 import type { LLMConfig } from "./openai-client";
+import { FIELDS_OF_WORK } from "@client/lib/constants";
 
 const CV_EXTRACTION_PROMPT = `You are a CV/resume parser. Extract structured information from the following CV text.
 
@@ -49,7 +50,8 @@ Return a JSON object with exactly this structure:
       "startDate": "YYYY-MM or approximate",
       "endDate": "YYYY-MM or null if current",
       "isCurrent": false,
-      "description": "brief summary or null"
+      "description": "brief summary or null",
+      "fieldsOfWork": ["Retail", "Sales"]
     }
   ],
   "education": [
@@ -121,6 +123,7 @@ Rules:
   - Use the "institution" field for the issuing organization (e.g. "Cambridge School", "Ciências e Letras")
   - If the section is titled "Other Courses", "Certifications", "Formations", "Professional Development", or similar — extract every single entry as a separate education item
 - Sort experiences by date (most recent first)
+- For each experience's "fieldsOfWork": pick 1–3 entries from the SAME official departments list used by businessAreaClassification. Use ONLY those exact strings (case-sensitive). If the experience is clearly unrelated to every field, return an empty array. Do NOT invent new field names.
 - For estimatedTotalYears: calculate total professional years from all experiences. Sum the durations. If dates are missing, estimate from context.
 - For businessAreaClassification: classify the candidate based on their overall experience and skills into the best-fit department from the official list. If none fits, set the primary to the closest match and fill customArea with a more accurate label.
 - For parsingConfidence: honestly assess how confident you are about each extracted field (0.0 to 1.0). Add flags for any uncertainties (e.g. "location_uncertain", "missing_language_levels", "date_gaps", "no_email", "ambiguous_education_level").
@@ -142,6 +145,71 @@ export class OpenAiCvParserService implements ICvParserService {
     }
 
     return JSON.parse(content) as CvExtractionResult;
+  }
+
+  /**
+   * Phase 2: classify a batch of experiences into canonical Fields of Work.
+   * Single LLM call per candidate. Used by the backfill script for
+   * candidates whose experiences predate per-experience field tagging.
+   */
+  async classifyExperienceFields(
+    experiences: Array<{
+      jobTitle: string;
+      company?: string | null;
+      description?: string | null;
+    }>
+  ): Promise<string[][]> {
+    if (experiences.length === 0) return [];
+
+    const systemPrompt = `You classify each work experience into one or more canonical Fields of Work.
+
+Official fields (use these EXACT strings, case-sensitive):
+${(FIELDS_OF_WORK as readonly string[]).map((f) => `- ${f}`).join("\n")}
+
+Return JSON of the form:
+{
+  "experiences": [
+    { "index": 0, "fieldsOfWork": ["Retail", "Sales"] },
+    { "index": 1, "fieldsOfWork": [] }
+  ]
+}
+
+Rules:
+- Pick 1–3 fields per experience from the official list above.
+- If the experience is clearly unrelated to every field, return an empty array for that index.
+- Do NOT invent new field names. Do NOT rephrase. Use the exact strings.
+- Preserve the input order via the "index" field.`;
+
+    const userContent = JSON.stringify(
+      experiences.map((e, i) => ({
+        index: i,
+        jobTitle: e.jobTitle,
+        company: e.company ?? null,
+        description: e.description ?? null,
+      }))
+    );
+
+    const content = await this.callLLMWithResilience(
+      systemPrompt,
+      userContent,
+      { response_format: { type: "json_object" } as const, temperature: 0.1, max_tokens: 1000 }
+    );
+    if (!content) throw new Error("LLM returned empty response for field classification");
+
+    const parsed = JSON.parse(content) as {
+      experiences?: Array<{ index: number; fieldsOfWork: unknown }>;
+    };
+    const allowed = new Set(FIELDS_OF_WORK as readonly string[]);
+    const result: string[][] = experiences.map(() => []);
+    for (const row of parsed.experiences ?? []) {
+      if (typeof row.index !== "number" || row.index < 0 || row.index >= experiences.length) continue;
+      const arr = Array.isArray(row.fieldsOfWork) ? row.fieldsOfWork : [];
+      result[row.index] = arr
+        .filter((x): x is string => typeof x === "string")
+        .map((x) => (FIELDS_OF_WORK as readonly string[]).find((f) => f.toLowerCase() === x.toLowerCase()))
+        .filter((x): x is string => !!x && allowed.has(x));
+    }
+    return result;
   }
 
   async classifyExperienceRelevance(

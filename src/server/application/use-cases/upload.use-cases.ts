@@ -602,6 +602,7 @@ export class UploadUseCases {
             endDate: exp.endDate || null,
             isCurrent: exp.isCurrent,
             description: exp.description || null,
+            fieldsOfWork: exp.fieldsOfWork ?? [],
           })),
           education: extraction.education.map((edu) => ({
             institution: edu.institution || null,
@@ -639,6 +640,7 @@ export class UploadUseCases {
         endDate: exp.endDate || null,
         isCurrent: exp.isCurrent,
         description: exp.description || null,
+        fieldsOfWork: exp.fieldsOfWork ?? [],
       })),
       education: extraction.education.map((edu) => ({
         institution: edu.institution || null,

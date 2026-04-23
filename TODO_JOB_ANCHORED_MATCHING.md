@@ -63,11 +63,11 @@ Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 
 ## Phase 2 — CV → per-experience Field of Work tags
 
-- [ ] Add `fields_of_work TEXT[]` on `experiences` (migration).
-- [ ] Extend the existing CV parser LLM call to emit `fieldsOfWork[]` per experience.
-- [ ] Backfill script for existing candidates; runs in batches, writes progress to a `parsing_jobs` row.
-- [ ] Repository method: `CandidateRepository.findExperienceVectorByField(candidateId)` → `{ [field]: years }`.
-- [ ] Unit tests: a CV with 3 experiences tags each correctly to one or more of the 16 fields.
+- [x] Add `fields_of_work TEXT[]` on `experiences` (migration — `20260423000001_experience_fields_of_work.sql`).
+- [x] Extend the existing CV parser LLM call to emit `fieldsOfWork[]` per experience.
+- [x] Backfill script for existing candidates (`scripts/backfill-experience-fields.ts`) — targeted classifier, tolerant to LLM invention (unknown fields dropped). Runs in batches, per-candidate, throttled.
+- [x] Repository method: `CandidateRepository.findExperienceVectorByField(candidateId)` → `Record<field, years>`.
+- [x] Unit tests: `tests/cv-fields-of-work.test.ts` (5 tests) covering canonical input, LLM omission, tolerance to invented values, case-insensitive matching, malformed input.
 
 ## Phase 3 — Refactor match engine to job-anchored scoring
 

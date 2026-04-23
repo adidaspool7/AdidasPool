@@ -28,6 +28,12 @@ export interface CvExtractionResult {
     endDate?: string | null;
     isCurrent: boolean;
     description?: string | null;
+    /**
+     * Canonical Fields of Work this experience maps to (subset of the 16 in
+     * src/client/lib/constants.ts). Emitted by the CV parser LLM.
+     * Phase 2 — docs/JOB_ANCHORED_MATCHING_PLAN.md.
+     */
+    fieldsOfWork?: string[];
   }[];
   education: {
     institution?: string | null;

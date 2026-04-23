@@ -56,6 +56,27 @@ export const CvExtractionSchema = z.object({
       endDate: z.string().optional().nullable(),
       isCurrent: z.boolean().default(false),
       description: z.string().optional().nullable(),
+      /**
+       * Phase 2: per-experience Field of Work tags (subset of the 16).
+       * Tolerant to LLM invention — unknown values are dropped.
+       */
+      fieldsOfWork: z.preprocess(
+        (v) => {
+          if (!Array.isArray(v)) return [];
+          const allowed = new Set(FIELDS_OF_WORK as readonly string[]);
+          return (v as unknown[])
+            .filter((x): x is string => typeof x === "string")
+            .map((x) => {
+              // Tolerant match: case-insensitive
+              const hit = (FIELDS_OF_WORK as readonly string[]).find(
+                (f) => f.toLowerCase() === x.toLowerCase()
+              );
+              return hit ?? null;
+            })
+            .filter((x): x is string => x !== null && allowed.has(x));
+        },
+        z.array(z.string()).default([])
+      ),
     })
   ),
 
