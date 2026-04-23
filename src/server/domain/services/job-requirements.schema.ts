@@ -1,0 +1,76 @@
+/**
+ * Job Requirements — Domain Schema
+ *
+ * ONION LAYER: Domain
+ * DEPENDENCIES: zod (cross-cutting), FIELDS_OF_WORK constant (client constants shared via path alias)
+ *
+ * Structured representation of hiring requirements extracted from a raw JD by
+ * the LLM. This is the *input contract* for the Phase-3 job-anchored matcher.
+ *
+ * Invariants (enforced here, not in the LLM prompt alone):
+ *   - Every numeric field is either a number or null — never invented.
+ *   - fieldsOfWork values must be a subset of the canonical 16.
+ *   - cefr values are restricted to the CEFR scale (or null).
+ *
+ * See docs/JOB_ANCHORED_MATCHING_PLAN.md — Phase 1.
+ */
+
+import { z } from "zod";
+import { FIELDS_OF_WORK } from "@/client/lib/constants";
+
+/** Current schema version. Bump when the shape changes incompatibly. */
+export const JOB_REQUIREMENTS_SCHEMA_VERSION = 1;
+
+export const SeniorityLevelSchema = z.enum([
+  "INTERN",
+  "JUNIOR",
+  "MID",
+  "SENIOR",
+  "LEAD",
+  "DIRECTOR",
+]);
+export type SeniorityLevel = z.infer<typeof SeniorityLevelSchema>;
+
+export const CefrLevelSchema = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
+export type CefrLevel = z.infer<typeof CefrLevelSchema>;
+
+export const EducationLevelSchema = z.enum([
+  "HIGH_SCHOOL",
+  "VOCATIONAL",
+  "BACHELOR",
+  "MASTER",
+  "PHD",
+  "OTHER",
+]);
+export type EducationLevel = z.infer<typeof EducationLevelSchema>;
+
+const FieldOfWorkSchema = z.enum(
+  FIELDS_OF_WORK as unknown as readonly [string, ...string[]]
+);
+
+/**
+ * JD requirements as extracted by the LLM.
+ * All numeric fields default to null — the extractor is forbidden from
+ * inventing them.
+ */
+export const JobRequirementsSchema = z.object({
+  fieldsOfWork: z.array(FieldOfWorkSchema).default([]),
+  seniorityLevel: SeniorityLevelSchema.nullable().default(null),
+  minYearsInField: z.number().int().min(0).max(40).nullable().default(null),
+  requiredSkills: z.array(z.string().min(1)).default([]),
+  preferredSkills: z.array(z.string().min(1)).default([]),
+  requiredLanguages: z
+    .array(
+      z.object({
+        language: z.string().min(1),
+        cefr: CefrLevelSchema.nullable().default(null),
+      })
+    )
+    .default([]),
+  requiredEducationLevel: EducationLevelSchema.nullable().default(null),
+  responsibilitiesSummary: z.string().nullable().default(null),
+  rawExtractionModel: z.string(),
+  rawExtractionTimestamp: z.string(),
+});
+
+export type JobRequirements = z.infer<typeof JobRequirementsSchema>;

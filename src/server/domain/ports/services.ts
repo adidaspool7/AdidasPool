@@ -150,4 +150,11 @@ export interface IJobScraperService {
    * @param maxPages - Maximum pages to scrape (for rate limiting). 0 = all pages.
    */
   scrapeJobs(maxPages?: number): Promise<ScrapedJob[]>;
+
+  /**
+   * Fetch the plain-text job description body for a single job detail URL.
+   * Returns null if the page is unreachable or the body cannot be extracted.
+   * Used by the Phase-1 requirements extractor.
+   */
+  fetchJobDescription(sourceUrl: string): Promise<string | null>;
 }

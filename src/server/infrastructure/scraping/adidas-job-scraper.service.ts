@@ -354,4 +354,61 @@ export class AdidasJobScraperService implements IJobScraperService {
       }
     }
   }
+
+  /**
+   * Fetch a single job's detail page and extract plain-text description body.
+   *
+   * Used by Phase-1 requirements extraction. Respects FETCH_DELAY_MS when
+   * called in batches by the caller (this method itself does not sleep).
+   *
+   * @param sourceUrl Absolute or BASE_URL-relative job detail URL
+   * @returns Plain-text description of the job, or null if not extractable
+   */
+  async fetchJobDescription(sourceUrl: string): Promise<string | null> {
+    const url = sourceUrl.startsWith("http") ? sourceUrl : `${BASE_URL}${sourceUrl}`;
+
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!response.ok) {
+      console.warn(
+        `[JobScraper] fetchJobDescription HTTP ${response.status} for ${url}`
+      );
+      return null;
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // The SuccessFactors JD body lives in #job-description (primary)
+    // or .jobdescription / #content-wrapper as fallbacks.
+    const candidates = [
+      "#job-description",
+      ".jobdescription",
+      ".jobDescription",
+      '[data-automation-id="jobPostingDescription"]',
+      "#content-wrapper",
+      "main",
+    ];
+    for (const sel of candidates) {
+      const el = $(sel).first();
+      if (el.length === 0) continue;
+      // Remove nav/script/style noise inside the selected region
+      el.find("script, style, nav, header, footer").remove();
+      const text = el.text().replace(/\u00a0/g, " ").trim();
+      if (text.length > 200) return text;
+    }
+
+    // Last-resort: full body minus the boilerplate navbars
+    const body = $("body").clone();
+    body.find("script, style, nav, header, footer").remove();
+    const bodyText = body.text().replace(/\u00a0/g, " ").trim();
+    return bodyText.length > 200 ? bodyText : null;
+  }
 }

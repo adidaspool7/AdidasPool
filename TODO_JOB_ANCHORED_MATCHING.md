@@ -7,30 +7,22 @@
 
 ## Phase 0 — Stop misleading HR (ship first, small, safe)
 
-- [ ] Relabel the candidates-evaluation table columns: rename score badge to **"Quality"** with tooltip *"profile completeness · not a hiring signal; use Match Jobs for job fit"*.
-- [ ] In the Match Jobs dialog, **hide** criteria whose `applicable === false` instead of showing them as `100`. (Today Experience/Language/Education/Skills all show `100` for scraped jobs — misleading.)
-- [ ] Add an empty-state banner to the Match Jobs dialog when fewer than N criteria are applicable: *"This job has limited structured requirements. Match quality will improve as we enrich job descriptions."*
+- [x] Relabel the candidates-evaluation table columns: rename score badge to **"Quality"** with tooltip *"profile completeness · not a hiring signal; use Match Jobs for job fit"*.
+- [x] ~~In the Match Jobs dialog, **hide** criteria whose `applicable === false`~~ — N/A, dialog deleted in `0919b0f`.
+- [x] ~~Add an empty-state banner to the Match Jobs dialog~~ — N/A, dialog deleted.
 - [ ] Update `AppReport/06_Features_Implementation.md` section on Candidates Evaluation to note the rubric's current meaning ("quality, not fit").
 
 ## Phase 1 — JD body scraping + LLM extraction
 
-- [ ] Add `parsed_requirements JSONB` + `parsed_requirements_version INT` columns on `jobs`. Migration file under `supabase/migrations/`.
-- [ ] Extend `adidas-job-scraper.service.ts` to fetch the JD body HTML at `source_url` (respect `FETCH_DELAY_MS`).
-- [ ] Strip boilerplate from JD HTML → plain text for LLM input.
-- [ ] Define Zod schema for `JobRequirements`:
-  - `fieldsOfWork: string[]` (subset of the 16)
-  - `seniorityLevel: "INTERN" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "DIRECTOR" | null`
-  - `minYearsInField: number | null`
-  - `requiredSkills: string[]`
-  - `preferredSkills: string[]`
-  - `requiredLanguages: { language: string; cefr: string | null }[]`
-  - `requiredEducationLevel: string | null`
-  - `responsibilitiesSummary: string | null`
-  - `rawExtractionModel: string` + `rawExtractionTimestamp: string`
-- [ ] Build `JobRequirementsExtractorService` in infrastructure (Groq primary, OpenAI fallback). Prompt: *"Extract structured hiring requirements. Return every numeric field as `null` if not explicitly stated. Do not invent."*
-- [ ] Persist parsed output on scrape; skip jobs already parsed with matching `source_url` hash.
-- [ ] One-off backfill script (`scripts/backfill-job-requirements.ts`) for existing jobs.
-- [ ] Unit tests: 3-4 real JD samples → verify extractor pins to the schema (no invention).
+- [x] Add `parsed_requirements JSONB` + `parsed_requirements_version INT` columns on `jobs`. Migration file under `supabase/migrations/`.
+- [x] Extend `adidas-job-scraper.service.ts` to fetch the JD body HTML at `source_url` (respect `FETCH_DELAY_MS`).
+- [x] Strip boilerplate from JD HTML → plain text for LLM input.
+- [x] Define Zod schema for `JobRequirements` (9 unit tests).
+- [x] Build `JobRequirementsExtractorService` in infrastructure (Groq primary, OpenAI fallback).
+- [x] Persist parsed output via `parsePendingJobRequirements(limit, delayMs)` use case; skip jobs already parsed (via `findUnparsedJobs`).
+- [x] One-off backfill script (`scripts/backfill-job-requirements.ts`) for existing jobs.
+- [x] Unit tests for the schema (LLM calls deliberately not mocked — schema enforces the contract).
+- [ ] Smoke test against 3-4 real JD samples (manual; run backfill in dev against Supabase).
 
 ## Phase 2 — CV → per-experience Field of Work tags
 

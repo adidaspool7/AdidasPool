@@ -154,6 +154,20 @@ export interface IJobRepository {
       type?: string | null;
     }[]
   ): Promise<{ created: number; updated: number }>;
+  /**
+   * Return jobs that have a source_url but no parsed_requirements yet
+   * (i.e. candidates for Phase-1 LLM extraction). Used by the backfill
+   * script and the post-sync extractor worker.
+   */
+  findUnparsedJobs(limit: number): Promise<
+    Array<{ id: string; sourceUrl: string | null; description: string | null }>
+  >;
+  /** Persist the LLM-extracted structured requirements for a job. */
+  updateParsedRequirements(
+    id: string,
+    parsedRequirements: unknown,
+    version: number
+  ): Promise<void>;
   upsertMatch(
     jobId: string,
     candidateId: string,

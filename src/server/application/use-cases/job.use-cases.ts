@@ -20,13 +20,24 @@ import type { CreateJobInput } from "@server/application/dtos";
 import type { UpdateJobInput } from "@server/application/dtos";
 import { NotFoundError } from "./candidate.use-cases";
 
+/**
+ * Minimal port for the Phase-1 job requirements extractor.
+ * Structural type so the application layer does not import the
+ * infrastructure class directly.
+ */
+export interface IJobRequirementsExtractor {
+  extract(jdText: string): Promise<Record<string, unknown>>;
+  readonly schemaVersion: number;
+}
+
 export class JobUseCases {
   constructor(
     private readonly jobRepo: IJobRepository,
     private readonly candidateRepo: ICandidateRepository,
     private readonly jobScraperService?: IJobScraperService,
     private readonly notificationRepo?: INotificationRepository,
-    private readonly applicationRepo?: IJobApplicationRepository
+    private readonly applicationRepo?: IJobApplicationRepository,
+    private readonly requirementsExtractor?: IJobRequirementsExtractor
   ) {}
 
   /**
@@ -252,6 +263,84 @@ export class JobUseCases {
       errors: [],
       durationMs,
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Phase-1 worker: find jobs with no parsed_requirements, fetch their JD
+   * body from the source_url, pass it through the LLM extractor, and persist
+   * the structured result.
+   *
+   * Bounded by `limit` — each run advances a batch, so repeated runs (manual
+   * or scheduled) eventually cover the corpus without blowing up LLM rate
+   * limits.
+   */
+  async parsePendingJobRequirements(
+    limit: number = 20,
+    delayMs: number = 1000
+  ): Promise<{
+    attempted: number;
+    parsed: number;
+    failed: number;
+    errors: Array<{ jobId: string; error: string }>;
+    durationMs: number;
+  }> {
+    if (!this.jobScraperService) {
+      throw new Error("Job scraper service is not configured");
+    }
+    if (!this.requirementsExtractor) {
+      throw new Error("Job requirements extractor is not configured");
+    }
+
+    const startedAt = Date.now();
+    const pending = await this.jobRepo.findUnparsedJobs(limit);
+
+    let parsed = 0;
+    let failed = 0;
+    const errors: Array<{ jobId: string; error: string }> = [];
+
+    for (let i = 0; i < pending.length; i++) {
+      const job = pending[i];
+      try {
+        let jdText = job.description ?? "";
+        if (!jdText || jdText.trim().length < 200) {
+          // Description not on file — fetch from source page.
+          if (!job.sourceUrl) {
+            throw new Error("No source_url and no on-file description");
+          }
+          const fetched = await this.jobScraperService.fetchJobDescription(
+            job.sourceUrl
+          );
+          if (!fetched) throw new Error("Failed to fetch JD body");
+          jdText = fetched;
+        }
+
+        const extracted = await this.requirementsExtractor.extract(jdText);
+        await this.jobRepo.updateParsedRequirements(
+          job.id,
+          extracted,
+          this.requirementsExtractor.schemaVersion
+        );
+        parsed++;
+      } catch (err) {
+        failed++;
+        errors.push({
+          jobId: job.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      if (i < pending.length - 1 && delayMs > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+
+    return {
+      attempted: pending.length,
+      parsed,
+      failed,
+      errors,
+      durationMs: Date.now() - startedAt,
     };
   }
 }

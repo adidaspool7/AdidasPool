@@ -594,10 +594,10 @@ export default function CandidatesPage() {
     }
   }
 
-  function SortableHeader({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) {
+  function SortableHeader({ field, children, className, title }: { field: string; children: React.ReactNode; className?: string; title?: string }) {
     const active = sortBy === field;
     return (
-      <TableHead className={className}>
+      <TableHead className={className} title={title}>
         <button
           className="flex items-center gap-1 hover:text-foreground transition-colors"
           onClick={() => toggleSort(field)}
@@ -728,7 +728,13 @@ export default function CandidatesPage() {
                 <SortableHeader field="firstName">Name</SortableHeader>
                 <TableHead className="text-center">Department</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <SortableHeader field="overallCvScore" className="text-center">Overall</SortableHeader>
+                <SortableHeader
+                  field="overallCvScore"
+                  className="text-center"
+                  title="CV quality score — independent of any job. Measures experience relevance, years, education, location, and languages against the configured weights."
+                >
+                  Quality
+                </SortableHeader>
                 <TableHead className="text-center">Score Breakdown</TableHead>
                 <TableHead className="text-center">Languages</TableHead>
                 <TableHead className="text-center">Source</TableHead>
@@ -848,8 +854,8 @@ export default function CandidatesPage() {
                       </DropdownMenu>
                     </TableCell>
 
-                    {/* Overall score */}
-                    <TableCell className="text-center">
+                    {/* Quality score — CV-intrinsic, not job-specific */}
+                    <TableCell className="text-center" title="CV quality score — independent of any job.">
                       <OverallScoreBadge
                         score={
                           useCustomRanking && c.rerankedScore != null
