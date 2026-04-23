@@ -319,6 +319,121 @@ function BusinessAreaDropdown({
   );
 }
 
+// ── Job picker (searchable) ──────────────────────────────────────
+
+function JobPicker({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: Array<{ id: string; title: string; department: string | null }>;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? options.filter((j) => {
+        const hay = `${j.title} ${j.department ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      })
+    : options;
+
+  const selected = options.find((j) => j.id === value) ?? null;
+  const displayLabel = selected
+    ? `${selected.title}${selected.department ? ` · ${selected.department}` : ""}`
+    : "Select a job…";
+  const shortLabel =
+    displayLabel.length > 40 ? displayLabel.slice(0, 38) + "…" : displayLabel;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent transition-colors w-[340px] h-8"
+        onClick={() => setOpen(!open)}
+      >
+        <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className={`truncate ${selected ? "" : "text-muted-foreground"}`}>{shortLabel}</span>
+        <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 w-[420px] rounded-md border bg-popover shadow-lg">
+          <div className="p-2 border-b">
+            <Input
+              placeholder="Search by title or department…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-72 overflow-y-auto p-1">
+            <button
+              type="button"
+              className={`w-full text-left rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors ${
+                value === "" ? "bg-accent font-medium" : "text-muted-foreground"
+              }`}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+                setSearch("");
+              }}
+            >
+              — No job (Quality only) —
+            </button>
+            {filtered.map((j) => {
+              const isActive = j.id === value;
+              return (
+                <button
+                  key={j.id}
+                  type="button"
+                  className={`w-full text-left rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors ${
+                    isActive ? "bg-accent font-medium" : ""
+                  }`}
+                  onClick={() => {
+                    onChange(j.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <div className="truncate">{j.title}</div>
+                  {j.department && (
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {j.department}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="px-2 py-3 text-sm text-muted-foreground text-center">
+                No jobs match
+              </p>
+            )}
+          </div>
+          <div className="px-2 py-1.5 border-t text-[11px] text-muted-foreground">
+            {filtered.length} of {options.length} jobs
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────
 
 export default function CandidatesPage() {
@@ -801,19 +916,11 @@ export default function CandidatesPage() {
       <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
         <Target className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Rank by fit for a job:</span>
-        <Select value={fitJobId || "none"} onValueChange={(v) => setFitJobId(v === "none" ? "" : v)}>
-          <SelectTrigger className="w-[320px] h-8">
-            <SelectValue placeholder="Select a job…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">— No job (Quality only) —</SelectItem>
-            {jobOptions.map((j) => (
-              <SelectItem key={j.id} value={j.id}>
-                {j.title}{j.department ? ` · ${j.department}` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <JobPicker
+          value={fitJobId}
+          options={jobOptions}
+          onChange={setFitJobId}
+        />
         {fitLoading && (
           <span className="inline-flex items-center text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Computing fit…
