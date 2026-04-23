@@ -160,11 +160,6 @@ export interface IJobRepository {
     matchScore: number,
     breakdown: any
   ): Promise<any>;
-  bulkUpsertMatches(
-    candidateId: string,
-    matches: { jobId: string; matchScore: number; breakdown: any }[]
-  ): Promise<void>;
-  findAllForMatching(): Promise<any[]>;
   delete(id: string): Promise<void>;
 }
 
