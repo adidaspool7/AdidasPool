@@ -122,6 +122,69 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 
 ---
 
+## Job-Anchored Matching (as of 2026-04-23)
+
+The "universal candidate match score" was deleted. Matching is now always
+**candidate × specific job**. See [docs/JOB_ANCHORED_MATCHING_PLAN.md](docs/JOB_ANCHORED_MATCHING_PLAN.md).
+
+### Two scores, two meanings
+
+- **Quality** — CV-intrinsic profile score (`candidates.overall_cv_score`). Profile
+  completeness, education, languages, location. Independent of any job. Useful as a
+  prefilter, not a hiring signal.
+- **Fit** — Computed live by `computeJobFit(job, candidate)` for a chosen job.
+  7 criteria (field, experience-in-field, seniority, required/preferred skills,
+  languages, education). Overall = avg of *applicable* criteria only. `isEligible`
+  flag = AND of applicable.met. Persisted in `job_matches` as a cache.
+
+### Pipeline
+
+1. **JD parsing** (`JobRequirementsExtractorService` → Groq, fallback OpenAI).
+   Stored in `jobs.parsed_requirements` JSONB + `parsed_requirements_version`.
+   Schema: [src/server/domain/services/job-requirements.schema.ts](src/server/domain/services/job-requirements.schema.ts).
+   `JOB_REQUIREMENTS_SCHEMA_VERSION = 1`. **Lazy** — parsed on first HR open of
+   "Rank candidates", not bulk. Cache invalidated when `bulkUpsertByExternalId`
+   detects a `source_url` change.
+2. **CV parsing** tags every experience with one or more canonical Fields of Work
+   (16 in [src/client/lib/constants.ts](src/client/lib/constants.ts)). Stored in
+   `experiences.fields_of_work TEXT[]` (GIN index). Tolerant Zod preprocess
+   silently drops LLM-invented values outside the canonical 16.
+3. **`computeJobFit`** is a pure function in
+   [src/server/domain/services/job-fit.service.ts](src/server/domain/services/job-fit.service.ts).
+   Zero deps, fully unit-tested.
+4. **Orchestrator** `JobUseCases.matchCandidatesToJob(jobId)` lazy-parses the JD,
+   loads candidates with experiences/languages/education/skills, builds the per-field
+   experience vector, runs `computeJobFit`, persists top-100 to `job_matches`.
+
+### UI surfaces
+
+- **`/dashboard/jobs/[id]/match-candidates`** — ranked candidates page; HR-only.
+- **`/dashboard/candidates`** — Quality column (always) + Fit column (blank until
+  HR picks a job from the toolbar dropdown). Picking a job overlays Fit scores.
+- **CTA "Rank candidates for this job"** on each HR job card.
+
+### Tables
+
+- `jobs.parsed_requirements JSONB`, `jobs.parsed_requirements_version INT`
+  (migration `20260423000000`)
+- `experiences.fields_of_work TEXT[]` + GIN index
+  (migration `20260423000001`)
+- `job_matches` (cache) — already in initial schema.
+
+### Tests
+
+- `tests/job-requirements-schema.test.ts` (9 tests)
+- `tests/cv-fields-of-work.test.ts` (5 tests)
+- `tests/job-fit.test.ts` (15 tests)
+
+### Backfill scripts (ops only — not part of normal flow)
+
+- `scripts/backfill-job-requirements.ts` — re-parse jobs with stale schema version.
+- `scripts/backfill-experience-fields.ts` — tag historical experiences.
+  Invoke: `npx tsx --env-file=.env.local scripts/<name>.ts [batch] [delay]`
+
+---
+
 ## Improvement Tracks
 
 - Auto-created when `finalDecision = "FAIL"` on an assessment result (Phase 5)

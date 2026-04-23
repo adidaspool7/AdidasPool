@@ -61,6 +61,9 @@ import {
   Trash2,
   SendHorizonal,
   UserCheck,
+  Target,
+  X,
+  Loader2,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 
@@ -339,6 +342,20 @@ export default function CandidatesPage() {
 
   // Custom ranking state
   const [useCustomRanking, setUseCustomRanking] = useState(false);
+
+  // ── Fit-for-job overlay (Phase 5) ────────────────────────────
+  // Optional: HR picks a job to overlay job-specific Fit scores onto the
+  // current candidate list. Quality stays as-is; Fit is a second column.
+  const [jobOptions, setJobOptions] = useState<
+    Array<{ id: string; title: string; department: string | null }>
+  >([]);
+  const [fitJobId, setFitJobId] = useState<string>("");
+  const [fitJobTitle, setFitJobTitle] = useState<string | null>(null);
+  const [fitMap, setFitMap] = useState<
+    Map<string, { score: number; eligible: boolean }>
+  >(new Map());
+  const [fitLoading, setFitLoading] = useState(false);
+  const [fitError, setFitError] = useState<string | null>(null);
   const [weightsModalOpen, setWeightsModalOpen] = useState(false);
   const [draft, setDraft] = useState<Record<WeightKey, number>>({
     experience: 0.25,
@@ -378,7 +395,68 @@ export default function CandidatesPage() {
       .then((r) => r.json())
       .then((data) => setCustomPresets(data))
       .catch(() => {});
+
+    // Load open-job options for the Fit-for-job picker
+    fetch("/api/jobs?pageSize=200")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.data)) {
+          setJobOptions(
+            data.data.map((j: { id: string; title: string; department: string | null }) => ({
+              id: j.id,
+              title: j.title,
+              department: j.department,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // When the picked job changes, fetch its match scores once and overlay
+  // them onto the visible rows. Empty selection clears the overlay.
+  useEffect(() => {
+    if (!fitJobId) {
+      setFitMap(new Map());
+      setFitJobTitle(null);
+      setFitError(null);
+      return;
+    }
+    let cancelled = false;
+    setFitLoading(true);
+    setFitError(null);
+    fetch(`/api/jobs/${fitJobId}/match-candidates`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || `Server error (${r.status})`);
+        }
+        return r.json();
+      })
+      .then((data: { job: { title: string }; matches: Array<{ candidate: { id: string }; fit: { overallScore: number; isEligible: boolean } }> }) => {
+        if (cancelled) return;
+        const map = new Map<string, { score: number; eligible: boolean }>();
+        for (const m of data.matches) {
+          map.set(m.candidate.id, {
+            score: Math.round(m.fit.overallScore),
+            eligible: m.fit.isEligible,
+          });
+        }
+        setFitMap(map);
+        setFitJobTitle(data.job.title);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setFitError(e instanceof Error ? e.message : "Failed to compute fit.");
+        setFitMap(new Map());
+      })
+      .finally(() => {
+        if (!cancelled) setFitLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fitJobId]);
 
   const fetchCandidates = useCallback(
     async (page = 1) => {
@@ -719,6 +797,52 @@ export default function CandidatesPage() {
         </div>
       </div>
 
+      {/* Fit-for-job overlay row */}
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+        <Target className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Rank by fit for a job:</span>
+        <Select value={fitJobId || "none"} onValueChange={(v) => setFitJobId(v === "none" ? "" : v)}>
+          <SelectTrigger className="w-[320px] h-8">
+            <SelectValue placeholder="Select a job…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— No job (Quality only) —</SelectItem>
+            {jobOptions.map((j) => (
+              <SelectItem key={j.id} value={j.id}>
+                {j.title}{j.department ? ` · ${j.department}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {fitLoading && (
+          <span className="inline-flex items-center text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Computing fit…
+          </span>
+        )}
+        {fitJobId && !fitLoading && fitJobTitle && (
+          <Badge variant="outline" className="text-xs">
+            Showing fit for: {fitJobTitle}
+          </Badge>
+        )}
+        {fitJobId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={() => setFitJobId("")}
+            title="Clear job"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+        {fitError && (
+          <span className="text-xs text-destructive">{fitError}</span>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          Quality is profile-only. Fit = match against this job&apos;s parsed requirements.
+        </span>
+      </div>
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
@@ -735,6 +859,22 @@ export default function CandidatesPage() {
                 >
                   Quality
                 </SortableHeader>
+                <TableHead
+                  className="text-center"
+                  title={
+                    fitJobTitle
+                      ? `Fit against "${fitJobTitle}" — computed from the job's parsed requirements (fields of work, seniority, skills, languages, education).`
+                      : "Pick a job above to compute Fit scores."
+                  }
+                >
+                  {fitJobTitle ? (
+                    <span>
+                      Fit (for {fitJobTitle.length > 18 ? fitJobTitle.slice(0, 16) + "…" : fitJobTitle})
+                    </span>
+                  ) : (
+                    <span>Fit (for …)</span>
+                  )}
+                </TableHead>
                 <TableHead className="text-center">Score Breakdown</TableHead>
                 <TableHead className="text-center">Languages</TableHead>
                 <TableHead className="text-center">Source</TableHead>
@@ -745,7 +885,7 @@ export default function CandidatesPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -755,7 +895,7 @@ export default function CandidatesPage() {
               ) : candidates.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-12 text-muted-foreground"
                   >
                     <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -878,6 +1018,46 @@ export default function CandidatesPage() {
                             {c.rerankedScore - c.overallCvScore}
                           </span>
                         )}
+                    </TableCell>
+
+                    {/* Fit (for selected job) — blank until HR picks one */}
+                    <TableCell className="text-center">
+                      {(() => {
+                        if (!fitJobId) {
+                          return <span className="text-xs text-muted-foreground">—</span>;
+                        }
+                        if (fitLoading) {
+                          return <Skeleton className="h-4 w-10 mx-auto" />;
+                        }
+                        const f = fitMap.get(c.id);
+                        if (!f) {
+                          return <span className="text-xs text-muted-foreground">—</span>;
+                        }
+                        const colour =
+                          f.score >= 70
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                            : f.score >= 45
+                              ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
+                              : "bg-red-500/15 text-red-700 dark:text-red-400";
+                        return (
+                          <div className="inline-flex items-center gap-1">
+                            <span
+                              className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour}`}
+                            >
+                              {f.score}
+                            </span>
+                            {!f.eligible && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] text-rose-700 border-rose-300 px-1 py-0 h-4"
+                                title="Candidate fails one or more hard requirements (e.g. minimum years, required language)."
+                              >
+                                Blocked
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
 
                     {/* Score breakdown mini bars */}

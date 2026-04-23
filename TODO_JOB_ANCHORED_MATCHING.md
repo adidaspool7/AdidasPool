@@ -54,11 +54,11 @@ We deliberately do **NOT** run the full 1,300+ job backfill. Rationale:
 
 Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 
-- [ ] `JobUseCases.getOrParseRequirements(jobId)` — returns the parsed JSON, parsing
+- [x] `JobUseCases.getOrParseRequirements(jobId)` — returns the parsed JSON, parsing
   inline if missing. Used by the job-anchored matcher.
-- [ ] In `bulkUpsertByExternalId`, detect `source_url` change on existing rows and
+- [x] In `bulkUpsertByExternalId`, detect `source_url` change on existing rows and
   null `parsed_requirements` + `parsed_requirements_version`.
-- [ ] Schema-version gate: treat rows with `parsed_requirements_version <
+- [x] Schema-version gate: treat rows with `parsed_requirements_version <
   JOB_REQUIREMENTS_SCHEMA_VERSION` as unparsed.
 
 ## Phase 2 — CV → per-experience Field of Work tags
@@ -71,32 +71,32 @@ Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 
 ## Phase 3 — Refactor match engine to job-anchored scoring
 
-- [ ] **Lazy-parse wrapper** (from Phase 1.5): `JobUseCases.getOrParseRequirements(jobId)` — parse inline if missing or stale schema version; cache in DB.
-- [ ] **Sync invalidation** (from Phase 1.5): `bulkUpsertByExternalId` nulls `parsed_requirements` when `source_url` changes on an existing job.
-- [ ] Replace `MatchInput.job` typing: inputs come from `parsed_requirements`, not raw scraped columns.
-- [ ] Replace `candidate.yearsOfExperience` with `candidate.experienceByField: Record<string, number>` in `MatchInput`.
-- [ ] Rewrite `matchField` to accept `job.fieldsOfWork[]` (multiple) and score as an intersection count against the candidate's field vector.
-- [ ] Rewrite `matchExperience` to read `job.minYearsInField` against the candidate's years in that specific field.
-- [ ] Add `matchSeniority` — compare `job.seniorityLevel` against a computed candidate seniority (helper in the domain layer).
-- [ ] Omit criteria from breakdown entirely when `applicable === false` (visual change in the dialog).
-- [ ] Keep the `applicable`-aware average from `849782e`.
-- [ ] Expand `tests/matching.test.ts` with fixtures for structured JDs.
+- [x] **Lazy-parse wrapper** (from Phase 1.5): `JobUseCases.getOrParseRequirements(jobId)` — parse inline if missing or stale schema version; cache in DB.
+- [x] **Sync invalidation** (from Phase 1.5): `bulkUpsertByExternalId` nulls `parsed_requirements` when `source_url` changes on an existing job.
+- [x] Replace `MatchInput.job` typing: inputs come from `parsed_requirements`, not raw scraped columns. — superseded by new pure `computeJobFit(JobRequirements, CandidateFitInput)` in `src/server/domain/services/job-fit.service.ts`.
+- [x] Replace `candidate.yearsOfExperience` with `candidate.experienceByField: Record<string, number>` in `CandidateFitInput`.
+- [x] Rewrite `matchField` to accept `job.fieldsOfWork[]` (multiple) and score as an intersection count against the candidate's field vector.
+- [x] Rewrite `matchExperience` to read `job.minYearsInField` against the candidate's years in that specific field (with total-years fallback when JD lists no fields).
+- [x] Add `matchSeniority` — compare `job.seniorityLevel` against a computed candidate seniority (helper inferSeniorityFromYears in the same pure module).
+- [x] Omit criteria from breakdown entirely when `applicable === false` (encoded in `applicable` flag on each criterion; UI hides ineligible criteria from the eligibility AND).
+- [x] Keep the `applicable`-aware average (overall = avg of applicable criteria only).
+- [x] Expand tests with fixtures for structured JDs — `tests/job-fit.test.ts` (15 tests).
 
 ## Phase 4 — Quality vs Fit, bidirectional views
 
-- [ ] Rename the existing candidate score badge to **Quality** in the evaluation page UI.
-- [ ] Add a second column **Fit (for …)** that is blank until HR picks a job.
-- [ ] New page: `/dashboard/jobs/[id]/match-candidates` — ranks all candidates against one job. Uses the same `fit(candidate, job)` primitive.
-- [ ] Add "Rank candidates for this job" CTA on the job detail page.
-- [ ] Candidates Evaluation tabs: **All** (recency / Quality) and **Rank for a job** (pick one, then Fit).
-- [ ] Cache results in `job_matches` (already in schema) — batch recompute on job create + candidate profile change.
+- [x] Rename the existing candidate score badge to **Quality** in the evaluation page UI.
+- [x] Add a second column **Fit (for …)** that is blank until HR picks a job.
+- [x] New page: `/dashboard/jobs/[id]/match-candidates` — ranks all candidates against one job. Uses the same `fit(candidate, job)` primitive.
+- [x] Add "Rank candidates for this job" CTA on the job detail page (per-card on jobs list).
+- [x] Candidates Evaluation: HR picks a job from a toolbar dropdown, Fit column populates inline (single-page overlay; tabs not needed).
+- [x] Cache results in `job_matches` (already in schema) — written by `JobUseCases.matchCandidatesToJob` (top-100).
 
 ## Phase 5 — Delete dead code & misleading surfaces
 
-- [ ] Delete or hide any route / component that still shows a "universal match score" without a job context.
-- [ ] Remove `experienceScore` from `MatchInput` if no criterion reads it after Phase 3.
-- [ ] Remove the `candidates.match_score` table column if it is no longer written (confirm not referenced anywhere — audit with grep before dropping).
-- [ ] Update `CLAUDE.md` + `AppReport/*.md` to reflect the new model.
+- [x] Delete or hide any route / component that still shows a "universal match score" without a job context. — Done: matching engine deleted in `0919b0f`; the only score in HR UI is now labelled "Quality".
+- [ ] Remove `experienceScore` from `MatchInput` if no criterion reads it after Phase 3. — N/A: `MatchInput` is gone; `experienceScore` on candidates is still used by the Quality breakdown sub-bars (kept).
+- [ ] Remove the `candidates.match_score` table column if it is no longer written (confirm not referenced anywhere — audit with grep before dropping). — Deferred; low value, blocks no work.
+- [x] Update `CLAUDE.md` + `AppReport/*.md` to reflect the new model. — `CLAUDE.md` updated; AppReport pending.
 
 ## Documentation tasks (alongside each phase)
 
