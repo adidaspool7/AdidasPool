@@ -22,6 +22,7 @@ import {
   cvParserService,
   emailService,
   jobScraperService,
+  jobRequirementsExtractor,
   storageService,
   textExtractionService,
 } from "@server/container";
@@ -45,7 +46,7 @@ export { NotFoundError, ValidationError };
 
 export const candidateUseCases = new CandidateUseCases(candidateRepository, storageService);
 
-export const jobUseCases = new JobUseCases(jobRepository, candidateRepository, jobScraperService, notificationRepository, jobApplicationRepository);
+export const jobUseCases = new JobUseCases(jobRepository, candidateRepository, jobScraperService, notificationRepository, jobApplicationRepository, jobRequirementsExtractor);
 
 export const assessmentUseCases = new AssessmentUseCases(
   assessmentRepository,

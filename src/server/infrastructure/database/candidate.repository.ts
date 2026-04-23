@@ -224,7 +224,7 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
   async findForMatching() {
     const { data, error } = await db
       .from("candidates")
-      .select(`*, languages:candidate_languages(*), education(*), skills(*)`)
+      .select(`*, languages:candidate_languages(*), education(*), skills(*), experiences(*)`)
       .neq("status", "NEW")
       .eq("is_duplicate", false);
     assertNoError(error, "candidate.findForMatching");
@@ -234,7 +234,7 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
   async findByIdForMatching(candidateId: string) {
     const { data, error } = await db
       .from("candidates")
-      .select(`*, languages:candidate_languages(*), education(*), skills(*)`)
+      .select(`*, languages:candidate_languages(*), education(*), skills(*), experiences(*)`)
       .eq("id", candidateId)
       .single();
     if (error) return null;

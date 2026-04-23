@@ -19,6 +19,7 @@ import { SupabaseScoringWeightsRepository } from "@server/infrastructure/databas
 import { SupabaseScoringPresetRepository } from "@server/infrastructure/database/scoring-preset.repository";
 import { SupabaseAnalyticsRepository } from "@server/infrastructure/database/analytics.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
+import { JobRequirementsExtractorService } from "@server/infrastructure/ai/job-requirements-extractor.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
 import { AdidasJobScraperService } from "@server/infrastructure/scraping/adidas-job-scraper.service";
 import { TextExtractionService } from "@server/infrastructure/extraction/text-extraction.service";
@@ -100,3 +101,9 @@ export const storageService: IStorageService =
 
 export const textExtractionService: ITextExtractionService =
   new TextExtractionService();
+
+/**
+ * Phase 1 — JD requirements extractor. Structural type so the application
+ * layer can depend on it without importing the infrastructure class.
+ */
+export const jobRequirementsExtractor = new JobRequirementsExtractorService();

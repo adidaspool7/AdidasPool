@@ -24,6 +24,11 @@ import {
   JOB_REQUIREMENTS_SCHEMA_VERSION,
   type JobRequirements,
 } from "@server/domain/services/job-requirements.schema";
+import {
+  computeJobFit,
+  type CandidateFitInput,
+  type JobFitResult,
+} from "@server/domain/services/job-fit.service";
 
 /**
  * Minimal port for the Phase-1 job requirements extractor.
@@ -415,4 +420,168 @@ export class JobUseCases {
     // Final validation before handing back.
     return JobRequirementsSchema.parse(extracted);
   }
+
+  /**
+   * Phase 4 orchestrator.
+   *
+   * Rank candidates against a single job's *parsed* requirements:
+   *   1. Resolve `JobRequirements` via the lazy-parse wrapper.
+   *   2. Load all matchable candidates with their experiences/languages/
+   *      education/skills (existing `findForMatching`).
+   *   3. Build the per-candidate `experienceByField` vector from the
+   *      tagged experiences (Phase 2).
+   *   4. Run the pure `computeJobFit(...)` against each.
+   *   5. Persist the top-N to `job_matches` so the UI is fast on reopen.
+   *
+   * Returns the ranked list (highest fit first) with full breakdowns.
+   */
+  async matchCandidatesToJob(
+    jobId: string,
+    options?: { persistTop?: number }
+  ): Promise<{
+    job: { id: string; title: string };
+    requirements: JobRequirements;
+    matches: Array<{
+      candidate: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        location: string | null;
+        country: string | null;
+        primaryBusinessArea: string | null;
+        matchScore: number | null;
+      };
+      fit: JobFitResult;
+    }>;
+  }> {
+    const job = await this.jobRepo.findById(jobId);
+    if (!job) throw new NotFoundError(`Job ${jobId} not found`);
+
+    const requirements = await this.getOrParseRequirements(jobId);
+
+    const candidates = await this.candidateRepo.findForMatching();
+
+    const ranked = candidates
+      .map((c: Record<string, any>) => {
+        const fit = computeJobFit(requirements, buildCandidateFitInput(c));
+        return {
+          candidate: {
+            id: c.id as string,
+            firstName: (c.firstName as string) ?? "",
+            lastName: (c.lastName as string) ?? "",
+            location: (c.location as string | null) ?? null,
+            country: (c.country as string | null) ?? null,
+            primaryBusinessArea: (c.primaryBusinessArea as string | null) ?? null,
+            matchScore: (c.matchScore as number | null) ?? null,
+          },
+          fit,
+        };
+      })
+      .sort((a, b) => b.fit.overallScore - a.fit.overallScore);
+
+    // Persist the top-N back to job_matches as a cache + audit trail.
+    const persistTop = options?.persistTop ?? 100;
+    const toPersist = ranked.slice(0, persistTop);
+    await Promise.all(
+      toPersist.map((r) =>
+        this.jobRepo.upsertMatch(
+          jobId,
+          r.candidate.id,
+          r.fit.overallScore,
+          r.fit.breakdown
+        )
+      )
+    );
+
+    return {
+      job: { id: job.id as string, title: job.title as string },
+      requirements,
+      matches: ranked,
+    };
+  }
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Adapt a "matching" candidate row (with experiences, languages, education,
+ * skills relations) into the pure `CandidateFitInput` shape consumed by the
+ * Phase 3 fit engine. Keeps the use-case readable.
+ */
+function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
+  const experiences = Array.isArray(c.experiences) ? c.experiences : [];
+  const experienceByField: Record<string, number> = {};
+  let totalYears = 0;
+  for (const exp of experiences) {
+    const years = experienceDurationYears(
+      exp.startDate ?? null,
+      exp.endDate ?? null,
+      Boolean(exp.isCurrent)
+    );
+    if (years <= 0) continue;
+    totalYears += years;
+    const fields: string[] = Array.isArray(exp.fieldsOfWork) ? exp.fieldsOfWork : [];
+    for (const f of fields) {
+      experienceByField[f] = (experienceByField[f] ?? 0) + years;
+    }
+  }
+  // Round to 1 decimal for display + stable scoring
+  for (const k of Object.keys(experienceByField)) {
+    experienceByField[k] = Math.round(experienceByField[k] * 10) / 10;
+  }
+
+  const languages = Array.isArray(c.languages) ? c.languages : [];
+  const education = Array.isArray(c.education) ? c.education : [];
+  const skills = Array.isArray(c.skills) ? c.skills : [];
+
+  // Highest-ranked education level the candidate holds.
+  const eduOrder = ["HIGH_SCHOOL", "VOCATIONAL", "BACHELOR", "MASTER", "PHD", "OTHER"];
+  let educationLevel: string | null = null;
+  let bestRank = -1;
+  for (const e of education) {
+    const lvl = e.level as string | null;
+    if (!lvl) continue;
+    const r = eduOrder.indexOf(lvl);
+    if (r > bestRank) {
+      bestRank = r;
+      educationLevel = lvl;
+    }
+  }
+
+  return {
+    experienceByField,
+    totalYearsExperience: Math.round(totalYears * 10) / 10,
+    educationLevel,
+    languages: languages.map((l: any) => ({
+      language: String(l.language ?? ""),
+      cefr: (l.assessedLevel as string | null) ?? (l.selfDeclaredLevel as string | null),
+    })),
+    skillNames: skills
+      .map((s: any) => String(s.name ?? ""))
+      .filter((s: string) => s.length > 0),
+  };
+}
+
+function experienceDurationYears(
+  startDate: string | null,
+  endDate: string | null,
+  isCurrent: boolean
+): number {
+  const start = parseLooseDate(startDate);
+  if (!start) return 0;
+  const end = isCurrent || !endDate ? new Date() : parseLooseDate(endDate) ?? new Date();
+  const ms = end.getTime() - start.getTime();
+  if (ms <= 0) return 0;
+  return ms / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+function parseLooseDate(s: string | null): Date | null {
+  if (!s) return null;
+  const trimmed = s.trim();
+  if (/^\d{4}$/.test(trimmed)) return new Date(`${trimmed}-01-01`);
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return new Date(`${trimmed}-01`);
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
 }
