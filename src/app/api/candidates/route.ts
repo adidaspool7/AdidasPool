@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
         : searchParams.get("needsReview") === "false"
           ? false
           : undefined,
+      excludeUnparsed: searchParams.get("excludeUnparsed") === "true"
+        ? true
+        : undefined,
       page: searchParams.get("page")
         ? Number(searchParams.get("page"))
         : 1,

@@ -457,6 +457,9 @@ export default function CandidatesPage() {
   const [locationSearch, setLocationSearch] = useState("");
   const [sortBy, setSortBy] = useState("overallCvScore");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  // Hide status=NEW (unparsed) candidates by default — they have no CV data
+  // and would appear as empty rows. HR can toggle them on.
+  const [showUnparsed, setShowUnparsed] = useState(false);
 
   // Custom ranking state
   const [useCustomRanking, setUseCustomRanking] = useState(false);
@@ -610,6 +613,7 @@ export default function CandidatesPage() {
           if (statusFilter === "SHORTLISTED_FILTER") params.set("shortlisted", "true");
           if (businessAreaFilter) params.set("businessArea", businessAreaFilter);
           if (locationSearch) params.set("locationSearch", locationSearch);
+          if (!showUnparsed) params.set("excludeUnparsed", "true");
 
           const res = await fetch(`/api/candidates?${params}`);
           if (!res.ok) throw new Error();
@@ -623,7 +627,7 @@ export default function CandidatesPage() {
         setLoading(false);
       }
     },
-    [search, statusFilter, businessAreaFilter, locationSearch, sortBy, sortOrder, useCustomRanking]
+    [search, statusFilter, businessAreaFilter, locationSearch, sortBy, sortOrder, useCustomRanking, showUnparsed]
   );
 
   useEffect(() => {
@@ -808,6 +812,17 @@ export default function CandidatesPage() {
 
   const hasActiveFilters = search || statusFilter || businessAreaFilter || locationSearch;
 
+  // When a job is picked, reorder visible candidates by Fit score desc so the
+  // best matches float to the top. Candidates without a Fit score sink to the
+  // bottom. Without a job selected, server order is preserved.
+  const displayedCandidates = fitJobId
+    ? [...candidates].sort((a, b) => {
+        const fa = fitMap.get(a.id)?.score ?? -1;
+        const fb = fitMap.get(b.id)?.score ?? -1;
+        return fb - fa;
+      })
+    : candidates;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -896,6 +911,15 @@ export default function CandidatesPage() {
         </Select>
 
         <div className="flex items-center gap-3 ml-auto">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title="Show sign-up accounts that have not uploaded a CV yet.">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary cursor-pointer"
+              checked={showUnparsed}
+              onChange={(e) => setShowUnparsed(e.target.checked)}
+            />
+            Show unparsed sign-ups
+          </label>
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -1008,7 +1032,7 @@ export default function CandidatesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                candidates.map((c) => {
+                displayedCandidates.map((c) => {
                   // status=NEW candidates have no parsed CV yet — dim the row so
                   // HR doesn't mistake the "—" values for a broken page.
                   const isUnparsed = c.status === "NEW";

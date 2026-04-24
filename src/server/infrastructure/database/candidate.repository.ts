@@ -90,6 +90,9 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     if (filters.needsReview !== undefined)
       query = query.eq("needs_review", filters.needsReview);
 
+    // Hide unparsed (status=NEW) candidates when requested
+    if (filters.excludeUnparsed) query = query.neq("status", "NEW");
+
     // Sort
     const sortCol = toSnakeCase(filters.sortBy ?? "createdAt");
     query = query

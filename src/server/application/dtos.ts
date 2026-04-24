@@ -302,6 +302,8 @@ export const CandidateFilterSchema = z.object({
   businessArea: z.string().optional(),
   shortlisted: z.boolean().optional(),
   needsReview: z.boolean().nullable().optional(),
+  /** When true, hide candidates with status=NEW (unparsed). Default: false. */
+  excludeUnparsed: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),

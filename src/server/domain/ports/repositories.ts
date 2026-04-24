@@ -36,6 +36,7 @@ export interface CandidateFilters {
   businessArea?: string;
   shortlisted?: boolean;
   needsReview?: boolean | null;
+  excludeUnparsed?: boolean;
   page: number;
   pageSize: number;
   sortBy: string;
