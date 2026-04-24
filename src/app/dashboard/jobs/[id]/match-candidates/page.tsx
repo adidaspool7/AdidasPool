@@ -15,8 +15,6 @@ import { Separator } from "@client/components/ui/separator";
 import {
   ArrowLeft,
   Briefcase,
-  CheckCircle2,
-  XCircle,
   Loader2,
   RefreshCw,
   ChevronDown,
@@ -334,17 +332,6 @@ export default function MatchCandidatesPage({
                           <Badge className={`${fitBadge(m.fit.overallScore)} font-semibold tabular-nums`}>
                             {Math.round(m.fit.overallScore)}
                           </Badge>
-                        </div>
-                        <div className="w-20 text-center">
-                          {m.fit.isEligible ? (
-                            <Badge className="bg-emerald-100 text-emerald-800">
-                              <CheckCircle2 className="w-3 h-3 mr-1" /> Eligible
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-rose-700 border-rose-300">
-                              <XCircle className="w-3 h-3 mr-1" /> Blocked
-                            </Badge>
-                          )}
                         </div>
                         <Link href={`/dashboard/candidates/${m.candidate.id}`}>
                           <Button variant="ghost" size="sm">
