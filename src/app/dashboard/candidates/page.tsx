@@ -107,6 +107,9 @@ interface Candidate {
   activatedAt: string | null;
   invitationSent: boolean;
   languages: { language: string; selfDeclaredLevel: string | null }[];
+  applications?: { id: string }[];
+  assessments?: { id: string; status: string }[];
+  interviews?: { id: string; finalDecision: string | null }[];
   _count?: { assessments: number; notes: number };
   rerankedScore?: number | null;
 }
@@ -1091,6 +1094,64 @@ export default function CandidatesPage() {
                               {[c.location, c.country].filter(Boolean).join(", ")}
                             </p>
                           )}
+                          {/* Funnel chips — compact pipeline stage at a glance */}
+                          {(() => {
+                            const applied = c.applications?.length ?? 0;
+                            const assessed = (c.assessments ?? []).filter((a) => a.status === "COMPLETED").length;
+                            const interviewed = (c.interviews ?? []).filter((i) => i.finalDecision != null).length;
+                            const decisionLabel =
+                              c.status === "HIRED" ? "Hired"
+                                : c.status === "OFFER_SENT" ? "Offer"
+                                  : c.status === "SHORTLISTED" ? "Shortlisted"
+                                    : c.status === "REJECTED" ? "Rejected"
+                                      : c.status === "ON_IMPROVEMENT_TRACK" ? "Improving"
+                                        : null;
+                            const decisionClass =
+                              c.status === "HIRED" || c.status === "OFFER_SENT"
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                                : c.status === "SHORTLISTED"
+                                  ? "bg-blue-500/15 text-blue-700 dark:text-blue-400"
+                                  : c.status === "REJECTED"
+                                    ? "bg-red-500/15 text-red-700 dark:text-red-400"
+                                    : c.status === "ON_IMPROVEMENT_TRACK"
+                                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                                      : "";
+                            const chip = (count: number, label: string, tip: string) => (
+                              <span
+                                title={tip}
+                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                  count > 0
+                                    ? "bg-primary/10 text-primary"
+                                    : "bg-muted text-muted-foreground/60"
+                                }`}
+                              >
+                                <span className="tabular-nums">{count}</span>
+                                <span>{label}</span>
+                              </span>
+                            );
+                            return (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                {chip(applied, "Applied", `${applied} job application${applied === 1 ? "" : "s"}`)}
+                                {chip(assessed, "Assessed", `${assessed} completed assessment${assessed === 1 ? "" : "s"}`)}
+                                {chip(interviewed, "Interviewed", `${interviewed} completed interview${interviewed === 1 ? "" : "s"}`)}
+                                {decisionLabel ? (
+                                  <span
+                                    title={`Current status: ${decisionLabel}`}
+                                    className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${decisionClass}`}
+                                  >
+                                    {decisionLabel}
+                                  </span>
+                                ) : (
+                                  <span
+                                    title="No hiring decision yet"
+                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground/60"
+                                  >
+                                    No decision
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </TableCell>

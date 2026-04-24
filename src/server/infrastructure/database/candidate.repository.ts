@@ -18,7 +18,9 @@ const CANDIDATE_LIST_SELECT = `
   *,
   languages:candidate_languages(*),
   tags:candidate_tags(*),
-  assessments(id),
+  applications:job_applications(id),
+  assessments(id, status),
+  interviews:interview_sessions(id, final_decision),
   notes:candidate_notes(id)
 ` as const;
 
