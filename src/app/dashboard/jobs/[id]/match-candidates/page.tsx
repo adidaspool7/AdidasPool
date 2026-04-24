@@ -51,7 +51,7 @@ interface RankedMatch {
     location: string | null;
     country: string | null;
     primaryBusinessArea: string | null;
-    matchScore: number | null;
+    profileScore: number | null;
   };
   fit: JobFitResult;
 }
@@ -85,6 +85,13 @@ function fitBadge(score: number) {
 function qualityLabel(q: number | null): string {
   if (q == null) return "—";
   return `${Math.round(q)}`;
+}
+
+function profileBadge(score: number | null) {
+  if (score == null) return "bg-muted text-muted-foreground";
+  if (score >= 70) return "bg-emerald-100 text-emerald-800";
+  if (score >= 45) return "bg-amber-100 text-amber-800";
+  return "bg-rose-100 text-rose-800";
 }
 
 // ============================================
@@ -188,7 +195,7 @@ export default function MatchCandidatesPage({
               {data.job.title}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Ranked candidates by Fit-for-this-job (independent of Quality score).
+              Ranked candidates by Fit-for-this-job (independent of Profile score).
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={load}>
@@ -322,10 +329,14 @@ export default function MatchCandidatesPage({
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quality</div>
-                          <div className="font-semibold tabular-nums">
-                            {qualityLabel(m.candidate.matchScore)}
-                          </div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Profile</div>
+                          {m.candidate.profileScore == null ? (
+                            <div className="font-semibold tabular-nums text-muted-foreground">—</div>
+                          ) : (
+                            <Badge className={`${profileBadge(m.candidate.profileScore)} font-semibold tabular-nums`}>
+                              {qualityLabel(m.candidate.profileScore)}
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -382,7 +393,7 @@ export default function MatchCandidatesPage({
 
       <Separator />
       <p className="text-xs text-muted-foreground">
-        Quality is the universal candidate-profile score. Fit is computed strictly against this
+        Profile is the CV-intrinsic score (independent of any job). Fit is computed strictly against this
         job&apos;s parsed requirements (fields, seniority, skills, languages, education).
       </p>
     </div>

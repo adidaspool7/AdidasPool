@@ -456,7 +456,7 @@ export class JobUseCases {
         location: string | null;
         country: string | null;
         primaryBusinessArea: string | null;
-        matchScore: number | null;
+        profileScore: number | null;
       };
       fit: JobFitResult;
     }>;
@@ -479,7 +479,7 @@ export class JobUseCases {
             location: (c.location as string | null) ?? null,
             country: (c.country as string | null) ?? null,
             primaryBusinessArea: (c.primaryBusinessArea as string | null) ?? null,
-            matchScore: (c.matchScore as number | null) ?? null,
+            profileScore: (c.overallCvScore as number | null) ?? null,
           },
           fit,
         };
