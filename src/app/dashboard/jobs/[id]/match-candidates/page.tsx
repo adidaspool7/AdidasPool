@@ -22,7 +22,13 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  SlidersHorizontal,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@client/components/ui/popover";
 
 // ============================================
 // TYPES (mirror server response)
@@ -110,6 +116,25 @@ export default function MatchCandidatesPage({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showIneligible, setShowIneligible] = useState(false);
 
+  // HR-tunable: fraction of JD required skills a candidate must cover to
+  // be flagged eligible. Persisted on scoring_weights.required_skill_threshold.
+  const [threshold, setThreshold] = useState<number>(0.5);
+  const [thresholdDraft, setThresholdDraft] = useState<number>(0.5);
+  const [savingThreshold, setSavingThreshold] = useState(false);
+
+  // Load the current threshold once.
+  useEffect(() => {
+    fetch("/api/scoring/weights")
+      .then((r) => r.json())
+      .then((w: { requiredSkillThreshold?: number }) => {
+        const t =
+          typeof w.requiredSkillThreshold === "number" ? w.requiredSkillThreshold : 0.5;
+        setThreshold(t);
+        setThresholdDraft(t);
+      })
+      .catch(() => {});
+  }, []);
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -140,6 +165,25 @@ export default function MatchCandidatesPage({
       else next.add(cid);
       return next;
     });
+  };
+
+  // Persist threshold and re-load matches so eligibility reflects the new cutoff.
+  const saveThreshold = async () => {
+    if (Math.abs(thresholdDraft - threshold) < 0.005) return;
+    setSavingThreshold(true);
+    try {
+      const res = await fetch("/api/scoring/weights", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requiredSkillThreshold: thresholdDraft }),
+      });
+      if (res.ok) {
+        setThreshold(thresholdDraft);
+        await load();
+      }
+    } finally {
+      setSavingThreshold(false);
+    }
   };
 
   if (loading) {
@@ -203,6 +247,86 @@ export default function MatchCandidatesPage({
           </Button>
         </div>
       </div>
+
+      {/* Eligibility threshold (HR-tunable, global) */}
+      <Card>
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium">Eligibility threshold</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
+                    What is this?
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 text-xs">
+                  <p className="mb-2">
+                    Minimum fraction of a job&apos;s <strong>required</strong> skills a candidate
+                    must cover to be flagged <strong>eligible</strong>.
+                  </p>
+                  <p className="text-muted-foreground">
+                    Lowering it surfaces candidates who match most — but not all — of the musts.
+                    Set to 100% to restore the strict all-or-nothing rule. Applies globally to every job.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={Math.round(thresholdDraft * 100)}
+                onChange={(e) => setThresholdDraft(Number(e.target.value) / 100)}
+                className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
+                disabled={savingThreshold}
+              />
+              <span className="text-sm font-semibold tabular-nums w-12 text-right">
+                {Math.round(thresholdDraft * 100)}%
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {[
+                { label: "Relaxed", v: 0.5 },
+                { label: "Balanced", v: 0.66 },
+                { label: "Strict", v: 1 },
+              ].map((p) => (
+                <Button
+                  key={p.label}
+                  variant={Math.abs(thresholdDraft - p.v) < 0.01 ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setThresholdDraft(p.v)}
+                  disabled={savingThreshold}
+                >
+                  {p.label} {Math.round(p.v * 100)}%
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                className="h-7 text-xs ml-1"
+                onClick={saveThreshold}
+                disabled={
+                  savingThreshold || Math.abs(thresholdDraft - threshold) < 0.005
+                }
+              >
+                {savingThreshold ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…
+                  </>
+                ) : (
+                  "Apply"
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Parsed JD requirements */}
       <Card>

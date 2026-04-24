@@ -332,6 +332,8 @@ export interface ScoringWeightsData {
   educationLevel: number;
   locationMatch: number;
   language: number;
+  /** 0..1 — fraction of a JD's required skills a candidate must cover to be "eligible". */
+  requiredSkillThreshold: number;
   presetName: string | null;
   updatedBy: string | null;
   updatedAt: Date;
@@ -346,6 +348,7 @@ export interface IScoringWeightsRepository {
       educationLevel: number;
       locationMatch: number;
       language: number;
+      requiredSkillThreshold?: number;
       presetName?: string | null;
       updatedBy?: string | null;
     }

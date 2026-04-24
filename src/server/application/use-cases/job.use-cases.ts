@@ -14,6 +14,7 @@ import type {
   ICandidateRepository,
   INotificationRepository,
   IJobApplicationRepository,
+  IScoringWeightsRepository,
 } from "@server/domain/ports/repositories";
 import type { IJobScraperService } from "@server/domain/ports/services";
 import type { CreateJobInput } from "@server/application/dtos";
@@ -26,6 +27,7 @@ import {
 } from "@server/domain/services/job-requirements.schema";
 import {
   computeJobFit,
+  DEFAULT_FIT_CONFIG,
   type CandidateFitInput,
   type JobFitResult,
 } from "@server/domain/services/job-fit.service";
@@ -47,7 +49,8 @@ export class JobUseCases {
     private readonly jobScraperService?: IJobScraperService,
     private readonly notificationRepo?: INotificationRepository,
     private readonly applicationRepo?: IJobApplicationRepository,
-    private readonly requirementsExtractor?: IJobRequirementsExtractor
+    private readonly requirementsExtractor?: IJobRequirementsExtractor,
+    private readonly scoringWeightsRepo?: IScoringWeightsRepository
   ) {}
 
   /**
@@ -468,9 +471,22 @@ export class JobUseCases {
 
     const candidates = await this.candidateRepo.findForMatching();
 
+    const fitConfig = { ...DEFAULT_FIT_CONFIG };
+    if (this.scoringWeightsRepo) {
+      try {
+        const w = await this.scoringWeightsRepo.get();
+        if (typeof w.requiredSkillThreshold === "number") {
+          fitConfig.requiredSkillThreshold = w.requiredSkillThreshold;
+        }
+      } catch {
+        // Fall back to default if the row is missing or the column hasn't
+        // been migrated yet.
+      }
+    }
+
     const ranked = candidates
       .map((c: Record<string, any>) => {
-        const fit = computeJobFit(requirements, buildCandidateFitInput(c));
+        const fit = computeJobFit(requirements, buildCandidateFitInput(c), fitConfig);
         return {
           candidate: {
             id: c.id as string,

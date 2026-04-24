@@ -32,6 +32,7 @@ export class SupabaseScoringWeightsRepository
         educationLevel: CV_SCORING_WEIGHTS.educationLevel,
         locationMatch: CV_SCORING_WEIGHTS.locationMatch,
         language: CV_SCORING_WEIGHTS.language,
+        requiredSkillThreshold: 0.5,
         presetName: "Default",
         updatedBy: null,
         updatedAt: new Date(),
@@ -45,6 +46,8 @@ export class SupabaseScoringWeightsRepository
       educationLevel: row.educationLevel,
       locationMatch: row.locationMatch,
       language: row.language,
+      requiredSkillThreshold:
+        typeof row.requiredSkillThreshold === "number" ? row.requiredSkillThreshold : 0.5,
       presetName: row.presetName ?? null,
       updatedBy: row.updatedBy ?? null,
       updatedAt: row.updatedAt,
@@ -57,10 +60,11 @@ export class SupabaseScoringWeightsRepository
     educationLevel: number;
     locationMatch: number;
     language: number;
+    requiredSkillThreshold?: number;
     presetName?: string | null;
     updatedBy?: string | null;
   }): Promise<ScoringWeightsData> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       id: DEFAULT_ID,
       experience: weights.experience,
       years_of_experience: weights.yearsOfExperience,
@@ -70,6 +74,9 @@ export class SupabaseScoringWeightsRepository
       preset_name: weights.presetName ?? null,
       updated_by: weights.updatedBy ?? null,
     };
+    if (typeof weights.requiredSkillThreshold === "number") {
+      payload.required_skill_threshold = weights.requiredSkillThreshold;
+    }
 
     // Try update first, then insert
     const { data: existing } = await db
@@ -106,6 +113,8 @@ export class SupabaseScoringWeightsRepository
       educationLevel: r.educationLevel,
       locationMatch: r.locationMatch,
       language: r.language,
+      requiredSkillThreshold:
+        typeof r.requiredSkillThreshold === "number" ? r.requiredSkillThreshold : 0.5,
       presetName: r.presetName ?? null,
       updatedBy: r.updatedBy ?? null,
       updatedAt: r.updatedAt,
