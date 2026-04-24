@@ -121,6 +121,7 @@ export default function MatchCandidatesPage({
   const [threshold, setThreshold] = useState<number>(0.5);
   const [thresholdDraft, setThresholdDraft] = useState<number>(0.5);
   const [savingThreshold, setSavingThreshold] = useState(false);
+  const [reparsing, setReparsing] = useState(false);
 
   // Load the current threshold once.
   useEffect(() => {
@@ -186,6 +187,24 @@ export default function MatchCandidatesPage({
     }
   };
 
+  // Force-invalidate the cached parsed_requirements and re-extract via LLM.
+  const reparseRequirements = async () => {
+    setReparsing(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/reparse-requirements`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setError(err.error || "Re-parse failed.");
+      }
+    } finally {
+      setReparsing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground">
@@ -244,6 +263,22 @@ export default function MatchCandidatesPage({
           </div>
           <Button variant="outline" size="sm" onClick={load}>
             <RefreshCw className="w-4 h-4 mr-2" /> Re-run
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reparseRequirements}
+            disabled={reparsing}
+          >
+            {reparsing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Re-parsing…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" /> Re-parse JD
+              </>
+            )}
           </Button>
         </div>
       </div>

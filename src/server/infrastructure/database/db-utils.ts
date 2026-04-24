@@ -23,6 +23,11 @@ const JSONB_KEYS = new Set([
   "rawAiResponse",
   "details",
   "parsingConfidence",
+  // Phase 1 job-anchored matching: the LLM-extracted JD requirements
+  // are JSONB. Must NOT be recursed into — otherwise ISO date strings
+  // inside (e.g. rawExtractionTimestamp) get coerced to Date objects
+  // and the Zod schema (z.string()) rejects the cache on reload.
+  "parsedRequirements",
 ]);
 
 // ----------------------------------------------------------------

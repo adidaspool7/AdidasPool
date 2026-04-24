@@ -432,6 +432,51 @@ export class JobUseCases {
   }
 
   /**
+   * Invalidates the cached `parsed_requirements` for a job and immediately
+   * re-extracts from the JD text / source_url. Returns the fresh result.
+   *
+   * Used by the HR "Force re-parse" button when the cache looks wrong
+   * (empty arrays, stale, LLM blip, etc.).
+   */
+  async forceReparseRequirements(jobId: string): Promise<JobRequirements> {
+    const job = await this.jobRepo.findById(jobId);
+    if (!job) {
+      throw new NotFoundError(`Job ${jobId} not found`);
+    }
+    if (!this.requirementsExtractor) {
+      throw new Error("Job requirements extractor is not configured");
+    }
+
+    let jdText = (job.description as string | null) ?? "";
+    if (!jdText || jdText.trim().length < 200) {
+      if (!this.jobScraperService) {
+        throw new Error(
+          `Job ${jobId} has no on-file description and the scraper is not configured`
+        );
+      }
+      const sourceUrl = job.sourceUrl as string | null;
+      if (!sourceUrl) {
+        throw new Error(
+          `Job ${jobId} has no source_url and no on-file description`
+        );
+      }
+      const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
+      if (!fetched) {
+        throw new Error(`Failed to fetch JD body for job ${jobId}`);
+      }
+      jdText = fetched;
+    }
+
+    const extracted = await this.requirementsExtractor.extract(jdText);
+    await this.jobRepo.updateParsedRequirements(
+      jobId,
+      extracted,
+      this.requirementsExtractor.schemaVersion
+    );
+    return JobRequirementsSchema.parse(extracted);
+  }
+
+  /**
    * Phase 4 orchestrator.
    *
    * Rank candidates against a single job's *parsed* requirements:
