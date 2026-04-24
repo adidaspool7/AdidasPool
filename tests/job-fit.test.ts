@@ -49,10 +49,43 @@ describe("computeJobFit — overall behavior", () => {
     expect(result.isEligible).toBe(true);
   });
 
-  it("flags as ineligible when any applicable criterion is unmet", () => {
+  it("flags as ineligible when required-skill coverage is below the 50% threshold", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["SAP IBP", "Excel", "Python"] },
+      { ...baseCandidate, skillNames: ["excel"] }
+    );
+    // 1/3 covered ≈ 33% < 50% default threshold → ineligible.
+    expect(result.isEligible).toBe(false);
+  });
+
+  it("passes eligibility when ≥50% of required skills are covered (default threshold)", () => {
     const result = computeJobFit(
       { ...baseJob, requiredSkills: ["SAP IBP", "Excel"] },
       { ...baseCandidate, skillNames: ["excel"] }
+    );
+    // 1/2 covered = 50% ≥ threshold → met.
+    expect(result.isEligible).toBe(true);
+  });
+
+  it("fuzzy-matches skills across phrasing differences", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["Excel", "English communication skills"] },
+      {
+        ...baseCandidate,
+        skillNames: ["Microsoft Excel", "strong communication"],
+      }
+    );
+    // "excel" ⊂ "microsoft excel" AND token overlap "communication" ≥ 0.5 → both met.
+    expect(result.isEligible).toBe(true);
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.score).toBe(100);
+  });
+
+  it("honours a strict threshold (1.0) to restore all-required behaviour", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["SAP IBP", "Excel"] },
+      { ...baseCandidate, skillNames: ["excel"] },
+      { requiredSkillThreshold: 1 }
     );
     expect(result.isEligible).toBe(false);
   });

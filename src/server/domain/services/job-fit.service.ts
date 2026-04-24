@@ -69,19 +69,38 @@ export interface JobFitResult {
   breakdown: CriterionResult[];
 }
 
+/**
+ * Tunable knobs for the fit engine. Defaults are hard-coded here so that
+ * the pure function stays deterministic in tests; HR can override via the
+ * use-case layer (read from `scoring_weights` or a settings table).
+ */
+export interface JobFitConfig {
+  /**
+   * Fraction (0..1) of the JD's required skills that a candidate must
+   * cover before `Required Skills` is considered *met*. Default 0.5 —
+   * "at least half of the musts". Set to 1 to restore strict behaviour.
+   */
+  requiredSkillThreshold: number;
+}
+
+export const DEFAULT_FIT_CONFIG: JobFitConfig = {
+  requiredSkillThreshold: 0.5,
+};
+
 // ============================================
 // PUBLIC ENTRY POINT
 // ============================================
 
 export function computeJobFit(
   job: JobRequirements,
-  candidate: CandidateFitInput
+  candidate: CandidateFitInput,
+  config: JobFitConfig = DEFAULT_FIT_CONFIG
 ): JobFitResult {
   const breakdown: CriterionResult[] = [
     matchField(job, candidate),
     matchExperience(job, candidate),
     matchSeniority(job, candidate),
-    matchRequiredSkills(job, candidate),
+    matchRequiredSkills(job, candidate, config),
     matchPreferredSkills(job, candidate),
     matchLanguages(job, candidate),
     matchEducation(job, candidate),
@@ -222,12 +241,20 @@ export function matchSeniority(
 }
 
 /**
- * Required (must-have) skills: pass iff every required skill is on the
- * candidate. Score is intersection ratio.
+ * Required (must-have) skills.
+ *
+ * Eligibility is now *thresholded*: the criterion is "met" when the
+ * candidate covers at least `config.requiredSkillThreshold` (default
+ * 50 %) of the JD's required skills. Strict-all-required behaviour is
+ * restored by setting the threshold to 1.
+ *
+ * Matching is token-based (Jaccard ≥ 0.5 OR substring after stop-word
+ * removal), not verbatim — see `skillsMatch()` for details.
  */
 export function matchRequiredSkills(
   job: JobRequirements,
-  candidate: CandidateFitInput
+  candidate: CandidateFitInput,
+  config: JobFitConfig = DEFAULT_FIT_CONFIG
 ): CriterionResult {
   if (job.requiredSkills.length === 0) {
     return {
@@ -239,28 +266,34 @@ export function matchRequiredSkills(
       detail: "JD does not list any required skill.",
     };
   }
-  const candidateSet = normalizedSkillSet(candidate.skillNames);
+  const candidateTokenSets = candidate.skillNames.map(skillTokenSet);
   const hits = job.requiredSkills.filter((s) =>
-    candidateSet.has(normalizeSkill(s))
+    candidateHasSkill(s, candidateTokenSets)
   );
   const score = Math.round((hits.length / job.requiredSkills.length) * 100);
-  const missing = job.requiredSkills.filter((s) => !candidateSet.has(normalizeSkill(s)));
+  const missing = job.requiredSkills.filter(
+    (s) => !candidateHasSkill(s, candidateTokenSets)
+  );
+  const coverage = hits.length / job.requiredSkills.length;
+  const met = coverage >= config.requiredSkillThreshold;
+  const thresholdPct = Math.round(config.requiredSkillThreshold * 100);
   return {
     key: "requiredSkills",
     label: "Required Skills",
     score,
     applicable: true,
-    met: missing.length === 0,
+    met,
     detail:
       missing.length === 0
         ? `All ${job.requiredSkills.length} required skills present.`
-        : `Missing: ${missing.join(", ")}.`,
+        : `Covers ${hits.length}/${job.requiredSkills.length} (threshold ${thresholdPct}%). Missing: ${missing.join(", ")}.`,
   };
 }
 
 /**
  * Preferred (nice-to-have) skills: never blocks eligibility (`met` always
- * true when applicable). Score is intersection ratio.
+ * true when applicable). Score is intersection ratio, using the same
+ * token-based matcher as required skills.
  */
 export function matchPreferredSkills(
   job: JobRequirements,
@@ -276,9 +309,9 @@ export function matchPreferredSkills(
       detail: "JD does not list any preferred skill.",
     };
   }
-  const candidateSet = normalizedSkillSet(candidate.skillNames);
+  const candidateTokenSets = candidate.skillNames.map(skillTokenSet);
   const hits = job.preferredSkills.filter((s) =>
-    candidateSet.has(normalizeSkill(s))
+    candidateHasSkill(s, candidateTokenSets)
   );
   const score = Math.round((hits.length / job.preferredSkills.length) * 100);
   return {
@@ -415,6 +448,83 @@ function normalizeSkill(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function normalizedSkillSet(skills: string[]): Set<string> {
-  return new Set(skills.map(normalizeSkill));
+// ============================================
+// FUZZY SKILL MATCHING
+// ============================================
+//
+// JDs and CVs rarely write skills the same way. "Microsoft Excel" in a CV
+// vs. "Excel" in a JD, or "English communication skills" vs "Communication".
+// We tokenize, drop filler words, then accept a match if either:
+//   - one token set is a (non-trivial) subset of the other, or
+//   - Jaccard similarity ≥ 0.5.
+// This keeps the matcher deterministic and dependency-free.
+
+const SKILL_STOPWORDS = new Set<string>([
+  "skills",
+  "skill",
+  "experience",
+  "knowledge",
+  "proficiency",
+  "proficient",
+  "understanding",
+  "familiarity",
+  "fluent",
+  "native",
+  "with",
+  "in",
+  "of",
+  "and",
+  "or",
+  "the",
+  "a",
+  "an",
+  "for",
+  "on",
+  "to",
+  "strong",
+  "excellent",
+  "good",
+  "basic",
+  "advanced",
+]);
+
+function skillTokenSet(raw: string): Set<string> {
+  const tokens = normalizeSkill(raw)
+    .replace(/[^a-z0-9\s+.#-]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !SKILL_STOPWORDS.has(t));
+  return new Set(tokens);
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter++;
+  const union = a.size + b.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
+function isMeaningfulSubset(small: Set<string>, large: Set<string>): boolean {
+  if (small.size === 0 || small.size > large.size) return false;
+  for (const t of small) if (!large.has(t)) return false;
+  return true;
+}
+
+/**
+ * Returns true if the required skill is "close enough" to any of the
+ * candidate's skill token sets.
+ */
+function candidateHasSkill(
+  required: string,
+  candidateTokenSets: Set<string>[]
+): boolean {
+  const req = skillTokenSet(required);
+  if (req.size === 0) return false;
+  for (const c of candidateTokenSets) {
+    if (c.size === 0) continue;
+    if (isMeaningfulSubset(req, c)) return true; // "excel" ⊂ "microsoft excel"
+    if (isMeaningfulSubset(c, req)) return true; // "excel" in JD ⊂ "microsoft excel"
+    if (jaccard(req, c) >= 0.5) return true;
+  }
+  return false;
 }
