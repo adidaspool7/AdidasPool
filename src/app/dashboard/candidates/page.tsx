@@ -396,7 +396,7 @@ function JobPicker({
                 setSearch("");
               }}
             >
-              — No job (Quality only) —
+              — No job (Profile score only) —
             </button>
             {filtered.map((j) => {
               const isActive = j.id === value;
@@ -974,7 +974,7 @@ export default function CandidatesPage() {
           <span className="text-xs text-destructive">{fitError}</span>
         )}
         <span className="ml-auto text-xs text-muted-foreground">
-          Quality is profile-only. Fit = match against this job&apos;s parsed requirements.
+          Profile = CV-intrinsic score. Fit = match against this job&apos;s parsed requirements.
         </span>
       </div>
 
@@ -990,9 +990,9 @@ export default function CandidatesPage() {
                 <SortableHeader
                   field="overallCvScore"
                   className="text-center"
-                  title="CV quality score — independent of any job. Measures experience relevance, years, education, location, and languages against the configured weights."
+                  title="Profile score — CV-intrinsic, independent of any job. Measures experience relevance, years, education, location, and languages against the configured weights."
                 >
-                  Quality
+                  Profile
                 </SortableHeader>
                 <TableHead
                   className="text-center"
@@ -1127,8 +1127,8 @@ export default function CandidatesPage() {
                       </DropdownMenu>
                     </TableCell>
 
-                    {/* Quality score — CV-intrinsic, not job-specific */}
-                    <TableCell className="text-center" title="CV quality score — independent of any job.">
+                    {/* Profile score — CV-intrinsic, not job-specific */}
+                    <TableCell className="text-center" title="Profile score — CV-intrinsic, independent of any job.">
                       <OverallScoreBadge
                         score={
                           useCustomRanking && c.rerankedScore != null
