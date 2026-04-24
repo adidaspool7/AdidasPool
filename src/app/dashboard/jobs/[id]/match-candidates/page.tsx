@@ -15,6 +15,8 @@ import { Separator } from "@client/components/ui/separator";
 import {
   ArrowLeft,
   Briefcase,
+  CheckCircle2,
+  XCircle,
   Loader2,
   RefreshCw,
   ChevronDown,
