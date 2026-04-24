@@ -70,8 +70,13 @@ import {
   X,
   Loader2,
   Info,
+  MoreHorizontal,
+  Mic,
+  FileText,
+  StickyNote,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
+import { useRole } from "@client/components/providers/role-provider";
 
 // Mirrors CriterionResult from src/server/domain/services/job-fit.service.ts.
 // Kept as a local type to avoid a client->server-only import path.
@@ -461,6 +466,7 @@ function JobPicker({
 
 export default function CandidatesPage() {
   const router = useRouter();
+  const { userName, userEmail } = useRole();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -497,6 +503,12 @@ export default function CandidatesPage() {
   >(new Map());
   const [fitLoading, setFitLoading] = useState(false);
   const [fitError, setFitError] = useState<string | null>(null);
+
+  // ── Row action: Add note dialog ──────────────────────────────
+  const [noteDialogFor, setNoteDialogFor] = useState<Candidate | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+
   const [weightsModalOpen, setWeightsModalOpen] = useState(false);
   const [draft, setDraft] = useState<Record<WeightKey, number>>({
     experience: 0.25,
@@ -713,6 +725,27 @@ export default function CandidatesPage() {
       }
     } catch {
       /* silent */
+    }
+  }
+
+  async function saveNote() {
+    if (!noteDialogFor || !noteDraft.trim()) return;
+    setNoteSaving(true);
+    try {
+      const author = userName || userEmail || "HR";
+      const res = await fetch(`/api/candidates/${noteDialogFor.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author, content: noteDraft.trim() }),
+      });
+      if (res.ok) {
+        setNoteDialogFor(null);
+        setNoteDraft("");
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setNoteSaving(false);
     }
   }
 
@@ -1029,13 +1062,14 @@ export default function CandidatesPage() {
                 <TableHead className="text-center">Languages</TableHead>
                 <TableHead className="text-center">Source</TableHead>
                 <SortableHeader field="createdAt" className="text-center">Added</SortableHeader>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -1045,7 +1079,7 @@ export default function CandidatesPage() {
               ) : candidates.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={10}
                     className="text-center py-12 text-muted-foreground"
                   >
                     <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -1400,6 +1434,36 @@ export default function CandidatesPage() {
                         month: "short",
                       })}
                     </TableCell>
+
+                    {/* Row quick-actions */}
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Actions">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/candidates/${c.id}`)}>
+                            <UserCircle className="h-4 w-4 mr-2" /> Open profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/ai-interview?candidateId=${c.id}`)}>
+                            <Mic className="h-4 w-4 mr-2" /> Start interview
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/assessments?candidateId=${c.id}`)}>
+                            <FileText className="h-4 w-4 mr-2" /> Assign assessment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setNoteDialogFor(c);
+                              setNoteDraft("");
+                            }}
+                          >
+                            <StickyNote className="h-4 w-4 mr-2" /> Add note
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                   );
                 })
@@ -1435,6 +1499,55 @@ export default function CandidatesPage() {
           </div>
         </div>
       )}
+
+      {/* ── Add Note Dialog (row quick-action) ─────────────────── */}
+      <Dialog
+        open={noteDialogFor !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setNoteDialogFor(null);
+            setNoteDraft("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <StickyNote className="h-5 w-5" />
+              Add note
+            </DialogTitle>
+            <DialogDescription>
+              {noteDialogFor
+                ? `Private HR note on ${noteDialogFor.firstName} ${noteDialogFor.lastName}.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            className="w-full min-h-[120px] rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Write a short note…"
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            maxLength={5000}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNoteDialogFor(null);
+                setNoteDraft("");
+              }}
+              disabled={noteSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveNote} disabled={!noteDraft.trim() || noteSaving}>
+              {noteSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Save note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Custom Ranking Weights Modal ──────────────────────── */}
       <Dialog open={weightsModalOpen} onOpenChange={setWeightsModalOpen}>
