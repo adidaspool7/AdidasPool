@@ -41,6 +41,11 @@ import {
 } from "@client/components/ui/dialog";
 import { Separator } from "@client/components/ui/separator";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@client/components/ui/popover";
+import {
   Search,
   ChevronLeft,
   ChevronRight,
@@ -64,8 +69,20 @@ import {
   Target,
   X,
   Loader2,
+  Info,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
+
+// Mirrors CriterionResult from src/server/domain/services/job-fit.service.ts.
+// Kept as a local type to avoid a client->server-only import path.
+interface FitCriterion {
+  key: string;
+  label: string;
+  score: number;
+  applicable: boolean;
+  met: boolean;
+  detail: string;
+}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -473,7 +490,7 @@ export default function CandidatesPage() {
   const [fitJobId, setFitJobId] = useState<string>("");
   const [fitJobTitle, setFitJobTitle] = useState<string | null>(null);
   const [fitMap, setFitMap] = useState<
-    Map<string, { score: number; eligible: boolean }>
+    Map<string, { score: number; eligible: boolean; breakdown: FitCriterion[] }>
   >(new Map());
   const [fitLoading, setFitLoading] = useState(false);
   const [fitError, setFitError] = useState<string | null>(null);
@@ -555,13 +572,14 @@ export default function CandidatesPage() {
         }
         return r.json();
       })
-      .then((data: { job: { title: string }; matches: Array<{ candidate: { id: string }; fit: { overallScore: number; isEligible: boolean } }> }) => {
+      .then((data: { job: { title: string }; matches: Array<{ candidate: { id: string }; fit: { overallScore: number; isEligible: boolean; breakdown: FitCriterion[] } }> }) => {
         if (cancelled) return;
-        const map = new Map<string, { score: number; eligible: boolean }>();
+        const map = new Map<string, { score: number; eligible: boolean; breakdown: FitCriterion[] }>();
         for (const m of data.matches) {
           map.set(m.candidate.id, {
             score: Math.round(m.fit.overallScore),
             eligible: m.fit.isEligible,
+            breakdown: m.fit.breakdown ?? [],
           });
         }
         setFitMap(map);
@@ -1173,11 +1191,96 @@ export default function CandidatesPage() {
                               ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
                               : "bg-red-500/15 text-red-700 dark:text-red-400";
                         return (
-                          <span
-                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour}`}
-                          >
-                            {f.score}
-                          </span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={(e) => e.stopPropagation()}
+                                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour} hover:ring-2 hover:ring-offset-1 hover:ring-offset-background hover:ring-current/30 transition`}
+                                title="View score breakdown"
+                              >
+                                {f.score}
+                                <Info className="h-3 w-3 opacity-60" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-80 p-0"
+                              align="center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="px-3 py-2 border-b bg-muted/40">
+                                <div className="text-xs font-semibold">
+                                  Fit breakdown
+                                </div>
+                                <div className="text-[11px] text-muted-foreground truncate">
+                                  {fitJobTitle ?? "Selected job"}
+                                </div>
+                              </div>
+                              <div className="p-2 space-y-1 max-h-72 overflow-y-auto">
+                                {f.breakdown.length === 0 && (
+                                  <div className="text-xs text-muted-foreground px-2 py-1">
+                                    No per-criterion details available.
+                                  </div>
+                                )}
+                                {f.breakdown.map((crit) => {
+                                  if (!crit.applicable) {
+                                    return (
+                                      <div
+                                        key={crit.key}
+                                        className="flex items-start justify-between gap-2 rounded px-2 py-1 text-[11px] text-muted-foreground"
+                                      >
+                                        <div className="flex-1">
+                                          <div className="font-medium">{crit.label}</div>
+                                          <div className="italic">Not required by this job.</div>
+                                        </div>
+                                        <span className="shrink-0 text-muted-foreground">—</span>
+                                      </div>
+                                    );
+                                  }
+                                  const critColour = crit.met
+                                    ? "text-emerald-700 dark:text-emerald-400"
+                                    : "text-red-700 dark:text-red-400";
+                                  return (
+                                    <div
+                                      key={crit.key}
+                                      className="flex items-start justify-between gap-2 rounded px-2 py-1 text-[11px]"
+                                    >
+                                      <div className="flex-1">
+                                        <div className="font-medium flex items-center gap-1">
+                                          {crit.met ? (
+                                            <Check className="h-3 w-3 text-emerald-600" />
+                                          ) : (
+                                            <X className="h-3 w-3 text-red-600" />
+                                          )}
+                                          {crit.label}
+                                        </div>
+                                        <div className="text-muted-foreground">
+                                          {crit.detail}
+                                        </div>
+                                      </div>
+                                      <span className={`shrink-0 font-bold tabular-nums ${critColour}`}>
+                                        {Math.round(crit.score)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {fitJobId && (
+                                <div className="px-3 py-2 border-t bg-muted/30">
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-primary hover:underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/dashboard/jobs/${fitJobId}/match-candidates`);
+                                    }}
+                                  >
+                                    See full ranking for this job →
+                                  </button>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
                         );
                       })()}
                     </TableCell>
