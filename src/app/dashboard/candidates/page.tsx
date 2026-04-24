@@ -978,13 +978,7 @@ export default function CandidatesPage() {
                       : "Pick a job above to compute Fit scores."
                   }
                 >
-                  {fitJobTitle ? (
-                    <span>
-                      Fit (for {fitJobTitle.length > 18 ? fitJobTitle.slice(0, 16) + "…" : fitJobTitle})
-                    </span>
-                  ) : (
-                    <span>Fit (for …)</span>
-                  )}
+                  <span>Fit for Position</span>
                 </TableHead>
                 <TableHead className="text-center">Score Breakdown</TableHead>
                 <TableHead className="text-center">Languages</TableHead>
@@ -1155,22 +1149,11 @@ export default function CandidatesPage() {
                               ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
                               : "bg-red-500/15 text-red-700 dark:text-red-400";
                         return (
-                          <div className="inline-flex items-center gap-1">
-                            <span
-                              className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour}`}
-                            >
-                              {f.score}
-                            </span>
-                            {!f.eligible && (
-                              <Badge
-                                variant="outline"
-                                className="text-[9px] text-rose-700 border-rose-300 px-1 py-0 h-4"
-                                title="Candidate fails one or more hard requirements (e.g. minimum years, required language)."
-                              >
-                                Blocked
-                              </Badge>
-                            )}
-                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour}`}
+                          >
+                            {f.score}
+                          </span>
                         );
                       })()}
                     </TableCell>
