@@ -20,15 +20,16 @@ export class SupabaseDeduplicationRepository
     firstName: string;
     lastName: string;
     location?: string | null;
+    excludeId?: string | null;
   }): Promise<DeduplicationResult> {
     // 1. Exact email match
     if (candidate.email) {
-      const { data, error } = await db
+      let q = db
         .from("candidates")
         .select("id")
-        .eq("email", candidate.email)
-        .limit(1)
-        .single();
+        .eq("email", candidate.email);
+      if (candidate.excludeId) q = q.neq("id", candidate.excludeId);
+      const { data, error } = await q.limit(1).single();
 
       if (!error && data) {
         return {
@@ -41,11 +42,13 @@ export class SupabaseDeduplicationRepository
     }
 
     // 2. Name match (case-insensitive)
-    const { data: nameMatches, error } = await db
+    let nameQ = db
       .from("candidates")
       .select("id, location")
       .ilike("first_name", candidate.firstName)
       .ilike("last_name", candidate.lastName);
+    if (candidate.excludeId) nameQ = nameQ.neq("id", candidate.excludeId);
+    const { data: nameMatches, error } = await nameQ;
     assertNoError(error, "dedup.checkForDuplicate");
 
     if (nameMatches && nameMatches.length > 0) {

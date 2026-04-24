@@ -222,11 +222,13 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
   }
 
   async findForMatching() {
+    // Filter out status=NEW and hard duplicates. Tolerate is_duplicate=NULL
+    // (rows imported from legacy sources may not have the default applied).
     const { data, error } = await db
       .from("candidates")
       .select(`*, languages:candidate_languages(*), education(*), skills(*), experiences(*)`)
       .neq("status", "NEW")
-      .eq("is_duplicate", false);
+      .or("is_duplicate.is.null,is_duplicate.eq.false");
     assertNoError(error, "candidate.findForMatching");
     return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }

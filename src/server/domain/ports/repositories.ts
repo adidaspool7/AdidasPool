@@ -316,6 +316,8 @@ export interface IDeduplicationRepository {
     firstName: string;
     lastName: string;
     location?: string | null;
+    /** Candidate ID to exclude from the search (used on re-parse to avoid self-match). */
+    excludeId?: string | null;
   }): Promise<DeduplicationResult>;
 }
 

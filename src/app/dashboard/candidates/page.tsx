@@ -1014,10 +1014,14 @@ export default function CandidatesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                candidates.map((c) => (
+                candidates.map((c) => {
+                  // status=NEW candidates have no parsed CV yet — dim the row so
+                  // HR doesn't mistake the "—" values for a broken page.
+                  const isUnparsed = c.status === "NEW";
+                  return (
                   <TableRow
                     key={c.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className={`cursor-pointer hover:bg-muted/50 ${isUnparsed ? "opacity-60" : ""}`}
                     onClick={() => router.push(`/dashboard/candidates/${c.id}`)}
                   >
                     {/* Name */}
@@ -1226,7 +1230,8 @@ export default function CandidatesPage() {
                       })}
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>

@@ -123,6 +123,8 @@ export class UploadUseCases {
       firstName: extraction.firstName,
       lastName: extraction.lastName,
       location: extraction.location,
+      // Avoid self-match when re-parsing an existing candidate.
+      excludeId: candidateId ?? null,
     });
 
     // 7. Upsert candidate + related records
