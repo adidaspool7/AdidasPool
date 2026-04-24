@@ -74,6 +74,8 @@ import {
   Mic,
   FileText,
   StickyNote,
+  Download,
+  CheckSquare,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 import { useRole } from "@client/components/providers/role-provider";
@@ -509,6 +511,10 @@ export default function CandidatesPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
 
+  // ── Bulk selection ───────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const [weightsModalOpen, setWeightsModalOpen] = useState(false);
   const [draft, setDraft] = useState<Record<WeightKey, number>>({
     experience: 0.25,
@@ -877,6 +883,104 @@ export default function CandidatesPage() {
       })
     : candidates;
 
+  // ── Bulk-selection helpers ─────────────────────────────────
+  const visibleIds = displayedCandidates.map((c) => c.id);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selected.has(id));
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
+  function exportSelectedCSV() {
+    const chosen = candidates.filter((c) => selected.has(c.id));
+    if (chosen.length === 0) return;
+    const rows = chosen.map((c) => {
+      const f = fitMap.get(c.id);
+      return {
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        email: c.email ?? "",
+        location: c.location ?? "",
+        country: c.country ?? "",
+        status: c.status,
+        shortlisted: c.shortlisted ? "yes" : "",
+        department: c.primaryBusinessArea ?? "",
+        profileScore: c.overallCvScore ?? "",
+        fitScore: f?.score ?? "",
+        languages: c.languages
+          .map((l) => `${l.language}${l.selfDeclaredLevel ? ` (${l.selfDeclaredLevel})` : ""}`)
+          .join("; "),
+        addedAt: c.createdAt,
+      };
+    });
+    const headers = Object.keys(rows[0]);
+    const escape = (v: string | number) => {
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => headers.map((h) => escape((r as Record<string, string | number>)[h])).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.download = `candidates-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function bulkAdvance(newStatus: string) {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/candidates/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+          })
+        )
+      );
+      setCandidates((prev) =>
+        prev.map((c) => (selected.has(c.id) ? { ...c, status: newStatus } : c))
+      );
+      clearSelection();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1034,10 +1138,66 @@ export default function CandidatesPage() {
 
       {/* Table */}
       <Card>
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2 bg-primary/5 text-sm">
+            <span className="font-medium">
+              {selected.size} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={exportSelectedCSV}
+              disabled={bulkBusy}
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8" disabled={bulkBusy}>
+                  {bulkBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Advance to…
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {ASSIGNABLE_STATUSES.map((s) => (
+                  <DropdownMenuItem key={s} onClick={() => bulkAdvance(s)}>
+                    {STATUS_LABEL[s] ?? s}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 ml-auto"
+              onClick={clearSelection}
+              disabled={bulkBusy}
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+          </div>
+        )}
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10 text-center">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible"
+                    className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                    checked={allVisibleSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected;
+                    }}
+                    onChange={toggleAllVisible}
+                  />
+                </TableHead>
                 <SortableHeader field="firstName">Name</SortableHeader>
                 <TableHead className="text-center">Department</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -1069,7 +1229,7 @@ export default function CandidatesPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 10 }).map((_, j) => (
+                    {Array.from({ length: 11 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -1079,7 +1239,7 @@ export default function CandidatesPage() {
               ) : candidates.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={11}
                     className="text-center py-12 text-muted-foreground"
                   >
                     <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -1097,6 +1257,16 @@ export default function CandidatesPage() {
                     className={`cursor-pointer hover:bg-muted/50 ${isUnparsed ? "opacity-60" : ""}`}
                     onClick={() => router.push(`/dashboard/candidates/${c.id}`)}
                   >
+                    {/* Selection checkbox */}
+                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${c.firstName} ${c.lastName}`}
+                        className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                        checked={selected.has(c.id)}
+                        onChange={() => toggleOne(c.id)}
+                      />
+                    </TableCell>
                     {/* Name */}
                     <TableCell>
                       <div className="flex items-start gap-1.5">
