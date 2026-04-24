@@ -43,6 +43,16 @@ export interface CandidateFitInput {
   languages: Array<{ language: string; cefr: CefrLevel | string | null }>;
   /** Lower-cased skill names (canonical form). */
   skillNames: string[];
+  /**
+   * Optional free-text evidence that can back a skill match — typically
+   * experience job titles (e.g. "Team Lead", "Marketing Manager"). These
+   * are tokenised with the same pipeline as `skillNames` and treated as
+   * additional "skill" sets when deciding whether the candidate covers a
+   * required skill. Never contributes to score *weight* — only to
+   * coverage. Descriptions/bullets are intentionally NOT included (too
+   * noisy to be a deterministic signal).
+   */
+  evidenceTexts?: string[];
   /** Optional pre-computed seniority (Phase 5 will compute this). */
   seniorityLevel?: SeniorityLevel | null;
 }
@@ -266,7 +276,7 @@ export function matchRequiredSkills(
       detail: "JD does not list any required skill.",
     };
   }
-  const candidateTokenSets = candidate.skillNames.map(skillTokenSet);
+  const candidateTokenSets = buildCandidateSkillPool(candidate);
   const hits = job.requiredSkills.filter((s) =>
     candidateHasSkill(s, candidateTokenSets)
   );
@@ -309,7 +319,7 @@ export function matchPreferredSkills(
       detail: "JD does not list any preferred skill.",
     };
   }
-  const candidateTokenSets = candidate.skillNames.map(skillTokenSet);
+  const candidateTokenSets = buildCandidateSkillPool(candidate);
   const hits = job.preferredSkills.filter((s) =>
     candidateHasSkill(s, candidateTokenSets)
   );
@@ -454,7 +464,8 @@ function normalizeSkill(s: string): string {
 //
 // JDs and CVs rarely write skills the same way. "Microsoft Excel" in a CV
 // vs. "Excel" in a JD, or "English communication skills" vs "Communication".
-// We tokenize, drop filler words, then accept a match if either:
+// We tokenize, drop filler words, apply bidirectional synonym groups to
+// canonicalise token forms, then accept a match if either:
 //   - one token set is a (non-trivial) subset of the other, or
 //   - Jaccard similarity ≥ 0.5.
 // This keeps the matcher deterministic and dependency-free.
@@ -488,11 +499,58 @@ const SKILL_STOPWORDS = new Set<string>([
   "advanced",
 ]);
 
+/**
+ * Bidirectional synonym groups. Every token in a group is canonicalised
+ * to the first entry (the "canonical form"). Both the JD side and the
+ * candidate side run through the same canonicalisation, so matching
+ * becomes an equivalence check rather than a free-text similarity.
+ *
+ * Rules for adding a group:
+ *   - Tokens must be single words (no spaces).
+ *   - Only include tokens that are *unambiguously* interchangeable in
+ *     an HR-skill context. When in doubt, leave it out.
+ */
+const SKILL_SYNONYM_GROUPS: string[][] = [
+  // Microsoft Office suite — JD often says "Microsoft Office", CVs list
+  // individual apps. Canonical = "office".
+  ["office", "excel", "word", "powerpoint", "outlook", "access", "onenote", "o365"],
+  // People-management family.
+  ["leadership", "lead", "manager", "management", "managing", "head", "supervisor", "supervising"],
+  // Coaching/mentoring.
+  ["coaching", "coach", "mentor", "mentoring", "mentorship"],
+  // Training/teaching.
+  ["training", "train", "teaching", "teacher", "instructor", "instruction", "facilitator", "facilitation"],
+  // Analytical thinking / data analysis.
+  ["analytical", "analysis", "analytics", "analyst", "analyze", "analysing", "analyzing"],
+  // Communication.
+  ["communication", "communications", "communicating", "presentation", "presenting", "presenter"],
+  // Problem solving / troubleshooting.
+  ["problem", "problem-solving", "troubleshooting", "troubleshoot", "debugging", "debug"],
+  // Motivation / engagement.
+  ["motivation", "motivating", "motivational", "engagement", "inspiring"],
+  // Appraisal / performance review.
+  ["appraisal", "appraisals", "review", "reviews", "evaluation", "evaluations", "feedback"],
+];
+
+const SKILL_TOKEN_CANONICAL = (() => {
+  const map = new Map<string, string>();
+  for (const group of SKILL_SYNONYM_GROUPS) {
+    const canonical = group[0];
+    for (const t of group) map.set(t, canonical);
+  }
+  return map;
+})();
+
+function canonicalToken(t: string): string {
+  return SKILL_TOKEN_CANONICAL.get(t) ?? t;
+}
+
 function skillTokenSet(raw: string): Set<string> {
   const tokens = normalizeSkill(raw)
     .replace(/[^a-z0-9\s+.#-]/g, " ")
     .split(/\s+/)
-    .filter((t) => t.length > 0 && !SKILL_STOPWORDS.has(t));
+    .filter((t) => t.length > 0 && !SKILL_STOPWORDS.has(t))
+    .map(canonicalToken);
   return new Set(tokens);
 }
 
@@ -527,4 +585,17 @@ function candidateHasSkill(
     if (jaccard(req, c) >= 0.5) return true;
   }
   return false;
+}
+
+/**
+ * Pool of tokenised skill-evidence sets for a candidate. Combines the
+ * explicit `skillNames` with `evidenceTexts` (experience titles, etc.).
+ * Empty sets are filtered out.
+ */
+function buildCandidateSkillPool(candidate: CandidateFitInput): Set<string>[] {
+  const sources = [
+    ...candidate.skillNames,
+    ...(candidate.evidenceTexts ?? []),
+  ];
+  return sources.map(skillTokenSet).filter((s) => s.size > 0);
 }

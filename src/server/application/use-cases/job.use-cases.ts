@@ -629,6 +629,15 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     skillNames: skills
       .map((s: any) => String(s.name ?? ""))
       .filter((s: string) => s.length > 0),
+    // Experience job titles count as additional skill evidence — a "Team
+    // Lead" title is strong support for "team management", "Marketing
+    // Manager" for "marketing", etc. Company names are intentionally
+    // excluded (too noisy / not skill-bearing). Descriptions are also
+    // excluded in this pass — they often contain filler that would
+    // produce false-positive matches.
+    evidenceTexts: experiences
+      .map((exp: any) => String(exp.title ?? ""))
+      .filter((s: string) => s.length > 0),
   };
 }
 

@@ -215,3 +215,59 @@ describe("matchEducation", () => {
     expect(edu.score).toBe(100);
   });
 });
+
+describe("skill synonyms + evidence texts", () => {
+  it("matches Microsoft Office against a candidate who lists Excel", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["Microsoft Office"] },
+      { ...baseCandidate, skillNames: ["Microsoft Excel"] }
+    );
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.score).toBe(100);
+    expect(req.met).toBe(true);
+  });
+
+  it("matches 'team management' against a Team Lead experience title via evidenceTexts", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["Team management", "Coaching"] },
+      {
+        ...baseCandidate,
+        skillNames: [],
+        evidenceTexts: ["Team Lead", "Senior Mentor"],
+      }
+    );
+    // team → leadership group via "lead"; "mentor" → coaching group.
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.score).toBe(100);
+    expect(req.met).toBe(true);
+  });
+
+  it("matches 'analytical skills' against a candidate skill 'data analysis'", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["Analytical skills"] },
+      { ...baseCandidate, skillNames: ["data analysis"] }
+    );
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.met).toBe(true);
+  });
+
+  it("matches 'problem solving' against 'troubleshooting'", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["Problem solving"] },
+      { ...baseCandidate, skillNames: ["Troubleshooting"] }
+    );
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.met).toBe(true);
+  });
+
+  it("does not match unrelated skills — synonyms stay scoped", () => {
+    const result = computeJobFit(
+      { ...baseJob, requiredSkills: ["SAP FI"] },
+      { ...baseCandidate, skillNames: ["Microsoft Excel"], evidenceTexts: ["Intern"] }
+    );
+    const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+    expect(req.score).toBe(0);
+    expect(req.met).toBe(false);
+  });
+});
+
