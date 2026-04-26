@@ -654,6 +654,8 @@ export default function JobsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
 
   // Application state
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -661,7 +663,12 @@ export default function JobsPage() {
   const [candidateId, setCandidateId] = useState<string | null>(null);
 
   const fetchJobs = useCallback(
-    async (page: number = 1, search?: string, department?: string) => {
+    async (
+      page: number = 1,
+      search?: string,
+      department?: string,
+      country?: string,
+    ) => {
       try {
         setLoading(true);
         const params = new URLSearchParams({
@@ -670,6 +677,7 @@ export default function JobsPage() {
         });
         if (search) params.set("search", search);
         if (department) params.set("department", department);
+        if (country) params.set("country", country);
         // Job Openings page never shows internships — internships live on
         // /dashboard/internships regardless of role (HR or candidate).
         params.set("excludeType", "INTERNSHIP");
@@ -692,6 +700,18 @@ export default function JobsPage() {
   // Fetch demo candidate + their existing applications on mount
   useEffect(() => {
     fetchJobs(1);
+
+    // Populate the country dropdown. Scoped to non-internships so it
+    // matches the listing context. Failure is non-fatal — dropdown just
+    // shows "All countries".
+    fetch("/api/jobs/countries?excludeType=INTERNSHIP")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.countries && Array.isArray(data.countries)) {
+          setAvailableCountries(data.countries as string[]);
+        }
+      })
+      .catch(() => {});
 
     if (role === "candidate") {
       // Get or create the current candidate
@@ -756,6 +776,7 @@ export default function JobsPage() {
         setSearchQuery("");
         setSearchInput("");
         setDepartmentFilter("");
+        setCountryFilter("");
         await fetchJobs(1);
       }
     },
@@ -894,11 +915,21 @@ export default function JobsPage() {
 
   const handleSearch = () => {
     setSearchQuery(searchInput);
-    fetchJobs(1, searchInput || undefined, departmentFilter || undefined);
+    fetchJobs(
+      1,
+      searchInput || undefined,
+      departmentFilter || undefined,
+      countryFilter || undefined,
+    );
   };
 
   const handlePageChange = (page: number) => {
-    fetchJobs(page, searchQuery || undefined, departmentFilter || undefined);
+    fetchJobs(
+      page,
+      searchQuery || undefined,
+      departmentFilter || undefined,
+      countryFilter || undefined,
+    );
     // Scroll to top of job list
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -917,7 +948,7 @@ export default function JobsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {role === "hr" && (
-            <CreateJobDialog onCreated={() => { setSearchQuery(""); setSearchInput(""); setDepartmentFilter(""); fetchJobs(1); }} />
+            <CreateJobDialog onCreated={() => { setSearchQuery(""); setSearchInput(""); setDepartmentFilter(""); setCountryFilter(""); fetchJobs(1); }} />
           )}
           <Button
             onClick={handleSync}
@@ -979,11 +1010,11 @@ export default function JobsPage() {
       <Separator />
 
       {/* Search & Filter */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[260px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by title, department, location..."
+            placeholder="Search by title or department..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -997,7 +1028,12 @@ export default function JobsPage() {
           onValueChange={(value) => {
             const dept = value === "all" ? "" : value;
             setDepartmentFilter(dept);
-            fetchJobs(1, searchQuery || undefined, dept || undefined);
+            fetchJobs(
+              1,
+              searchQuery || undefined,
+              dept || undefined,
+              countryFilter || undefined,
+            );
           }}
         >
           <SelectTrigger className="w-[220px]">
@@ -1008,6 +1044,30 @@ export default function JobsPage() {
             <SelectItem value="all">All departments</SelectItem>
             {FIELDS_OF_WORK.map((field) => (
               <SelectItem key={field} value={field}>{field}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={countryFilter}
+          onValueChange={(value) => {
+            const country = value === "all" ? "" : value;
+            setCountryFilter(country);
+            fetchJobs(
+              1,
+              searchQuery || undefined,
+              departmentFilter || undefined,
+              country || undefined,
+            );
+          }}
+        >
+          <SelectTrigger className="w-[180px]">
+            <Globe className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+            <SelectValue placeholder="All countries" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All countries</SelectItem>
+            {availableCountries.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -71,7 +71,7 @@ interface RankedMatch {
 }
 
 interface MatchResponse {
-  job: { id: string; title: string };
+  job: { id: string; title: string; sourceUrl: string | null };
   requirements: {
     fieldsOfWork?: string[];
     seniorityLevel?: string | null;
@@ -391,9 +391,98 @@ export default function MatchCandidatesPage({
         </div>
       </div>
 
-      {/* Match Settings (HR-tunable, global). Replaces the eligibility-only
-          threshold panel: HR can now reweight or fully ignore individual
-          criteria, plus tune the required-skill coverage threshold. */}
+      {/* Parsed JD requirements (placed above Match Settings so HR can
+          eyeball "what's the matcher scoring against?" before tuning) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Parsed Job Requirements</CardTitle>
+              <CardDescription>What the matcher is scoring against.</CardDescription>
+            </div>
+            {data.job.sourceUrl && (
+              <a
+                href={data.job.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                View on adidas Careers <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm grid gap-3 md:grid-cols-2">
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Fields of Work</div>
+            <div className="flex flex-wrap gap-1">
+              {(data.requirements.fieldsOfWork ?? []).length === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                data.requirements.fieldsOfWork!.map((f) => (
+                  <Badge key={f} variant="secondary">{f}</Badge>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Seniority / Experience</div>
+            <div>
+              {data.requirements.seniorityLevel ?? "Any"} ·{" "}
+              {data.requirements.minYearsInField != null
+                ? `${data.requirements.minYearsInField}+ yrs in field`
+                : "no minimum"}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Required Skills</div>
+            <div className="flex flex-wrap gap-1">
+              {(data.requirements.requiredSkills ?? []).length === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                data.requirements.requiredSkills!.map((s) => (
+                  <Badge key={s} className="bg-blue-100 text-blue-800">{s}</Badge>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Preferred Skills</div>
+            <div className="flex flex-wrap gap-1">
+              {(data.requirements.preferredSkills ?? []).length === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                data.requirements.preferredSkills!.map((s) => (
+                  <Badge key={s} variant="outline">{s}</Badge>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Languages</div>
+            <div className="flex flex-wrap gap-1">
+              {(data.requirements.requiredLanguages ?? []).length === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                data.requirements.requiredLanguages!.map((l) => (
+                  <Badge key={l.language} variant="secondary">
+                    {l.language}{l.cefr ? ` ${l.cefr}` : ""}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Education</div>
+            <div>{data.requirements.requiredEducationLevel ?? "—"}</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Match Settings (HR-tunable, global). Placed below Parsed
+          Requirements so HR sees "what we're matching against" first,
+          then the levers to reshape the ranking, immediately above the
+          ranked candidate list. */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
@@ -529,79 +618,6 @@ export default function MatchCandidatesPage({
                 "Apply"
               )}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Parsed JD requirements */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Parsed Job Requirements</CardTitle>
-          <CardDescription>What the matcher is scoring against.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm grid gap-3 md:grid-cols-2">
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Fields of Work</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.fieldsOfWork ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.fieldsOfWork!.map((f) => (
-                  <Badge key={f} variant="secondary">{f}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Seniority / Experience</div>
-            <div>
-              {data.requirements.seniorityLevel ?? "Any"} ·{" "}
-              {data.requirements.minYearsInField != null
-                ? `${data.requirements.minYearsInField}+ yrs in field`
-                : "no minimum"}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Required Skills</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.requiredSkills ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.requiredSkills!.map((s) => (
-                  <Badge key={s} className="bg-blue-100 text-blue-800">{s}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Preferred Skills</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.preferredSkills ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.preferredSkills!.map((s) => (
-                  <Badge key={s} variant="outline">{s}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Languages</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.requiredLanguages ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.requiredLanguages!.map((l) => (
-                  <Badge key={l.language} variant="secondary">
-                    {l.language}{l.cefr ? ` ${l.cefr}` : ""}
-                  </Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Education</div>
-            <div>{data.requirements.requiredEducationLevel ?? "—"}</div>
           </div>
         </CardContent>
       </Card>

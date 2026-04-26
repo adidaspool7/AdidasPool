@@ -18,6 +18,7 @@ export class SupabaseJobRepository implements IJobRepository {
     excludeType?: string;
     internshipStatus?: string;
     department?: string;
+    country?: string;
   }) {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 100;
@@ -28,13 +29,17 @@ export class SupabaseJobRepository implements IJobRepository {
       .from("jobs")
       .select("*, matches:job_matches(id), assessments(id)", { count: "exact" });
 
-    // Search: split on whitespace, each term must match at least one field
+    // Search: split on whitespace, each term must match at least one field.
+    // NOTE: country is intentionally excluded here — short 2-letter codes
+    // ("PT", "FR") cause false-positive substring hits in title/department
+    // (e.g. "Senior PT-BR Linguist"). Country is filtered exactly via the
+    // dedicated `country` option below.
     if (options?.search) {
       const terms = options.search.trim().split(/\s+/).filter(Boolean);
       for (const term of terms) {
         const t = term.replace(/'/g, "''");
         query = query.or(
-          `title.ilike.%${t}%,department.ilike.%${t}%,location.ilike.%${t}%,country.ilike.%${t}%`
+          `title.ilike.%${t}%,department.ilike.%${t}%,location.ilike.%${t}%`
         );
       }
     }
@@ -45,6 +50,7 @@ export class SupabaseJobRepository implements IJobRepository {
       query = query.eq("internship_status", options.internshipStatus);
     if (options?.department)
       query = query.ilike("department", `%${options.department}%`);
+    if (options?.country) query = query.eq("country", options.country);
 
     const { data, error, count } = await query
       .order("created_at", { ascending: false })
@@ -126,6 +132,29 @@ export class SupabaseJobRepository implements IJobRepository {
       from += pageSize;
     }
     return out;
+  }
+
+  async findDistinctCountries(options?: {
+    type?: string;
+    excludeType?: string;
+    internshipStatus?: string;
+  }): Promise<string[]> {
+    let q = db
+      .from("jobs")
+      .select("country")
+      .not("country", "is", null);
+    if (options?.type) q = q.eq("type", options.type);
+    if (options?.excludeType) q = q.neq("type", options.excludeType);
+    if (options?.internshipStatus)
+      q = q.eq("internship_status", options.internshipStatus);
+    const { data, error } = await q;
+    assertNoError(error, "job.findDistinctCountries");
+    const set = new Set<string>();
+    for (const r of (data ?? []) as Array<{ country: string | null }>) {
+      const c = (r.country ?? "").trim();
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort();
   }
 
   async findById(id: string) {

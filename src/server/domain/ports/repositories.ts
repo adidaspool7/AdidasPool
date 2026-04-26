@@ -143,6 +143,7 @@ export interface IJobRepository {
     excludeType?: string;
     internshipStatus?: string;
     department?: string;
+    country?: string;
   }): Promise<PaginatedResult<any>>;
   findById(id: string): Promise<any | null>;
   findByExternalId(externalId: string): Promise<any | null>;
@@ -179,6 +180,17 @@ export interface IJobRepository {
   findAllForPicker(): Promise<
     Array<{ id: string; title: string; department: string | null; country: string | null }>
   >;
+  /**
+   * Distinct country codes (2-letter where available) across the jobs
+   * table, optionally narrowed by type / excludeType / internshipStatus
+   * so the dropdown matches the listing context (e.g. only countries
+   * that actually have internships).
+   */
+  findDistinctCountries(options?: {
+    type?: string;
+    excludeType?: string;
+    internshipStatus?: string;
+  }): Promise<string[]>;
   /** Persist the LLM-extracted structured requirements for a job. */
   updateParsedRequirements(
     id: string,

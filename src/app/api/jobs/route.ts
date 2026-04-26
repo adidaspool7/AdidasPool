@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
     const excludeType = searchParams.get("excludeType") || undefined;
     const internshipStatus = searchParams.get("internshipStatus") || undefined;
     const department = searchParams.get("department") || undefined;
+    const country = searchParams.get("country") || undefined;
 
-    const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department });
+    const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department, country });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching jobs:", error);

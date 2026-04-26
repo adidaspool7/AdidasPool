@@ -64,8 +64,20 @@ export class JobUseCases {
     excludeType?: string;
     internshipStatus?: string;
     department?: string;
+    country?: string;
   }) {
     return this.jobRepo.findMany(options);
+  }
+
+  /**
+   * Distinct list of country codes for the country dropdown filter.
+   */
+  async listDistinctCountries(options?: {
+    type?: string;
+    excludeType?: string;
+    internshipStatus?: string;
+  }) {
+    return this.jobRepo.findDistinctCountries(options);
   }
 
   /**
@@ -494,7 +506,7 @@ export class JobUseCases {
     jobId: string,
     options?: { persistTop?: number }
   ): Promise<{
-    job: { id: string; title: string };
+    job: { id: string; title: string; sourceUrl: string | null };
     requirements: JobRequirements;
     matches: Array<{
       candidate: {
@@ -573,7 +585,11 @@ export class JobUseCases {
     );
 
     return {
-      job: { id: job.id as string, title: job.title as string },
+      job: {
+        id: job.id as string,
+        title: job.title as string,
+        sourceUrl: (job.sourceUrl as string | null) ?? null,
+      },
       requirements,
       matches: ranked,
     };
