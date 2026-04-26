@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoringWeightsRepository } from "@server/application";
 import { z } from "zod";
+import { CRITERION_KEYS } from "@server/domain/services/job-fit.service";
+
+const CriterionWeightsSchema = z
+  .object(
+    Object.fromEntries(
+      CRITERION_KEYS.map((k) => [k, z.number().min(0).max(3)])
+    ) as Record<(typeof CRITERION_KEYS)[number], z.ZodNumber>
+  )
+  .partial();
 
 const WeightsUpdateSchema = z.object({
   experience: z.number().min(0).max(1),
@@ -20,14 +29,20 @@ const WeightsUpdateSchema = z.object({
 );
 
 /**
- * Schema for PATCH \u2014 partial update, currently only the fit-matcher
- * threshold. Kept separate from WeightsUpdateSchema so HR can tweak
- * eligibility without being forced to resubmit the full weight vector.
+ * Schema for PATCH — partial update covering the two HR-tunable knobs
+ * for job-fit (skill threshold + per-criterion weights). Either field is
+ * optional; HR can adjust one without resubmitting the other.
  */
-const ThresholdPatchSchema = z.object({
-  requiredSkillThreshold: z.number().min(0).max(1),
-  updatedBy: z.string().nullable().optional(),
-});
+const ThresholdPatchSchema = z
+  .object({
+    requiredSkillThreshold: z.number().min(0).max(1).optional(),
+    fitCriterionWeights: CriterionWeightsSchema.optional(),
+    updatedBy: z.string().nullable().optional(),
+  })
+  .refine(
+    (v) => v.requiredSkillThreshold !== undefined || v.fitCriterionWeights !== undefined,
+    { message: "At least one of requiredSkillThreshold or fitCriterionWeights is required" }
+  );
 
 /**
  * GET /api/scoring/weights
@@ -83,6 +98,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const parsed = ThresholdPatchSchema.parse(body);
     const current = await scoringWeightsRepository.get();
+    const mergedFitWeights = parsed.fitCriterionWeights
+      ? { ...current.fitCriterionWeights, ...parsed.fitCriterionWeights }
+      : current.fitCriterionWeights;
     const weights = await scoringWeightsRepository.upsert({
       experience: current.experience,
       yearsOfExperience: current.yearsOfExperience,
@@ -90,7 +108,9 @@ export async function PATCH(request: NextRequest) {
       locationMatch: current.locationMatch,
       language: current.language,
       presetName: current.presetName,
-      requiredSkillThreshold: parsed.requiredSkillThreshold,
+      requiredSkillThreshold:
+        parsed.requiredSkillThreshold ?? current.requiredSkillThreshold,
+      fitCriterionWeights: mergedFitWeights,
       updatedBy: parsed.updatedBy ?? current.updatedBy,
     });
     return NextResponse.json(weights);

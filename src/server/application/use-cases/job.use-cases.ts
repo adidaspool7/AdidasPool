@@ -516,12 +516,23 @@ export class JobUseCases {
 
     const candidates = await this.candidateRepo.findForMatching();
 
-    const fitConfig = { ...DEFAULT_FIT_CONFIG };
+    const fitConfig = {
+      ...DEFAULT_FIT_CONFIG,
+      criterionWeights: { ...DEFAULT_FIT_CONFIG.criterionWeights },
+    };
     if (this.scoringWeightsRepo) {
       try {
         const w = await this.scoringWeightsRepo.get();
         if (typeof w.requiredSkillThreshold === "number") {
           fitConfig.requiredSkillThreshold = w.requiredSkillThreshold;
+        }
+        if (w.fitCriterionWeights) {
+          // Merge HR overrides onto the defaults so any newly-added
+          // criterion still has a sensible weight.
+          fitConfig.criterionWeights = {
+            ...fitConfig.criterionWeights,
+            ...(w.fitCriterionWeights as typeof fitConfig.criterionWeights),
+          };
         }
       } catch {
         // Fall back to default if the row is missing or the column hasn't

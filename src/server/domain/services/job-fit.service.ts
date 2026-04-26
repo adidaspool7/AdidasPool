@@ -80,6 +80,39 @@ export interface JobFitResult {
 }
 
 /**
+ * The 7 criterion keys returned by `computeJobFit` — used for typed
+ * weight maps in `JobFitConfig.criterionWeights`.
+ */
+export const CRITERION_KEYS = [
+  "field",
+  "experience",
+  "seniority",
+  "requiredSkills",
+  "preferredSkills",
+  "languages",
+  "education",
+] as const;
+export type CriterionKey = (typeof CRITERION_KEYS)[number];
+
+/**
+ * Default weights: required skills carry the most signal, field +
+ * experience moderate, the rest light. Setting any weight to 0 drops
+ * that dimension from BOTH the overall score AND the eligibility flag —
+ * useful when HR knows the JD parser missed something.
+ *
+ * Range: 0..3 (UI-enforced). Internally any non-negative number works.
+ */
+export const DEFAULT_CRITERION_WEIGHTS: Record<CriterionKey, number> = {
+  field: 2,
+  experience: 2,
+  seniority: 1,
+  requiredSkills: 3,
+  preferredSkills: 1,
+  languages: 1,
+  education: 1,
+};
+
+/**
  * Tunable knobs for the fit engine. Defaults are hard-coded here so that
  * the pure function stays deterministic in tests; HR can override via the
  * use-case layer (read from `scoring_weights` or a settings table).
@@ -91,10 +124,17 @@ export interface JobFitConfig {
    * "at least half of the musts". Set to 1 to restore strict behaviour.
    */
   requiredSkillThreshold: number;
+  /**
+   * Per-criterion importance weights. Score is a weighted average over
+   * applicable criteria with weight > 0. Eligibility is "every criterion
+   * with weight > 0 AND applicable has met=true".
+   */
+  criterionWeights: Record<CriterionKey, number>;
 }
 
 export const DEFAULT_FIT_CONFIG: JobFitConfig = {
   requiredSkillThreshold: 0.5,
+  criterionWeights: { ...DEFAULT_CRITERION_WEIGHTS },
 };
 
 // ============================================
@@ -116,14 +156,29 @@ export function computeJobFit(
     matchEducation(job, candidate),
   ];
 
-  const applicable = breakdown.filter((c) => c.applicable);
+  const weights = config.criterionWeights ?? DEFAULT_CRITERION_WEIGHTS;
+  // A criterion contributes to the score iff it's applicable AND has a
+  // positive weight (weight 0 = HR explicitly ignores this dimension).
+  const contributing = breakdown.filter(
+    (c) => c.applicable && (weights[c.key as CriterionKey] ?? 0) > 0
+  );
+
+  const totalWeight = contributing.reduce(
+    (sum, c) => sum + (weights[c.key as CriterionKey] ?? 0),
+    0
+  );
   const overallScore =
-    applicable.length === 0
+    totalWeight === 0
       ? 0
       : Math.round(
-          applicable.reduce((sum, c) => sum + c.score, 0) / applicable.length
+          contributing.reduce(
+            (sum, c) => sum + c.score * (weights[c.key as CriterionKey] ?? 0),
+            0
+          ) / totalWeight
         );
-  const isEligible = applicable.every((c) => c.met);
+  // Eligibility: every weighted+applicable criterion must be met.
+  // Criteria with weight 0 are ignored entirely (HR opt-out).
+  const isEligible = contributing.every((c) => c.met);
 
   return { overallScore, isEligible, breakdown };
 }

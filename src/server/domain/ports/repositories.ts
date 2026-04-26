@@ -334,6 +334,13 @@ export interface ScoringWeightsData {
   language: number;
   /** 0..1 — fraction of a JD's required skills a candidate must cover to be "eligible". */
   requiredSkillThreshold: number;
+  /**
+   * Per-criterion importance weights for the job-fit engine.
+   * Keys: field | experience | seniority | requiredSkills |
+   * preferredSkills | languages | education. Values 0..3.
+   * 0 = HR explicitly ignores the dimension (drops it from score AND eligibility).
+   */
+  fitCriterionWeights: Record<string, number>;
   presetName: string | null;
   updatedBy: string | null;
   updatedAt: Date;
@@ -349,6 +356,7 @@ export interface IScoringWeightsRepository {
       locationMatch: number;
       language: number;
       requiredSkillThreshold?: number;
+      fitCriterionWeights?: Record<string, number>;
       presetName?: string | null;
       updatedBy?: string | null;
     }

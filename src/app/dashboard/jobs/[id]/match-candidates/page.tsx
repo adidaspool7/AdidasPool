@@ -36,6 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@client/components/ui/dropdown-menu";
+import { cn } from "@client/lib/utils";
 
 // ============================================
 // TYPES (mirror server response)
@@ -88,6 +89,82 @@ interface MatchResponse {
 // HELPERS
 // ============================================
 
+// Per-criterion weights — must mirror server `CRITERION_KEYS` in
+// src/server/domain/services/job-fit.service.ts.
+const CRITERION_KEYS = [
+  "field",
+  "experience",
+  "seniority",
+  "requiredSkills",
+  "preferredSkills",
+  "languages",
+  "education",
+] as const;
+type CriterionKey = (typeof CRITERION_KEYS)[number];
+
+const CRITERION_LABELS: Record<CriterionKey, string> = {
+  field: "Field of Work",
+  experience: "Experience (years)",
+  seniority: "Seniority",
+  requiredSkills: "Required Skills",
+  preferredSkills: "Preferred Skills",
+  languages: "Languages",
+  education: "Education",
+};
+
+const BALANCED_PRESET: Record<CriterionKey, number> = {
+  field: 2,
+  experience: 2,
+  seniority: 1,
+  requiredSkills: 3,
+  preferredSkills: 1,
+  languages: 1,
+  education: 1,
+};
+
+const SKILLS_FIRST_PRESET: Record<CriterionKey, number> = {
+  field: 2,
+  experience: 1,
+  seniority: 1,
+  requiredSkills: 3,
+  preferredSkills: 2,
+  languages: 1,
+  education: 1,
+};
+
+const EXPERIENCE_FIRST_PRESET: Record<CriterionKey, number> = {
+  field: 3,
+  experience: 3,
+  seniority: 2,
+  requiredSkills: 1,
+  preferredSkills: 1,
+  languages: 1,
+  education: 1,
+};
+
+const PRESETS: { label: string; weights: Record<CriterionKey, number> }[] = [
+  { label: "Balanced", weights: BALANCED_PRESET },
+  { label: "Skills-first", weights: SKILLS_FIRST_PRESET },
+  { label: "Experience-first", weights: EXPERIENCE_FIRST_PRESET },
+];
+
+function mergeWeights(raw: Record<string, number> | undefined): Record<CriterionKey, number> {
+  const out: Record<CriterionKey, number> = { ...BALANCED_PRESET };
+  if (raw) {
+    for (const k of CRITERION_KEYS) {
+      const v = raw[k];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        out[k] = Math.max(0, Math.min(3, v));
+      }
+    }
+  }
+  return out;
+}
+
+function weightsEqual(a: Record<CriterionKey, number>, b: Record<CriterionKey, number>): boolean {
+  return CRITERION_KEYS.every((k) => a[k] === b[k]);
+}
+
 function fitBadge(score: number) {
   if (score >= 80) return "bg-emerald-100 text-emerald-800";
   if (score >= 60) return "bg-blue-100 text-blue-800";
@@ -126,24 +203,30 @@ export default function MatchCandidatesPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [showIneligible, setShowIneligible] = useState(false);
 
-  // HR-tunable: fraction of JD required skills a candidate must cover to
-  // be flagged eligible. Persisted on scoring_weights.required_skill_threshold.
+  // HR-tunable scoring config. All persisted on scoring_weights (global).
   const [threshold, setThreshold] = useState<number>(0.5);
   const [thresholdDraft, setThresholdDraft] = useState<number>(0.5);
-  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [criterionWeights, setCriterionWeights] = useState<Record<CriterionKey, number>>(BALANCED_PRESET);
+  const [criterionWeightsDraft, setCriterionWeightsDraft] = useState<Record<CriterionKey, number>>(BALANCED_PRESET);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [reparsing, setReparsing] = useState(false);
 
-  // Load the current threshold once.
+  // Pure UI knob — minimum fit score to display. Not persisted.
+  const [scoreFloor, setScoreFloor] = useState<number>(0);
+
+  // Load the current threshold + weights once.
   useEffect(() => {
     fetch("/api/scoring/weights")
       .then((r) => r.json())
-      .then((w: { requiredSkillThreshold?: number }) => {
+      .then((w: { requiredSkillThreshold?: number; fitCriterionWeights?: Record<string, number> }) => {
         const t =
           typeof w.requiredSkillThreshold === "number" ? w.requiredSkillThreshold : 0.5;
         setThreshold(t);
         setThresholdDraft(t);
+        const cw = mergeWeights(w.fitCriterionWeights);
+        setCriterionWeights(cw);
+        setCriterionWeightsDraft(cw);
       })
       .catch(() => {});
   }, []);
@@ -180,22 +263,30 @@ export default function MatchCandidatesPage({
     });
   };
 
-  // Persist threshold and re-load matches so eligibility reflects the new cutoff.
-  const saveThreshold = async () => {
-    if (Math.abs(thresholdDraft - threshold) < 0.005) return;
-    setSavingThreshold(true);
+  // Persist threshold + weights and re-load matches so scores reflect them.
+  const saveConfig = async () => {
+    const thresholdChanged = Math.abs(thresholdDraft - threshold) >= 0.005;
+    const weightsChanged = (Object.keys(criterionWeightsDraft) as CriterionKey[]).some(
+      (k) => criterionWeightsDraft[k] !== criterionWeights[k]
+    );
+    if (!thresholdChanged && !weightsChanged) return;
+    setSavingConfig(true);
     try {
       const res = await fetch("/api/scoring/weights", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requiredSkillThreshold: thresholdDraft }),
+        body: JSON.stringify({
+          requiredSkillThreshold: thresholdDraft,
+          fitCriterionWeights: criterionWeightsDraft,
+        }),
       });
       if (res.ok) {
         setThreshold(thresholdDraft);
+        setCriterionWeights(criterionWeightsDraft);
         await load();
       }
     } finally {
-      setSavingThreshold(false);
+      setSavingConfig(false);
     }
   };
 
@@ -251,7 +342,8 @@ export default function MatchCandidatesPage({
 
   const eligible = data.matches.filter((m) => m.fit.isEligible);
   const ineligible = data.matches.filter((m) => !m.fit.isEligible);
-  const visible = showIneligible ? data.matches : eligible;
+  // Always rank everyone; HR uses the score floor (UI-only) to filter.
+  const visible = data.matches.filter((m) => m.fit.overallScore >= scoreFloor);
 
   return (
     <div className="p-6 space-y-6">
@@ -299,32 +391,111 @@ export default function MatchCandidatesPage({
         </div>
       </div>
 
-      {/* Eligibility threshold (HR-tunable, global) */}
+      {/* Match Settings (HR-tunable, global). Replaces the eligibility-only
+          threshold panel: HR can now reweight or fully ignore individual
+          criteria, plus tune the required-skill coverage threshold. */}
       <Card>
-        <CardContent className="py-3 px-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium">Eligibility threshold</span>
+              <CardTitle className="text-base">Match Settings</CardTitle>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
                     What is this?
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 text-xs">
+                <PopoverContent className="w-96 text-xs">
                   <p className="mb-2">
-                    Minimum fraction of a job&apos;s <strong>required</strong> skills a candidate
-                    must cover to be flagged <strong>eligible</strong>.
+                    HR-tunable weights for the 7 fit criteria. The fit score
+                    is a <strong>weighted average</strong> of the applicable
+                    criteria using these weights.
+                  </p>
+                  <p className="mb-2 text-muted-foreground">
+                    Set a weight to <strong>0</strong> to fully ignore that
+                    dimension — useful when you know our JD/CV parser missed
+                    something on it (e.g. a skill list it couldn&apos;t extract).
+                    Eligibility ignores zero-weight criteria too.
                   </p>
                   <p className="text-muted-foreground">
-                    Lowering it surfaces candidates who match most — but not all — of the musts.
-                    Set to 100% to restore the strict all-or-nothing rule. Applies globally to every job.
+                    Settings are saved globally and apply to every job.
                   </p>
                 </PopoverContent>
               </Popover>
             </div>
+            <div className="flex items-center gap-1">
+              {PRESETS.map((p) => {
+                const active = weightsEqual(criterionWeightsDraft, p.weights);
+                return (
+                  <Button
+                    key={p.label}
+                    variant={active ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setCriterionWeightsDraft({ ...p.weights })}
+                    disabled={savingConfig}
+                  >
+                    {p.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2 pb-4 px-4">
+          {/* Per-criterion weight sliders */}
+          <div className="grid gap-3 md:grid-cols-2">
+            {CRITERION_KEYS.map((k) => {
+              const v = criterionWeightsDraft[k];
+              const isOff = v === 0;
+              return (
+                <div key={k} className="flex items-center gap-3 text-sm">
+                  <span className={cn("w-44 shrink-0", isOff && "text-muted-foreground line-through")}>
+                    {CRITERION_LABELS[k]}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={3}
+                    step={1}
+                    value={v}
+                    onChange={(e) =>
+                      setCriterionWeightsDraft((prev) => ({
+                        ...prev,
+                        [k]: Number(e.target.value),
+                      }))
+                    }
+                    className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
+                    disabled={savingConfig}
+                  />
+                  <span className="w-16 text-right tabular-nums text-xs text-muted-foreground">
+                    {isOff ? "off" : `weight ${v}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
 
+          <Separator className="my-4" />
+
+          {/* Required-skill coverage threshold + Apply */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">Required-skill coverage</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
+                    ?
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 text-xs">
+                  Minimum fraction of the JD&apos;s required skills a candidate
+                  must cover for the eligibility chip to read &quot;all reqs met&quot;.
+                  Affects the chip only — every candidate is still ranked.
+                </PopoverContent>
+              </Popover>
+            </div>
             <div className="flex items-center gap-2 flex-1 min-w-[220px]">
               <input
                 type="range"
@@ -334,47 +505,30 @@ export default function MatchCandidatesPage({
                 value={Math.round(thresholdDraft * 100)}
                 onChange={(e) => setThresholdDraft(Number(e.target.value) / 100)}
                 className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
-                disabled={savingThreshold}
+                disabled={savingConfig}
               />
               <span className="text-sm font-semibold tabular-nums w-12 text-right">
                 {Math.round(thresholdDraft * 100)}%
               </span>
             </div>
-
-            <div className="flex items-center gap-1">
-              {[
-                { label: "Relaxed", v: 0.5 },
-                { label: "Balanced", v: 0.66 },
-                { label: "Strict", v: 1 },
-              ].map((p) => (
-                <Button
-                  key={p.label}
-                  variant={Math.abs(thresholdDraft - p.v) < 0.01 ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setThresholdDraft(p.v)}
-                  disabled={savingThreshold}
-                >
-                  {p.label} {Math.round(p.v * 100)}%
-                </Button>
-              ))}
-              <Button
-                size="sm"
-                className="h-7 text-xs ml-1"
-                onClick={saveThreshold}
-                disabled={
-                  savingThreshold || Math.abs(thresholdDraft - threshold) < 0.005
-                }
-              >
-                {savingThreshold ? (
-                  <>
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…
-                  </>
-                ) : (
-                  "Apply"
-                )}
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={saveConfig}
+              disabled={
+                savingConfig ||
+                (Math.abs(thresholdDraft - threshold) < 0.005 &&
+                  weightsEqual(criterionWeightsDraft, criterionWeights))
+              }
+            >
+              {savingConfig ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…
+                </>
+              ) : (
+                "Apply"
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -452,20 +606,27 @@ export default function MatchCandidatesPage({
         </CardContent>
       </Card>
 
-      {/* Ranking summary */}
-      <div className="flex items-center justify-between">
+      {/* Ranking summary + score floor (UI-only filter, not persisted) */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{eligible.length}</span> eligible ·{" "}
-          <span className="font-semibold text-foreground">{ineligible.length}</span> not eligible ·{" "}
-          {data.matches.length} total
+          <span className="font-semibold text-foreground">{visible.length}</span>{" "}
+          shown · <span className="font-semibold text-foreground">{eligible.length}</span> meet
+          all reqs · <span className="font-semibold text-foreground">{ineligible.length}</span>{" "}
+          partial · {data.matches.length} total
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowIneligible((v) => !v)}
-        >
-          {showIneligible ? "Hide ineligible" : "Show ineligible"}
-        </Button>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Min fit</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={scoreFloor}
+            onChange={(e) => setScoreFloor(Number(e.target.value))}
+            className="w-32 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
+          />
+          <span className="font-semibold tabular-nums w-10 text-right">{scoreFloor}%</span>
+        </div>
       </div>
 
       {/* Ranked candidates */}
@@ -474,7 +635,9 @@ export default function MatchCandidatesPage({
           <div className="divide-y">
             {visible.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                No candidates match yet. Upload more CVs or relax requirements.
+                {data.matches.length === 0
+                  ? "No candidates yet. Upload more CVs."
+                  : `No candidates above ${scoreFloor}% fit. Lower the Min fit slider to see more.`}
               </div>
             ) : (
               visible.map((m, i) => {
@@ -519,11 +682,11 @@ export default function MatchCandidatesPage({
                           </Badge>
                           {m.fit.isEligible ? (
                             <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                              <CheckCircle2 className="w-3 h-3" /> Eligible
+                              <CheckCircle2 className="w-3 h-3" /> All reqs met
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-rose-700 dark:text-rose-400">
-                              <XCircle className="w-3 h-3" /> Not eligible
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                              <XCircle className="w-3 h-3" /> Partial fit
                             </span>
                           )}
                         </div>
