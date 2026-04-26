@@ -229,8 +229,8 @@ export default function MatchCandidatesPage({
   if (error) {
     return (
       <div className="p-6">
-        <Link href="/dashboard/jobs" className="inline-flex items-center text-sm text-muted-foreground mb-4">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to jobs
+        <Link href="/dashboard/job-matching" className="inline-flex items-center text-sm text-muted-foreground mb-4">
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Job Matching
         </Link>
         <Card className="border-destructive">
           <CardHeader>
@@ -258,10 +258,10 @@ export default function MatchCandidatesPage({
       {/* Header */}
       <div>
         <Link
-          href="/dashboard/jobs"
+          href="/dashboard/job-matching"
           className="inline-flex items-center text-sm text-muted-foreground mb-2 hover:text-foreground"
         >
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to jobs
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Job Matching
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>

@@ -162,9 +162,15 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
               )}
               <div className="space-y-1">
                 {section.items.map((item) => {
-                  const active =
+                  // Special case: /dashboard/jobs/[id]/match-candidates belongs to "Job Matching",
+                  // not "Job Openings", even though it lives under /dashboard/jobs/*.
+                  const isMatchCandidatesPath = /^\/dashboard\/jobs\/[^/]+\/match-candidates(\/|$)/.test(pathname);
+                  let active =
                     pathname === item.href ||
                     (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+                  if (isMatchCandidatesPath) {
+                    active = item.href === "/dashboard/job-matching";
+                  }
                   return (
                     <Link
                       key={item.name}
