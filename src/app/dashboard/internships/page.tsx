@@ -56,7 +56,8 @@ import {
 } from "lucide-react";
 import { Input } from "@client/components/ui/input";
 import { useRole } from "@client/components/providers/role-provider";
-import { FIELDS_OF_WORK } from "@client/lib/constants";
+import { FIELDS_OF_WORK, formatCountryLabel } from "@client/lib/constants";
+import { MultiSelectCombobox } from "@client/components/ui/multi-select-combobox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1240,7 +1241,9 @@ export default function InternshipsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
 
   // Application state (candidate only)
   const [applications, setApplications] = useState<Application[]>([]);
@@ -1249,7 +1252,7 @@ export default function InternshipsPage() {
   const [candidateId, setCandidateId] = useState<string | null>(null);
 
   const fetchInternships = useCallback(
-    async (page: number = 1, search?: string, department?: string) => {
+    async (page: number = 1, search?: string, department?: string[], country?: string[]) => {
       try {
         setLoading(true);
         const params = new URLSearchParams({
@@ -1260,7 +1263,10 @@ export default function InternshipsPage() {
         // Candidates only see active internships
         if (!isHR) params.set("internshipStatus", "ACTIVE");
         if (search) params.set("search", search);
-        if (department) params.set("department", department);
+        if (department && department.length > 0)
+          params.set("department", department.join(","));
+        if (country && country.length > 0)
+          params.set("country", country.join(","));
 
         const res = await fetch(`/api/jobs?${params}`);
         if (res.ok) {
@@ -1300,6 +1306,20 @@ export default function InternshipsPage() {
   useEffect(() => {
     fetchInternships(1);
 
+    // Populate the country dropdown scoped to active internships so the
+    // options match what the candidate-side listing actually contains.
+    const countriesUrl = isHR
+      ? "/api/jobs/countries?type=INTERNSHIP"
+      : "/api/jobs/countries?type=INTERNSHIP&internshipStatus=ACTIVE";
+    fetch(countriesUrl)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.countries && Array.isArray(data.countries)) {
+          setAvailableCountries(data.countries as string[]);
+        }
+      })
+      .catch(() => {});
+
     if (role === "candidate") {
       fetch("/api/me")
         .then((r) => (r.ok ? r.json() : null))
@@ -1335,11 +1355,21 @@ export default function InternshipsPage() {
 
   const handleSearch = () => {
     setSearchQuery(searchInput);
-    fetchInternships(1, searchInput || undefined, departmentFilter || undefined);
+    fetchInternships(
+      1,
+      searchInput || undefined,
+      departmentFilter.length > 0 ? departmentFilter : undefined,
+      countryFilter.length > 0 ? countryFilter : undefined,
+    );
   };
 
   const handlePageChange = (page: number) => {
-    fetchInternships(page, searchQuery || undefined, departmentFilter || undefined);
+    fetchInternships(
+      page,
+      searchQuery || undefined,
+      departmentFilter.length > 0 ? departmentFilter : undefined,
+      countryFilter.length > 0 ? countryFilter : undefined,
+    );
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1369,7 +1399,8 @@ export default function InternshipsPage() {
             onCreated={() => {
               setSearchQuery("");
               setSearchInput("");
-              setDepartmentFilter("");
+              setDepartmentFilter([]);
+              setCountryFilter([]);
               fetchInternships(1);
             }}
           />
@@ -1411,7 +1442,7 @@ export default function InternshipsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search internships by title, department, location..."
+            placeholder="Search by title…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -1420,25 +1451,40 @@ export default function InternshipsPage() {
             className="pl-10"
           />
         </div>
-        <Select
-          value={departmentFilter}
-          onValueChange={(value) => {
-            const dept = value === "all" ? "" : value;
-            setDepartmentFilter(dept);
-            fetchInternships(1, searchQuery || undefined, dept || undefined);
+        <MultiSelectCombobox
+          options={FIELDS_OF_WORK.map((field) => ({ value: field, label: field }))}
+          selected={departmentFilter}
+          onChange={(next) => {
+            setDepartmentFilter(next);
+            fetchInternships(
+              1,
+              searchQuery || undefined,
+              next.length > 0 ? next : undefined,
+              countryFilter.length > 0 ? countryFilter : undefined,
+            );
           }}
-        >
-          <SelectTrigger className="w-[220px]">
-            <Building2 className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="All departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All departments</SelectItem>
-            {FIELDS_OF_WORK.map((field) => (
-              <SelectItem key={field} value={field}>{field}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          placeholder="All departments"
+          searchPlaceholder="Search departments…"
+          emptyMessage="No department found."
+          widthClassName="w-[220px]"
+        />
+        <MultiSelectCombobox
+          options={availableCountries.map((c) => ({ value: c, label: formatCountryLabel(c) }))}
+          selected={countryFilter}
+          onChange={(next) => {
+            setCountryFilter(next);
+            fetchInternships(
+              1,
+              searchQuery || undefined,
+              departmentFilter.length > 0 ? departmentFilter : undefined,
+              next.length > 0 ? next : undefined,
+            );
+          }}
+          placeholder="All countries"
+          searchPlaceholder="Search countries…"
+          emptyMessage="No country found."
+          widthClassName="w-[200px]"
+        />
         <Button variant="secondary" onClick={handleSearch}>
           Search
         </Button>
@@ -1475,7 +1521,7 @@ export default function InternshipsPage() {
                 isApplying={applyingJobId === internship.id}
                 onApply={handleApply}
                 isHR={isHR}
-                onUpdated={() => fetchInternships(pagination.page, searchQuery || undefined, departmentFilter || undefined)}
+                onUpdated={() => fetchInternships(pagination.page, searchQuery || undefined, departmentFilter.length > 0 ? departmentFilter : undefined, countryFilter.length > 0 ? countryFilter : undefined)}
 
               />
             ))}

@@ -63,8 +63,8 @@ export class JobUseCases {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
-    department?: string;
-    country?: string;
+    department?: string | string[];
+    country?: string | string[];
   }) {
     return this.jobRepo.findMany(options);
   }

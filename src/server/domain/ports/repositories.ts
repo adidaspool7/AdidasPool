@@ -142,8 +142,8 @@ export interface IJobRepository {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
-    department?: string;
-    country?: string;
+    department?: string | string[];
+    country?: string | string[];
   }): Promise<PaginatedResult<any>>;
   findById(id: string): Promise<any | null>;
   findByExternalId(externalId: string): Promise<any | null>;

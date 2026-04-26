@@ -17,8 +17,8 @@ export class SupabaseJobRepository implements IJobRepository {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
-    department?: string;
-    country?: string;
+    department?: string | string[];
+    country?: string | string[];
   }) {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 100;
@@ -48,9 +48,33 @@ export class SupabaseJobRepository implements IJobRepository {
     if (options?.excludeType) query = query.neq("type", options.excludeType);
     if (options?.internshipStatus)
       query = query.eq("internship_status", options.internshipStatus);
-    if (options?.department)
-      query = query.ilike("department", `%${options.department}%`);
-    if (options?.country) query = query.eq("country", options.country);
+    if (options?.department) {
+      const depts = Array.isArray(options.department)
+        ? options.department
+        : [options.department];
+      const cleaned = depts.map((d) => d.trim()).filter(Boolean);
+      if (cleaned.length === 1) {
+        query = query.ilike("department", `%${cleaned[0]}%`);
+      } else if (cleaned.length > 1) {
+        // OR of substring matches — mirrors single-value semantics so
+        // "Retail" still matches "Retail (Store)" etc.
+        const expr = cleaned
+          .map((d) => `department.ilike.%${d.replace(/[,()]/g, " ").trim()}%`)
+          .join(",");
+        query = query.or(expr);
+      }
+    }
+    if (options?.country) {
+      const countries = Array.isArray(options.country)
+        ? options.country
+        : [options.country];
+      const cleaned = countries.map((c) => c.trim()).filter(Boolean);
+      if (cleaned.length === 1) {
+        query = query.eq("country", cleaned[0]);
+      } else if (cleaned.length > 1) {
+        query = query.in("country", cleaned);
+      }
+    }
 
     const { data, error, count } = await query
       .order("created_at", { ascending: false })

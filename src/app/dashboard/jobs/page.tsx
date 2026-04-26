@@ -50,7 +50,8 @@ import {
 } from "lucide-react";
 import { Input } from "@client/components/ui/input";
 import { useRole } from "@client/components/providers/role-provider";
-import { FIELDS_OF_WORK } from "@client/lib/constants";
+import { FIELDS_OF_WORK, formatCountryLabel } from "@client/lib/constants";
+import { MultiSelectCombobox } from "@client/components/ui/multi-select-combobox";
 
 // ============================================
 // TYPES
@@ -653,8 +654,8 @@ export default function JobsPage() {
   const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [countryFilter, setCountryFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
 
   // Application state
@@ -666,8 +667,8 @@ export default function JobsPage() {
     async (
       page: number = 1,
       search?: string,
-      department?: string,
-      country?: string,
+      department?: string[],
+      country?: string[],
     ) => {
       try {
         setLoading(true);
@@ -676,8 +677,10 @@ export default function JobsPage() {
           pageSize: String(PAGE_SIZE),
         });
         if (search) params.set("search", search);
-        if (department) params.set("department", department);
-        if (country) params.set("country", country);
+        if (department && department.length > 0)
+          params.set("department", department.join(","));
+        if (country && country.length > 0)
+          params.set("country", country.join(","));
         // Job Openings page never shows internships — internships live on
         // /dashboard/internships regardless of role (HR or candidate).
         params.set("excludeType", "INTERNSHIP");
@@ -775,8 +778,8 @@ export default function JobsPage() {
       if (result.success) {
         setSearchQuery("");
         setSearchInput("");
-        setDepartmentFilter("");
-        setCountryFilter("");
+        setDepartmentFilter([]);
+        setCountryFilter([]);
         await fetchJobs(1);
       }
     },
@@ -918,8 +921,8 @@ export default function JobsPage() {
     fetchJobs(
       1,
       searchInput || undefined,
-      departmentFilter || undefined,
-      countryFilter || undefined,
+      departmentFilter.length > 0 ? departmentFilter : undefined,
+      countryFilter.length > 0 ? countryFilter : undefined,
     );
   };
 
@@ -927,8 +930,8 @@ export default function JobsPage() {
     fetchJobs(
       page,
       searchQuery || undefined,
-      departmentFilter || undefined,
-      countryFilter || undefined,
+      departmentFilter.length > 0 ? departmentFilter : undefined,
+      countryFilter.length > 0 ? countryFilter : undefined,
     );
     // Scroll to top of job list
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -948,7 +951,7 @@ export default function JobsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {role === "hr" && (
-            <CreateJobDialog onCreated={() => { setSearchQuery(""); setSearchInput(""); setDepartmentFilter(""); setCountryFilter(""); fetchJobs(1); }} />
+            <CreateJobDialog onCreated={() => { setSearchQuery(""); setSearchInput(""); setDepartmentFilter([]); setCountryFilter([]); fetchJobs(1); }} />
           )}
           <Button
             onClick={handleSync}
@@ -1014,7 +1017,7 @@ export default function JobsPage() {
         <div className="relative flex-1 min-w-[260px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by title or department..."
+            placeholder="Search by title…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -1023,54 +1026,40 @@ export default function JobsPage() {
             className="pl-10"
           />
         </div>
-        <Select
-          value={departmentFilter}
-          onValueChange={(value) => {
-            const dept = value === "all" ? "" : value;
-            setDepartmentFilter(dept);
+        <MultiSelectCombobox
+          options={FIELDS_OF_WORK.map((field) => ({ value: field, label: field }))}
+          selected={departmentFilter}
+          onChange={(next) => {
+            setDepartmentFilter(next);
             fetchJobs(
               1,
               searchQuery || undefined,
-              dept || undefined,
-              countryFilter || undefined,
+              next.length > 0 ? next : undefined,
+              countryFilter.length > 0 ? countryFilter : undefined,
             );
           }}
-        >
-          <SelectTrigger className="w-[220px]">
-            <Building2 className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="All departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All departments</SelectItem>
-            {FIELDS_OF_WORK.map((field) => (
-              <SelectItem key={field} value={field}>{field}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={countryFilter}
-          onValueChange={(value) => {
-            const country = value === "all" ? "" : value;
-            setCountryFilter(country);
+          placeholder="All departments"
+          searchPlaceholder="Search departments…"
+          emptyMessage="No department found."
+          widthClassName="w-[220px]"
+        />
+        <MultiSelectCombobox
+          options={availableCountries.map((c) => ({ value: c, label: formatCountryLabel(c) }))}
+          selected={countryFilter}
+          onChange={(next) => {
+            setCountryFilter(next);
             fetchJobs(
               1,
               searchQuery || undefined,
-              departmentFilter || undefined,
-              country || undefined,
+              departmentFilter.length > 0 ? departmentFilter : undefined,
+              next.length > 0 ? next : undefined,
             );
           }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <Globe className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="All countries" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All countries</SelectItem>
-            {availableCountries.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          placeholder="All countries"
+          searchPlaceholder="Search countries…"
+          emptyMessage="No country found."
+          widthClassName="w-[200px]"
+        />
         <Button variant="secondary" onClick={handleSearch}>
           Search
         </Button>

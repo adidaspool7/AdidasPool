@@ -19,8 +19,16 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || undefined;
     const excludeType = searchParams.get("excludeType") || undefined;
     const internshipStatus = searchParams.get("internshipStatus") || undefined;
-    const department = searchParams.get("department") || undefined;
-    const country = searchParams.get("country") || undefined;
+    // Both filters accept comma-separated values for multi-select UIs
+    // (Job Openings, Internships, Job Matching toolbars).
+    const departmentRaw = searchParams.get("department") || undefined;
+    const countryRaw = searchParams.get("country") || undefined;
+    const department = departmentRaw
+      ? departmentRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const country = countryRaw
+      ? countryRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
 
     const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department, country });
     return NextResponse.json(result);
