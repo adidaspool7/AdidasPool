@@ -804,46 +804,6 @@ export default function CandidateDetailPage({
           </CardContent>
         </Card>
       )}
-
-      {/* ── Job Matches ─────────────────────────────────────────── */}
-      {c.jobMatches && c.jobMatches.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Job Matches ({c.jobMatches.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {c.jobMatches.map((m: any) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between rounded-md border p-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">
-                      {m.job?.title || "Unknown Job"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.job?.location || ""}{" "}
-                      {m.job?.department && `· ${m.job.department}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Progress
-                      value={m.matchScore}
-                      className="h-2 w-20"
-                    />
-                    <span className="text-sm font-bold tabular-nums">
-                      {m.matchScore}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
