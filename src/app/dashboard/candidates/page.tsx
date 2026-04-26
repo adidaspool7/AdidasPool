@@ -53,23 +53,13 @@ import {
   UserCircle,
   Building2,
   ChevronDown,
-  SlidersHorizontal,
   Star,
-  Briefcase,
-  Clock,
-  GraduationCap,
   MapPin,
-  Languages,
-  Zap,
   Check,
-  Save,
-  Trash2,
   SendHorizonal,
   UserCheck,
-  Target,
   X,
   Loader2,
-  Info,
   MoreHorizontal,
   Mic,
   FileText,
@@ -79,17 +69,6 @@ import {
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 import { useRole } from "@client/components/providers/role-provider";
-
-// Mirrors CriterionResult from src/server/domain/services/job-fit.service.ts.
-// Kept as a local type to avoid a client->server-only import path.
-interface FitCriterion {
-  key: string;
-  label: string;
-  score: number;
-  applicable: boolean;
-  met: boolean;
-  detail: string;
-}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -118,7 +97,6 @@ interface Candidate {
   assessments?: { id: string; status: string }[];
   interviews?: { id: string; finalDecision: string | null }[];
   _count?: { assessments: number; notes: number };
-  rerankedScore?: number | null;
 }
 
 interface Pagination {
@@ -126,16 +104,6 @@ interface Pagination {
   pageSize: number;
   total: number;
   totalPages: number;
-}
-
-interface SavedPreset {
-  id: string;
-  name: string;
-  experience: number;
-  yearsOfExperience: number;
-  educationLevel: number;
-  locationMatch: number;
-  language: number;
 }
 
 // ── Status config ────────────────────────────────────────────────
@@ -235,26 +203,6 @@ function OverallScoreBadge({ score }: { score: number | null }) {
   );
 }
 
-// ── Scoring weight presets & config ──────────────────────────────
-
-const WEIGHT_CONFIG = [
-  { key: "experience" as const, label: "Experience Relevance", icon: Briefcase, colour: "bg-blue-500" },
-  { key: "yearsOfExperience" as const, label: "Years of Experience", icon: Clock, colour: "bg-indigo-500" },
-  { key: "educationLevel" as const, label: "Education Level", icon: GraduationCap, colour: "bg-purple-500" },
-  { key: "locationMatch" as const, label: "Location Match", icon: MapPin, colour: "bg-emerald-500" },
-  { key: "language" as const, label: "Language Proficiency", icon: Languages, colour: "bg-amber-500" },
-];
-
-type WeightKey = (typeof WEIGHT_CONFIG)[number]["key"];
-
-const BUILT_IN_PRESETS: { name: string; weights: Record<WeightKey, number>; description: string }[] = [
-  { name: "Default", weights: { experience: 0.25, yearsOfExperience: 0.10, educationLevel: 0.15, locationMatch: 0.15, language: 0.35 }, description: "Language-focused — ideal for customer-facing roles" },
-  { name: "Balanced", weights: { experience: 0.20, yearsOfExperience: 0.20, educationLevel: 0.20, locationMatch: 0.20, language: 0.20 }, description: "Equal emphasis on all scoring components" },
-  { name: "Experience-First", weights: { experience: 0.35, yearsOfExperience: 0.25, educationLevel: 0.10, locationMatch: 0.10, language: 0.20 }, description: "Prioritises work experience and seniority" },
-  { name: "Language-Heavy", weights: { experience: 0.15, yearsOfExperience: 0.05, educationLevel: 0.10, locationMatch: 0.10, language: 0.60 }, description: "Maximum language emphasis" },
-  { name: "Local Talent", weights: { experience: 0.20, yearsOfExperience: 0.10, educationLevel: 0.15, locationMatch: 0.35, language: 0.20 }, description: "Location proximity is most important" },
-];
-
 // ── Business area dropdown ───────────────────────────────────────
 
 function BusinessAreaDropdown({
@@ -346,124 +294,6 @@ function BusinessAreaDropdown({
   );
 }
 
-// ── Job picker (searchable) ──────────────────────────────────────
-
-function JobPicker({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: Array<{ id: string; title: string; department: string | null; country: string | null }>;
-  onChange: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? options.filter((j) => {
-        const hay = `${j.title} ${j.department ?? ""} ${j.country ?? ""}`.toLowerCase();
-        return hay.includes(q);
-      })
-    : options;
-
-  const selected = options.find((j) => j.id === value) ?? null;
-  const selectedMeta = selected
-    ? [selected.department, selected.country].filter(Boolean).join(" · ")
-    : "";
-  const displayLabel = selected
-    ? `${selected.title}${selectedMeta ? ` · ${selectedMeta}` : ""}`
-    : "Select a job…";
-  const shortLabel =
-    displayLabel.length > 40 ? displayLabel.slice(0, 38) + "…" : displayLabel;
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent transition-colors w-[340px] h-8"
-        onClick={() => setOpen(!open)}
-      >
-        <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className={`truncate ${selected ? "" : "text-muted-foreground"}`}>{shortLabel}</span>
-        <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground shrink-0" />
-      </button>
-      {open && (
-        <div className="absolute z-50 top-full mt-1 w-[420px] rounded-md border bg-popover shadow-lg">
-          <div className="p-2 border-b">
-            <Input
-              placeholder="Search by title, department or country…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 text-sm"
-              autoFocus
-            />
-          </div>
-          <div className="max-h-72 overflow-y-auto p-1">
-            <button
-              type="button"
-              className={`w-full text-left rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors ${
-                value === "" ? "bg-accent font-medium" : "text-muted-foreground"
-              }`}
-              onClick={() => {
-                onChange("");
-                setOpen(false);
-                setSearch("");
-              }}
-            >
-              — No job (Profile score only) —
-            </button>
-            {filtered.map((j) => {
-              const isActive = j.id === value;
-              return (
-                <button
-                  key={j.id}
-                  type="button"
-                  className={`w-full text-left rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors ${
-                    isActive ? "bg-accent font-medium" : ""
-                  }`}
-                  onClick={() => {
-                    onChange(j.id);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <div className="truncate">{j.title}</div>
-                  {(j.department || j.country) && (
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {[j.department, j.country].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-            {filtered.length === 0 && (
-              <p className="px-2 py-3 text-sm text-muted-foreground text-center">
-                No jobs match
-              </p>
-            )}
-          </div>
-          <div className="px-2 py-1.5 border-t text-[11px] text-muted-foreground">
-            {filtered.length} of {options.length} jobs
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main page ────────────────────────────────────────────────────
 
 export default function CandidatesPage() {
@@ -483,28 +313,12 @@ export default function CandidatesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [businessAreaFilter, setBusinessAreaFilter] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState("overallCvScore");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   // Hide status=NEW (unparsed) candidates by default — they have no CV data
   // and would appear as empty rows. HR can toggle them on.
   const [showUnparsed, setShowUnparsed] = useState(false);
-
-  // Custom ranking state
-  const [useCustomRanking, setUseCustomRanking] = useState(false);
-
-  // ── Fit-for-job overlay (Phase 5) ────────────────────────────
-  // Optional: HR picks a job to overlay job-specific Fit scores onto the
-  // current candidate list. Quality stays as-is; Fit is a second column.
-  const [jobOptions, setJobOptions] = useState<
-    Array<{ id: string; title: string; department: string | null; country: string | null }>
-  >([]);
-  const [fitJobId, setFitJobId] = useState<string>("");
-  const [fitJobTitle, setFitJobTitle] = useState<string | null>(null);
-  const [fitMap, setFitMap] = useState<
-    Map<string, { score: number; eligible: boolean; breakdown: FitCriterion[] }>
-  >(new Map());
-  const [fitLoading, setFitLoading] = useState(false);
-  const [fitError, setFitError] = useState<string | null>(null);
 
   // ── Row action: Add note dialog ──────────────────────────────
   const [noteDialogFor, setNoteDialogFor] = useState<Candidate | null>(null);
@@ -515,158 +329,45 @@ export default function CandidatesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  const [weightsModalOpen, setWeightsModalOpen] = useState(false);
-  const [draft, setDraft] = useState<Record<WeightKey, number>>({
-    experience: 0.25,
-    yearsOfExperience: 0.10,
-    educationLevel: 0.15,
-    locationMatch: 0.15,
-    language: 0.35,
-  });
-  const [savedWeights, setSavedWeights] = useState<Record<WeightKey, number> | null>(null);
-  const [weightPreset, setWeightPreset] = useState<string | null>(null);
-  const [savingWeights, setSavingWeights] = useState(false);
-
-  // Custom presets (user-saved)
-  const [customPresets, setCustomPresets] = useState<SavedPreset[]>([]);
-  const [showSavePreset, setShowSavePreset] = useState(false);
-  const [newPresetName, setNewPresetName] = useState("");
-
-  // Load saved weights + custom presets on mount
-  useEffect(() => {
-    fetch("/api/scoring/weights")
-      .then((r) => r.json())
-      .then((data) => {
-        const w: Record<WeightKey, number> = {
-          experience: data.experience,
-          yearsOfExperience: data.yearsOfExperience,
-          educationLevel: data.educationLevel,
-          locationMatch: data.locationMatch,
-          language: data.language,
-        };
-        setSavedWeights(w);
-        setDraft(w);
-        setWeightPreset(data.presetName ?? null);
-      })
-      .catch(() => {});
-
-    fetch("/api/scoring/presets")
-      .then((r) => r.json())
-      .then((data) => setCustomPresets(data))
-      .catch(() => {});
-
-    // Load ALL jobs for the Fit-for-job picker (lightweight endpoint)
-    fetch("/api/jobs/picker")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data?.jobs)) {
-          setJobOptions(
-            data.jobs.map((j: { id: string; title: string; department: string | null; country: string | null }) => ({
-              id: j.id,
-              title: j.title,
-              department: j.department,
-              country: j.country,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // When the picked job changes, fetch its match scores once and overlay
-  // them onto the visible rows. Empty selection clears the overlay.
-  useEffect(() => {
-    if (!fitJobId) {
-      setFitMap(new Map());
-      setFitJobTitle(null);
-      setFitError(null);
-      return;
-    }
-    let cancelled = false;
-    setFitLoading(true);
-    setFitError(null);
-    fetch(`/api/jobs/${fitJobId}/match-candidates`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.error || `Server error (${r.status})`);
-        }
-        return r.json();
-      })
-      .then((data: { job: { title: string }; matches: Array<{ candidate: { id: string }; fit: { overallScore: number; isEligible: boolean; breakdown: FitCriterion[] } }> }) => {
-        if (cancelled) return;
-        const map = new Map<string, { score: number; eligible: boolean; breakdown: FitCriterion[] }>();
-        for (const m of data.matches) {
-          map.set(m.candidate.id, {
-            score: Math.round(m.fit.overallScore),
-            eligible: m.fit.isEligible,
-            breakdown: m.fit.breakdown ?? [],
-          });
-        }
-        setFitMap(map);
-        setFitJobTitle(data.job.title);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setFitError(e instanceof Error ? e.message : "Failed to compute fit.");
-        setFitMap(new Map());
-      })
-      .finally(() => {
-        if (!cancelled) setFitLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [fitJobId]);
-
   const fetchCandidates = useCallback(
     async (page = 1) => {
       setLoading(true);
 
       try {
-        if (useCustomRanking) {
-          const res = await fetch("/api/candidates/rerank", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              page,
-              pageSize: 20,
-              search: search || undefined,
-              status: statusFilter && statusFilter !== "SHORTLISTED_FILTER" ? statusFilter : undefined,
-              shortlisted: statusFilter === "SHORTLISTED_FILTER" ? true : undefined,
-              businessArea: businessAreaFilter || undefined,
-            }),
-          });
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          setCandidates(data.candidates);
-          setPagination(data.pagination);
-        } else {
-          const params = new URLSearchParams();
-          params.set("page", String(page));
-          params.set("pageSize", "20");
-          params.set("sortBy", sortBy);
-          params.set("sortOrder", sortOrder);
-          if (search) params.set("search", search);
-          if (statusFilter && statusFilter !== "SHORTLISTED_FILTER") params.set("status", statusFilter);
-          if (statusFilter === "SHORTLISTED_FILTER") params.set("shortlisted", "true");
-          if (businessAreaFilter) params.set("businessArea", businessAreaFilter);
-          if (locationSearch) params.set("locationSearch", locationSearch);
-          if (!showUnparsed) params.set("excludeUnparsed", "true");
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("pageSize", "20");
+        params.set("sortBy", sortBy);
+        params.set("sortOrder", sortOrder);
+        if (search) params.set("search", search);
+        if (statusFilter && statusFilter !== "SHORTLISTED_FILTER") params.set("status", statusFilter);
+        if (statusFilter === "SHORTLISTED_FILTER") params.set("shortlisted", "true");
+        if (businessAreaFilter) params.set("businessArea", businessAreaFilter);
+        if (locationSearch) params.set("locationSearch", locationSearch);
+        // sourceFilter values: ALL | PLATFORM | NON_PLATFORM (UI labels:
+        // "Self-applied" / "Added by HR"). The DB enum has 3 raw values
+        // but we collapse EXTERNAL+INTERNAL into one HR-facing label.
+        if (sourceFilter === "PLATFORM") params.set("sourceType", "PLATFORM");
+        if (!showUnparsed) params.set("excludeUnparsed", "true");
 
-          const res = await fetch(`/api/candidates?${params}`);
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          setCandidates(data.candidates);
-          setPagination(data.pagination);
+        const res = await fetch(`/api/candidates?${params}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        let rows = data.candidates as Candidate[];
+        // "Added by HR" filter is client-side because the API only accepts
+        // exact enum values; this is acceptable since pageSize=20.
+        if (sourceFilter === "NON_PLATFORM") {
+          rows = rows.filter((c) => c.sourceType !== "PLATFORM");
         }
+        setCandidates(rows);
+        setPagination(data.pagination);
       } catch {
         setCandidates([]);
       } finally {
         setLoading(false);
       }
     },
-    [search, statusFilter, businessAreaFilter, locationSearch, sortBy, sortOrder, useCustomRanking, showUnparsed]
+    [search, statusFilter, businessAreaFilter, locationSearch, sourceFilter, sortBy, sortOrder, showUnparsed]
   );
 
   useEffect(() => {
@@ -756,94 +457,6 @@ export default function CandidatesPage() {
   }
 
   // ── Scoring weights modal logic ────────────────────────────────
-
-  const totalPct = Math.round(
-    (draft.experience + draft.yearsOfExperience + draft.educationLevel + draft.locationMatch + draft.language) * 100
-  );
-  const isWeightsValid = Math.abs(totalPct - 100) <= 1;
-
-  function handleSliderChange(key: WeightKey, value: number) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function applyPresetWeights(weights: Record<WeightKey, number>) {
-    setDraft({ ...weights });
-  }
-
-  async function saveCustomPreset() {
-    if (!newPresetName.trim() || !isWeightsValid) return;
-    try {
-      const res = await fetch("/api/scoring/presets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newPresetName.trim(), ...draft }),
-      });
-      if (res.ok) {
-        const preset = await res.json();
-        setCustomPresets((prev) => [preset, ...prev]);
-        setNewPresetName("");
-        setShowSavePreset(false);
-      }
-    } catch {
-      /* silent */
-    }
-  }
-
-  async function deleteCustomPreset(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    try {
-      const res = await fetch(`/api/scoring/presets/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setCustomPresets((prev) => prev.filter((p) => p.id !== id));
-      }
-    } catch {
-      /* silent */
-    }
-  }
-
-  async function applyWeights() {
-    setSavingWeights(true);
-    try {
-      // Check if matches built-in or custom preset
-      const matchingBuiltIn = BUILT_IN_PRESETS.find((p) =>
-        WEIGHT_CONFIG.every((c) => Math.abs(p.weights[c.key] - draft[c.key]) < 0.001)
-      );
-      const matchingCustom = customPresets.find((p) =>
-        WEIGHT_CONFIG.every((c) => Math.abs(p[c.key] - draft[c.key]) < 0.001)
-      );
-      const presetLabel = matchingBuiltIn?.name ?? matchingCustom?.name ?? "Custom";
-
-      const res = await fetch("/api/scoring/weights", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...draft,
-          presetName: presetLabel,
-          updatedBy: "HR",
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSavedWeights({ ...draft });
-        setWeightPreset(data.presetName ?? "Custom");
-        setUseCustomRanking(true);
-        setWeightsModalOpen(false);
-      }
-    } catch {
-      /* silent */
-    } finally {
-      setSavingWeights(false);
-    }
-  }
-
-  function openWeightsModal() {
-    if (savedWeights) setDraft({ ...savedWeights });
-    setShowSavePreset(false);
-    setNewPresetName("");
-    setWeightsModalOpen(true);
-  }
-
   // ── Sort helpers ───────────────────────────────────────────────
 
   function toggleSort(field: string) {
@@ -870,18 +483,11 @@ export default function CandidatesPage() {
     );
   }
 
-  const hasActiveFilters = search || statusFilter || businessAreaFilter || locationSearch;
+  const hasActiveFilters = Boolean(
+    search || statusFilter || businessAreaFilter || locationSearch || (sourceFilter && sourceFilter !== "ALL")
+  );
 
-  // When a job is picked, reorder visible candidates by Fit score desc so the
-  // best matches float to the top. Candidates without a Fit score sink to the
-  // bottom. Without a job selected, server order is preserved.
-  const displayedCandidates = fitJobId
-    ? [...candidates].sort((a, b) => {
-        const fa = fitMap.get(a.id)?.score ?? -1;
-        const fb = fitMap.get(b.id)?.score ?? -1;
-        return fb - fa;
-      })
-    : candidates;
+  const displayedCandidates = candidates;
 
   // ── Bulk-selection helpers ─────────────────────────────────
   const visibleIds = displayedCandidates.map((c) => c.id);
@@ -918,7 +524,6 @@ export default function CandidatesPage() {
     const chosen = candidates.filter((c) => selected.has(c.id));
     if (chosen.length === 0) return;
     const rows = chosen.map((c) => {
-      const f = fitMap.get(c.id);
       return {
         id: c.id,
         firstName: c.firstName,
@@ -930,7 +535,6 @@ export default function CandidatesPage() {
         shortlisted: c.shortlisted ? "yes" : "",
         department: c.primaryBusinessArea ?? "",
         profileScore: c.overallCvScore ?? "",
-        fitScore: f?.score ?? "",
         languages: c.languages
           .map((l) => `${l.language}${l.selfDeclaredLevel ? ` (${l.selfDeclaredLevel})` : ""}`)
           .join("; "),
@@ -987,39 +591,11 @@ export default function CandidatesPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Candidates&apos; Analysis
+            Candidates
           </h1>
           <p className="text-muted-foreground">
-            Browse, filter by department, and rank your talent pool by CV scores.
+            Talent pool — manage candidates independent of any specific job.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {useCustomRanking && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setUseCustomRanking(false)}
-            >
-              Reset to Default
-            </Button>
-          )}
-          <button
-            type="button"
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-              useCustomRanking
-                ? "border-primary bg-primary/5 text-primary"
-                : "hover:bg-accent"
-            }`}
-            onClick={openWeightsModal}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>Custom Ranking</span>
-            {useCustomRanking && weightPreset && (
-              <Badge variant="outline" className="text-[10px]">
-                {weightPreset}
-              </Badge>
-            )}
-          </button>
         </div>
       </div>
 
@@ -1049,6 +625,20 @@ export default function CandidatesPage() {
             onChange={(e) => setLocationSearch(e.target.value)}
           />
         </div>
+
+        <Select
+          value={sourceFilter || "ALL"}
+          onValueChange={(v) => setSourceFilter(v)}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All sources" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All sources</SelectItem>
+            <SelectItem value="PLATFORM">Self-applied</SelectItem>
+            <SelectItem value="NON_PLATFORM">Added by HR</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Select
           value={statusFilter || "all"}
@@ -1087,6 +677,7 @@ export default function CandidatesPage() {
                 setStatusFilter("");
                 setBusinessAreaFilter("");
                 setLocationSearch("");
+                setSourceFilter("ALL");
               }}
             >
               Clear filters
@@ -1096,44 +687,6 @@ export default function CandidatesPage() {
             {pagination.total} candidate{pagination.total !== 1 && "s"}
           </span>
         </div>
-      </div>
-
-      {/* Fit-for-job overlay row */}
-      <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
-        <Target className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Rank by fit for a job:</span>
-        <JobPicker
-          value={fitJobId}
-          options={jobOptions}
-          onChange={setFitJobId}
-        />
-        {fitLoading && (
-          <span className="inline-flex items-center text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Computing fit…
-          </span>
-        )}
-        {fitJobId && !fitLoading && fitJobTitle && (
-          <Badge variant="outline" className="text-xs">
-            Showing fit for: {fitJobTitle}
-          </Badge>
-        )}
-        {fitJobId && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => setFitJobId("")}
-            title="Clear job"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
-        {fitError && (
-          <span className="text-xs text-destructive">{fitError}</span>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground">
-          Profile = CV-intrinsic score. Fit = match against this job&apos;s parsed requirements.
-        </span>
       </div>
 
       {/* Table */}
@@ -1208,16 +761,6 @@ export default function CandidatesPage() {
                 >
                   Profile
                 </SortableHeader>
-                <TableHead
-                  className="text-center"
-                  title={
-                    fitJobTitle
-                      ? `Fit against "${fitJobTitle}" — computed from the job's parsed requirements (fields of work, seniority, skills, languages, education).`
-                      : "Pick a job above to compute Fit scores."
-                  }
-                >
-                  <span>Fit for Position</span>
-                </TableHead>
                 <TableHead className="text-center">Score Breakdown</TableHead>
                 <TableHead className="text-center">Languages</TableHead>
                 <TableHead className="text-center">Source</TableHead>
@@ -1229,7 +772,7 @@ export default function CandidatesPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 11 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -1239,7 +782,7 @@ export default function CandidatesPage() {
               ) : candidates.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={11}
+                    colSpan={10}
                     className="text-center py-12 text-muted-foreground"
                   >
                     <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -1412,142 +955,7 @@ export default function CandidatesPage() {
 
                     {/* Profile score — CV-intrinsic, not job-specific */}
                     <TableCell className="text-center" title="Profile score — CV-intrinsic, independent of any job.">
-                      <OverallScoreBadge
-                        score={
-                          useCustomRanking && c.rerankedScore != null
-                            ? c.rerankedScore
-                            : c.overallCvScore
-                        }
-                      />
-                      {useCustomRanking &&
-                        c.rerankedScore != null &&
-                        c.overallCvScore != null &&
-                        c.rerankedScore !== c.overallCvScore && (
-                          <span
-                            className={`text-[10px] ml-1 ${
-                              c.rerankedScore > c.overallCvScore
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }`}
-                          >
-                            {c.rerankedScore > c.overallCvScore ? "+" : ""}
-                            {c.rerankedScore - c.overallCvScore}
-                          </span>
-                        )}
-                    </TableCell>
-
-                    {/* Fit (for selected job) — blank until HR picks one */}
-                    <TableCell className="text-center">
-                      {(() => {
-                        if (!fitJobId) {
-                          return <span className="text-xs text-muted-foreground">—</span>;
-                        }
-                        if (fitLoading) {
-                          return <Skeleton className="h-4 w-10 mx-auto" />;
-                        }
-                        const f = fitMap.get(c.id);
-                        if (!f) {
-                          return <span className="text-xs text-muted-foreground">—</span>;
-                        }
-                        const colour =
-                          f.score >= 70
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                            : f.score >= 45
-                              ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
-                              : "bg-red-500/15 text-red-700 dark:text-red-400";
-                        return (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={(e) => e.stopPropagation()}
-                                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${colour} hover:ring-2 hover:ring-offset-1 hover:ring-offset-background hover:ring-current/30 transition`}
-                                title="View score breakdown"
-                              >
-                                {f.score}
-                                <Info className="h-3 w-3 opacity-60" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-80 p-0"
-                              align="center"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="px-3 py-2 border-b bg-muted/40">
-                                <div className="text-xs font-semibold">
-                                  Fit breakdown
-                                </div>
-                                <div className="text-[11px] text-muted-foreground truncate">
-                                  {fitJobTitle ?? "Selected job"}
-                                </div>
-                              </div>
-                              <div className="p-2 space-y-1 max-h-72 overflow-y-auto">
-                                {f.breakdown.length === 0 && (
-                                  <div className="text-xs text-muted-foreground px-2 py-1">
-                                    No per-criterion details available.
-                                  </div>
-                                )}
-                                {f.breakdown.map((crit) => {
-                                  if (!crit.applicable) {
-                                    return (
-                                      <div
-                                        key={crit.key}
-                                        className="flex items-start justify-between gap-2 rounded px-2 py-1 text-[11px] text-muted-foreground"
-                                      >
-                                        <div className="flex-1">
-                                          <div className="font-medium">{crit.label}</div>
-                                          <div className="italic">Not required by this job.</div>
-                                        </div>
-                                        <span className="shrink-0 text-muted-foreground">—</span>
-                                      </div>
-                                    );
-                                  }
-                                  const critColour = crit.met
-                                    ? "text-emerald-700 dark:text-emerald-400"
-                                    : "text-red-700 dark:text-red-400";
-                                  return (
-                                    <div
-                                      key={crit.key}
-                                      className="flex items-start justify-between gap-2 rounded px-2 py-1 text-[11px]"
-                                    >
-                                      <div className="flex-1">
-                                        <div className="font-medium flex items-center gap-1">
-                                          {crit.met ? (
-                                            <Check className="h-3 w-3 text-emerald-600" />
-                                          ) : (
-                                            <X className="h-3 w-3 text-red-600" />
-                                          )}
-                                          {crit.label}
-                                        </div>
-                                        <div className="text-muted-foreground">
-                                          {crit.detail}
-                                        </div>
-                                      </div>
-                                      <span className={`shrink-0 font-bold tabular-nums ${critColour}`}>
-                                        {Math.round(crit.score)}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {fitJobId && (
-                                <div className="px-3 py-2 border-t bg-muted/30">
-                                  <button
-                                    type="button"
-                                    className="text-[11px] text-primary hover:underline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/dashboard/jobs/${fitJobId}/match-candidates`);
-                                    }}
-                                  >
-                                    See full ranking for this job →
-                                  </button>
-                                </div>
-                              )}
-                            </PopoverContent>
-                          </Popover>
-                        );
-                      })()}
+                      <OverallScoreBadge score={c.overallCvScore} />
                     </TableCell>
 
                     {/* Score breakdown mini bars */}
@@ -1577,23 +985,30 @@ export default function CandidatesPage() {
                       {c.sourceType === "PLATFORM" ? (
                         <Badge variant="default" className="text-xs gap-1">
                           <UserCheck className="h-3 w-3" />
-                          Active
-                        </Badge>
-                      ) : c.invitationSent ? (
-                        <Badge variant="outline" className="text-xs gap-1 text-amber-600 border-amber-300">
-                          <SendHorizonal className="h-3 w-3" />
-                          Invited
+                          Self-applied
                         </Badge>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => markInvitationSent(e, c.id)}
-                        >
-                          <SendHorizonal className="h-3 w-3" />
-                          Send Invite
-                        </Button>
+                        <div className="flex flex-col items-center gap-1">
+                          <Badge variant="outline" className="text-xs">
+                            Added by HR
+                          </Badge>
+                          {c.invitationSent ? (
+                            <Badge variant="outline" className="text-[10px] gap-1 text-amber-600 border-amber-300">
+                              <SendHorizonal className="h-3 w-3" />
+                              Invited
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => markInvitationSent(e, c.id)}
+                            >
+                              <SendHorizonal className="h-3 w-3" />
+                              Send Invite
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </TableCell>
 
@@ -1714,228 +1129,6 @@ export default function CandidatesPage() {
             <Button onClick={saveNote} disabled={!noteDraft.trim() || noteSaving}>
               {noteSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Save note
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Custom Ranking Weights Modal ──────────────────────── */}
-      <Dialog open={weightsModalOpen} onOpenChange={setWeightsModalOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <SlidersHorizontal className="h-5 w-5" />
-              Custom Ranking Weights
-            </DialogTitle>
-            <DialogDescription>
-              Adjust weight sliders, pick a preset, then hit Apply to re-rank
-              candidates.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-            {/* Weight sliders */}
-            <div className="space-y-5 py-2">
-              {WEIGHT_CONFIG.map((config) => {
-                const Icon = config.icon;
-                const pct = Math.round(draft[config.key] * 100);
-                return (
-                  <div key={config.key} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`rounded-md p-1.5 ${config.colour} text-white`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                        </div>
-                        <span className="text-sm font-medium">{config.label}</span>
-                      </div>
-                      <span className="text-sm font-bold tabular-nums w-10 text-right">
-                        {pct}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={pct}
-                      onChange={(e) =>
-                        handleSliderChange(config.key, Number(e.target.value) / 100)
-                      }
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary bg-muted"
-                    />
-                  </div>
-                );
-              })}
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total</span>
-                <Badge
-                  variant={isWeightsValid ? "default" : "destructive"}
-                  className="tabular-nums"
-                >
-                  {totalPct}%
-                </Badge>
-              </div>
-
-              {!isWeightsValid && (
-                <p className="text-sm text-destructive">
-                  Weights must sum to 100%. Currently <strong>{totalPct}%</strong>.
-                </p>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Quick presets (built-in) */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Quick Presets</span>
-              </div>
-              <div className="grid gap-1.5 sm:grid-cols-2">
-                {BUILT_IN_PRESETS.map((preset) => {
-                  const isActive = WEIGHT_CONFIG.every(
-                    (c) => Math.abs(preset.weights[c.key] - draft[c.key]) < 0.001
-                  );
-                  return (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      className={`rounded-lg border p-2.5 text-left transition-colors hover:bg-accent ${
-                        isActive ? "border-primary bg-primary/5" : ""
-                      }`}
-                      onClick={() => applyPresetWeights(preset.weights)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{preset.name}</span>
-                        {isActive && (
-                          <Badge variant="outline" className="text-[10px]">
-                            Active
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {preset.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Custom presets (user-saved) */}
-            {customPresets.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Save className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Your Saved Presets</span>
-                  </div>
-                  <div className="grid gap-1.5 sm:grid-cols-2">
-                    {customPresets.map((preset) => {
-                      const w: Record<WeightKey, number> = {
-                        experience: preset.experience,
-                        yearsOfExperience: preset.yearsOfExperience,
-                        educationLevel: preset.educationLevel,
-                        locationMatch: preset.locationMatch,
-                        language: preset.language,
-                      };
-                      const isActive = WEIGHT_CONFIG.every(
-                        (c) => Math.abs(w[c.key] - draft[c.key]) < 0.001
-                      );
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          className={`rounded-lg border p-2.5 text-left transition-colors hover:bg-accent group relative ${
-                            isActive ? "border-primary bg-primary/5" : ""
-                          }`}
-                          onClick={() => applyPresetWeights(w)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{preset.name}</span>
-                            {isActive && (
-                              <Badge variant="outline" className="text-[10px]">
-                                Active
-                              </Badge>
-                            )}
-                            <button
-                              type="button"
-                              className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                              title="Delete preset"
-                              onClick={(e) => deleteCustomPreset(e, preset.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                            Exp {Math.round(w.experience * 100)}% · Yrs {Math.round(w.yearsOfExperience * 100)}% · Edu {Math.round(w.educationLevel * 100)}% · Loc {Math.round(w.locationMatch * 100)}% · Lng {Math.round(w.language * 100)}%
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Save as preset */}
-            <Separator />
-            <div>
-              {!showSavePreset ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  disabled={!isWeightsValid}
-                  onClick={() => setShowSavePreset(true)}
-                >
-                  <Save className="h-3.5 w-3.5 mr-1.5" />
-                  Save Current Weights as Preset
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Preset name…"
-                    value={newPresetName}
-                    onChange={(e) => setNewPresetName(e.target.value)}
-                    className="h-8 text-sm flex-1"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveCustomPreset();
-                      if (e.key === "Escape") setShowSavePreset(false);
-                    }}
-                  />
-                  <Button size="sm" className="h-8" disabled={!newPresetName.trim()} onClick={saveCustomPreset}>
-                    Save
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowSavePreset(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="shrink-0 pt-3 border-t">
-            <Button variant="outline" onClick={() => setWeightsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!isWeightsValid || savingWeights}
-              onClick={applyWeights}
-            >
-              {savingWeights ? (
-                "Applying…"
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-1" /> Apply &amp; Re-Rank
-                </>
-              )}
             </Button>
           </DialogFooter>
         </DialogContent>

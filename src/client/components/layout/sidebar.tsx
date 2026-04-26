@@ -21,6 +21,7 @@ import {
   Upload,
   Megaphone,
   Menu,
+  Target,
 } from "lucide-react";
 import { cn } from "@client/lib/utils";
 import { useRole, type UserRole } from "@client/components/providers/role-provider";
@@ -83,7 +84,8 @@ const hrNavigationSections: NavSection[] = [
     items: [
       { name: "Job Openings", href: "/dashboard/jobs", icon: Briefcase },
       { name: "Job Applications", href: "/dashboard/received-applications", icon: Inbox },
-      { name: "Candidates Evaluation", href: "/dashboard/candidates", icon: Users },
+      { name: "Candidates", href: "/dashboard/candidates", icon: Users },
+      { name: "Job Matching", href: "/dashboard/job-matching", icon: Target },
     ],
   },
   {

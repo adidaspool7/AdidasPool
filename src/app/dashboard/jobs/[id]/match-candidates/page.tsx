@@ -23,12 +23,19 @@ import {
   ChevronRight,
   ExternalLink,
   SlidersHorizontal,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@client/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@client/components/ui/dropdown-menu";
 
 // ============================================
 // TYPES (mirror server response)
@@ -88,16 +95,21 @@ function fitBadge(score: number) {
   return "bg-rose-100 text-rose-800";
 }
 
-function qualityLabel(q: number | null): string {
-  if (q == null) return "—";
-  return `${Math.round(q)}`;
-}
-
-function profileBadge(score: number | null) {
-  if (score == null) return "bg-muted text-muted-foreground";
-  if (score >= 70) return "bg-emerald-100 text-emerald-800";
-  if (score >= 45) return "bg-amber-100 text-amber-800";
-  return "bg-rose-100 text-rose-800";
+// Parse the requiredSkills criterion's detail string to extract a short
+// "Missing: <first> +N" chip. Detail format example:
+//   "Has 2 of 4 required skills. Missing: Foo, Bar."
+function missingSkillsSummary(breakdown: CriterionResult[]): string | null {
+  const c = breakdown.find((b) => b.key === "requiredSkills");
+  if (!c || !c.applicable || c.met) return null;
+  const m = c.detail.match(/Missing:\s*([^.]+)/i);
+  if (!m) return null;
+  const skills = m[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (skills.length === 0) return null;
+  if (skills.length === 1) return `Missing: ${skills[0]}`;
+  return `Missing: ${skills[0]} +${skills.length - 1}`;
 }
 
 // ============================================
@@ -261,25 +273,29 @@ export default function MatchCandidatesPage({
               Ranked candidates by Fit-for-this-job (independent of Profile score).
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={load}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Re-run
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={reparseRequirements}
-            disabled={reparsing}
-          >
-            {reparsing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Re-parsing…
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2" /> Re-parse JD
-              </>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={load}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Re-run
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={reparseRequirements} disabled={reparsing}>
+                {reparsing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Re-parsing…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Re-parse JD
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -463,6 +479,7 @@ export default function MatchCandidatesPage({
             ) : (
               visible.map((m, i) => {
                 const isOpen = expanded.has(m.candidate.id);
+                const missing = missingSkillsSummary(m.fit.breakdown);
                 return (
                   <div key={m.candidate.id} className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -480,30 +497,35 @@ export default function MatchCandidatesPage({
                         <div className="font-medium truncate">
                           {m.candidate.firstName} {m.candidate.lastName}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {[m.candidate.primaryBusinessArea, m.candidate.location, m.candidate.country]
-                            .filter(Boolean)
-                            .join(" · ") || "—"}
+                        <div className="text-xs text-muted-foreground truncate flex items-center gap-2">
+                          <span className="truncate">
+                            {[m.candidate.primaryBusinessArea, m.candidate.location, m.candidate.country]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </span>
+                          {missing && (
+                            <span className="shrink-0 inline-flex items-center rounded-md bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-300">
+                              {missing}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Profile</div>
-                          {m.candidate.profileScore == null ? (
-                            <div className="font-semibold tabular-nums text-muted-foreground">—</div>
-                          ) : (
-                            <Badge className={`${profileBadge(m.candidate.profileScore)} font-semibold tabular-nums`}>
-                              {qualityLabel(m.candidate.profileScore)}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Fit
-                          </div>
-                          <Badge className={`${fitBadge(m.fit.overallScore)} font-semibold tabular-nums`}>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <Badge
+                            className={`${fitBadge(m.fit.overallScore)} font-bold tabular-nums text-base px-3 py-1`}
+                          >
                             {Math.round(m.fit.overallScore)}
                           </Badge>
+                          {m.fit.isEligible ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3 h-3" /> Eligible
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-rose-700 dark:text-rose-400">
+                              <XCircle className="w-3 h-3" /> Not eligible
+                            </span>
+                          )}
                         </div>
                         <Link href={`/dashboard/candidates/${m.candidate.id}`}>
                           <Button variant="ghost" size="sm">
@@ -551,10 +573,6 @@ export default function MatchCandidatesPage({
       </Card>
 
       <Separator />
-      <p className="text-xs text-muted-foreground">
-        Profile is the CV-intrinsic score (independent of any job). Fit is computed strictly against this
-        job&apos;s parsed requirements (fields, seniority, skills, languages, education).
-      </p>
     </div>
   );
 }
