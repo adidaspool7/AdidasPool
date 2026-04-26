@@ -21,6 +21,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   ExternalLink,
   SlidersHorizontal,
   MoreHorizontal,
@@ -211,6 +212,9 @@ export default function MatchCandidatesPage({
   const [criterionWeightsDraft, setCriterionWeightsDraft] = useState<Record<CriterionKey, number>>(BALANCED_PRESET);
   const [savingConfig, setSavingConfig] = useState(false);
   const [reparsing, setReparsing] = useState(false);
+  // Collapsed by default — HR rarely tunes weights, so it should not
+  // dominate the page above the candidate list.
+  const [matchSettingsOpen, setMatchSettingsOpen] = useState(false);
 
   // Pure UI knob — minimum fit score to display. Not persisted.
   const [scoreFloor, setScoreFloor] = useState<number>(0);
@@ -235,7 +239,11 @@ export default function MatchCandidatesPage({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/jobs/${id}/match-candidates`);
+      const res = await fetch(`/api/jobs/${id}/match-candidates`, {
+        // Bypass HTTP cache so that re-loading after a Match Settings
+        // change always re-runs the matcher with the new weights.
+        cache: "no-store",
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Server error (${res.status})`);
@@ -361,9 +369,6 @@ export default function MatchCandidatesPage({
               <Briefcase className="w-6 h-6 text-blue-600" />
               {data.job.title}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Ranked candidates by Fit-for-this-job (independent of Profile score).
-            </p>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -486,52 +491,67 @@ export default function MatchCandidatesPage({
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMatchSettingsOpen((v) => !v)}
+              className="flex items-center gap-2 text-left hover:opacity-80"
+              aria-expanded={matchSettingsOpen}
+            >
+              {matchSettingsOpen ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
               <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
               <CardTitle className="text-base">Match Settings</CardTitle>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
-                    What is this?
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-96 text-xs">
-                  <p className="mb-2">
-                    HR-tunable weights for the 7 fit criteria. The fit score
-                    is a <strong>weighted average</strong> of the applicable
-                    criteria using these weights.
-                  </p>
-                  <p className="mb-2 text-muted-foreground">
-                    Set a weight to <strong>0</strong> to fully ignore that
-                    dimension — useful when you know our JD/CV parser missed
-                    something on it (e.g. a skill list it couldn&apos;t extract).
-                    Eligibility ignores zero-weight criteria too.
-                  </p>
-                  <p className="text-muted-foreground">
-                    Settings are saved globally and apply to every job.
-                  </p>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="flex items-center gap-1">
-              {PRESETS.map((p) => {
-                const active = weightsEqual(criterionWeightsDraft, p.weights);
-                return (
-                  <Button
-                    key={p.label}
-                    variant={active ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setCriterionWeightsDraft({ ...p.weights })}
-                    disabled={savingConfig}
-                  >
-                    {p.label}
-                  </Button>
-                );
-              })}
-            </div>
+            </button>
+            {matchSettingsOpen && (
+              <div className="flex items-center gap-2 ml-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
+                      What is this?
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96 text-xs">
+                    <p className="mb-2">
+                      HR-tunable weights for the 7 fit criteria. The fit score
+                      is a <strong>weighted average</strong> of the applicable
+                      criteria using these weights.
+                    </p>
+                    <p className="mb-2 text-muted-foreground">
+                      Set a weight to <strong>0</strong> to fully ignore that
+                      dimension — useful when you know our JD/CV parser missed
+                      something on it (e.g. a skill list it couldn&apos;t extract).
+                      Eligibility ignores zero-weight criteria too.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Settings are saved globally and apply to every job.
+                    </p>
+                  </PopoverContent>
+                </Popover>
+                <div className="flex items-center gap-1">
+                  {PRESETS.map((p) => {
+                    const active = weightsEqual(criterionWeightsDraft, p.weights);
+                    return (
+                      <Button
+                        key={p.label}
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setCriterionWeightsDraft({ ...p.weights })}
+                        disabled={savingConfig}
+                      >
+                        {p.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </CardHeader>
+        {matchSettingsOpen && (
         <CardContent className="pt-2 pb-4 px-4">
           {/* Per-criterion weight sliders */}
           <div className="grid gap-3 md:grid-cols-2">
@@ -620,6 +640,7 @@ export default function MatchCandidatesPage({
             </Button>
           </div>
         </CardContent>
+        )}
       </Card>
 
       {/* Ranking summary + score floor (UI-only filter, not persisted) */}
@@ -644,6 +665,11 @@ export default function MatchCandidatesPage({
           <span className="font-semibold tabular-nums w-10 text-right">{scoreFloor}%</span>
         </div>
       </div>
+
+      {/* Subtitle placed immediately above the candidate list. */}
+      <p className="text-sm text-muted-foreground">
+        Ranked candidates by Fit-for-this-job
+      </p>
 
       {/* Ranked candidates */}
       <Card>

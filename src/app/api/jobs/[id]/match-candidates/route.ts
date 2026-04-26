@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases, NotFoundError } from "@server/application";
 import { createClient } from "@/lib/supabase/server";
 
+// Always recompute on every request \u2014 the response depends on the
+// current `scoring_weights` row and on candidate data that can change
+// at any moment. Without this, Next.js' default route caching would
+// make Match Settings adjustments appear to have no effect.
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/jobs/[id]/match-candidates
  *
