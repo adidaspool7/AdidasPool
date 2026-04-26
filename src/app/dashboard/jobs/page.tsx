@@ -421,14 +421,12 @@ function JobCard({
   isApplied,
   isApplying,
   showApply,
-  showRank,
 }: {
   job: Job;
   onApply?: (jobId: string) => void;
   isApplied?: boolean;
   isApplying?: boolean;
   showApply?: boolean;
-  showRank?: boolean;
 }) {
   return (
     <Card>
@@ -507,14 +505,6 @@ function JobCard({
           {!isApplied && <JobStatusBadge status={job.status} />}
           {job.type && job.type !== "FULL_TIME" && <JobTypeBadge type={job.type} />}
         </div>
-        {showRank && (
-          <Link href={`/dashboard/jobs/${job.id}/match-candidates`} className="block">
-            <Button size="sm" variant="outline" className="w-full gap-2">
-              <Briefcase className="h-4 w-4" />
-              Rank candidates for this job
-            </Button>
-          </Link>
-        )}
       </CardContent>
     </Card>
   );
@@ -1050,7 +1040,6 @@ export default function JobsPage() {
                 key={job.id}
                 job={job}
                 showApply={role === "candidate" && !!candidateId}
-                showRank={role === "hr"}
                 isApplied={appliedJobIds.has(job.id)}
                 isApplying={applyingJobId === job.id}
                 onApply={handleApply}
