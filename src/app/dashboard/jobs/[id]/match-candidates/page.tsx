@@ -272,17 +272,10 @@ export default function MatchCandidatesPage({
   };
 
   // Persist threshold + weights and re-load matches so scores reflect them.
-  // Optional overrides bypass draft state — used by preset buttons that
-  // want to save in one click without the user having to also press Apply.
-  const saveConfig = async (override?: {
-    weights?: Record<CriterionKey, number>;
-    threshold?: number;
-  }) => {
-    const nextWeights = override?.weights ?? criterionWeightsDraft;
-    const nextThreshold = override?.threshold ?? thresholdDraft;
-    const thresholdChanged = Math.abs(nextThreshold - threshold) >= 0.005;
-    const weightsChanged = (Object.keys(nextWeights) as CriterionKey[]).some(
-      (k) => nextWeights[k] !== criterionWeights[k]
+  const saveConfig = async () => {
+    const thresholdChanged = Math.abs(thresholdDraft - threshold) >= 0.005;
+    const weightsChanged = (Object.keys(criterionWeightsDraft) as CriterionKey[]).some(
+      (k) => criterionWeightsDraft[k] !== criterionWeights[k]
     );
     if (!thresholdChanged && !weightsChanged) return;
     setSavingConfig(true);
@@ -291,19 +284,21 @@ export default function MatchCandidatesPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requiredSkillThreshold: nextThreshold,
-          fitCriterionWeights: nextWeights,
+          requiredSkillThreshold: thresholdDraft,
+          fitCriterionWeights: criterionWeightsDraft,
         }),
       });
       if (res.ok) {
-        setThreshold(nextThreshold);
-        setThresholdDraft(nextThreshold);
-        setCriterionWeights(nextWeights);
-        setCriterionWeightsDraft(nextWeights);
+        setThreshold(thresholdDraft);
+        setCriterionWeights(criterionWeightsDraft);
         await load();
       } else {
         const err = await res.json().catch(() => ({}));
-        setError(err.error || "Failed to save match settings.");
+        const msg =
+          err.error +
+          (err.details ? `: ${JSON.stringify(err.details)}` : "") ||
+          `Failed to save match settings (HTTP ${res.status}).`;
+        setError(msg);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save match settings.");
@@ -553,13 +548,7 @@ export default function MatchCandidatesPage({
                         variant={active ? "default" : "outline"}
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => {
-                          // Update draft immediately for visual feedback,
-                          // then persist + re-rank in one click — no need
-                          // for the user to also press Apply.
-                          setCriterionWeightsDraft({ ...p.weights });
-                          saveConfig({ weights: { ...p.weights } });
-                        }}
+                        onClick={() => setCriterionWeightsDraft({ ...p.weights })}
                         disabled={savingConfig}
                       >
                         {p.label}
@@ -643,7 +632,7 @@ export default function MatchCandidatesPage({
             <Button
               size="sm"
               className="h-7 text-xs"
-              onClick={() => saveConfig()}
+              onClick={saveConfig}
               disabled={
                 savingConfig ||
                 (Math.abs(thresholdDraft - threshold) < 0.005 &&

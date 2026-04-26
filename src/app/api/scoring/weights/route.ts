@@ -123,7 +123,13 @@ export async function PATCH(request: NextRequest) {
     }
     console.error("Error patching scoring weights:", error);
     return NextResponse.json(
-      { error: "Failed to patch scoring weights" },
+      {
+        error: "Failed to patch scoring weights",
+        // Surface the underlying message so HR-side error banners actually
+        // tell us *why* (e.g. "column 'fit_criterion_weights' does not exist"
+        // when prod has not been migrated, or RLS rejection, etc.).
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
