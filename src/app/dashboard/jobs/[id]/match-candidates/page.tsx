@@ -528,15 +528,10 @@ export default function MatchCandidatesPage({
                       is a <strong>weighted average</strong> of the applicable
                       criteria using these weights.
                     </p>
-                    <p className="mb-2 text-muted-foreground">
-                      Set a weight to <strong>0</strong> to fully ignore that
-                      dimension — useful when you know our JD/CV parser missed
-                      something on it (e.g. a skill list it couldn&apos;t extract).
-                      Eligibility ignores zero-weight criteria too.
-                    </p>
-                    <p className="text-muted-foreground">
-                      Settings are saved globally and apply to every job.
-                    </p>
+                    <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                      <li>Set a weight to <strong>0</strong> to fully ignore that dimension.</li>
+                      <li>Eligibility ignores zero-weight criteria.</li>
+                    </ul>
                   </PopoverContent>
                 </Popover>
                 <div className="flex items-center gap-1">
@@ -587,8 +582,15 @@ export default function MatchCandidatesPage({
                     className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
                     disabled={savingConfig}
                   />
-                  <span className="w-16 text-right tabular-nums text-xs text-muted-foreground">
-                    {isOff ? "off" : `weight ${v}`}
+                  <span
+                    className={cn(
+                      "w-16 text-right text-xs",
+                      isOff ? "text-muted-foreground italic" : "text-blue-600"
+                    )}
+                    aria-label={isOff ? "off" : `weight ${v} of 3`}
+                    title={isOff ? "Ignored" : `Weight ${v} of 3`}
+                  >
+                    {isOff ? "off" : "★".repeat(v) + "☆".repeat(3 - v)}
                   </span>
                 </div>
               );
