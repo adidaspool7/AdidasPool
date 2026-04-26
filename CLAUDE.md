@@ -71,7 +71,7 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - JSONB fields are **excluded from recursive camelization**: `parsedData`, `evaluationRationale`, `errorLog`, `result`, `breakdown`, `rawAiResponse`, `details`, `parsingConfidence`
 - IDs: `TEXT PRIMARY KEY`, generated with `crypto.randomUUID()` via `generateId()`
 - `updated_at`: handled by PostgreSQL trigger `set_updated_at()` — no app-level timestamp management
-- Migration file: `supabase/migrations/20260413000000_initial_schema.sql` — run once in Supabase SQL Editor
+- Migration file: `supabase/migrations/00000000000000_schema.sql` — single canonical schema file. Consolidated 2026-04-26: every prior per-feature delta has been inlined. Run once in Supabase SQL Editor for fresh databases.
 
 ### Key Tables
 `candidates`, `experiences`, `education`, `candidate_languages`, `skills`, `candidate_tags`, `candidate_notes`, `jobs`, `job_applications`, `job_matches`, `assessment_templates`, `assessments`, `assessment_results`, `interview_sessions`, `interview_transcript_turns`, `interview_proctoring_events`, `improvement_tracks`, `improvement_progress`, `notifications`, `notification_preferences`, `promo_campaigns`, `parsing_jobs`, `scoring_weights`, `scoring_presets`, `sync_jobs`
@@ -118,7 +118,7 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - **Language Assessment mode**: Free-form English conversation scored on CEFR rubric (grammar, vocabulary, fluency). Separate FastAPI system prompt (`build_language_system_prompt`). Evaluator returns `cefr_level`, `grammar`, `vocabulary`, `fluency` inside `technical` dict; persisted to `evaluation_rationale` JSONB. Pass threshold: B1+.
 - **Technical Assessment mode**: Existing behavior — skill validation Q&A, single-topic enforcement.
 - Mode selected via button toggle on `/dashboard/ai-interview`. Stored in `interview_sessions.interview_mode` (`TECHNICAL` | `LANGUAGE`).
-- DB migration: `supabase/migrations/20260414000000_add_interview_mode.sql` — must be run manually in Supabase SQL editor.
+- DB schema: `interview_sessions.interview_mode` (`TECHNICAL` | `LANGUAGE`) is now part of the canonical `00000000000000_schema.sql`.
 
 ---
 
@@ -166,10 +166,9 @@ The "universal candidate match score" was deleted. Matching is now always
 ### Tables
 
 - `jobs.parsed_requirements JSONB`, `jobs.parsed_requirements_version INT`
-  (migration `20260423000000`)
 - `experiences.fields_of_work TEXT[]` + GIN index
-  (migration `20260423000001`)
-- `job_matches` (cache) — already in initial schema.
+- `job_matches` (cache)
+- All consolidated into the canonical `00000000000000_schema.sql`.
 
 ### Tests
 

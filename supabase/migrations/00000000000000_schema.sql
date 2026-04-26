@@ -1,7 +1,14 @@
 -- =============================================================
--- Talent Intelligence Platform — Initial Schema
+-- Talent Intelligence Platform — Canonical Schema
 -- Migrated from Prisma schema to Supabase PostgreSQL
 -- Run this in the Supabase SQL Editor (Project → SQL Editor)
+--
+-- Consolidated 2026-04-26: this file now contains every schema
+-- change shipped through 2026-04-26. The previous per-feature
+-- delta migration files have been removed — their contents are
+-- inlined below in their respective table definitions. Production
+-- already has every change applied; this file is the source of
+-- truth for fresh dev databases and documentation.
 -- =============================================================
 
 -- ----------------------------------------------------------------
@@ -94,7 +101,8 @@ CREATE TYPE notification_type AS ENUM (
   'ASSESSMENT_INVITE', 'ASSESSMENT_COMPLETED',
   'HR_APPLICATION_RECEIVED', 'HR_APPLICATION_WITHDRAWN',
   'HR_ASSESSMENT_COMPLETED', 'HR_CV_UPLOADED',
-  'PROMOTIONAL', 'CV_UPLOADED', 'STATUS_CHANGE'
+  'PROMOTIONAL', 'CV_UPLOADED', 'STATUS_CHANGE',
+  'JOB_INVITATION'
 );
 
 CREATE TYPE parsing_job_status AS ENUM (
@@ -120,7 +128,23 @@ CREATE TABLE scoring_weights (
   location_match      FLOAT NOT NULL DEFAULT 0.15,
   language            FLOAT NOT NULL DEFAULT 0.35,
   preset_name         TEXT,
-  updated_by          TEXT
+  updated_by          TEXT,
+  -- Job-anchored matching: minimum fraction of a JD's required skills
+  -- a candidate must cover for the eligibility chip to read "all reqs met".
+  required_skill_threshold FLOAT NOT NULL DEFAULT 0.5
+    CHECK (required_skill_threshold >= 0 AND required_skill_threshold <= 1),
+  -- HR-tunable per-criterion fit weights for the 7 job-fit criteria.
+  -- Setting any weight to 0 drops that dimension from BOTH overall score
+  -- AND eligibility (used when HR knows the JD parser missed a dimension).
+  fit_criterion_weights JSONB NOT NULL DEFAULT '{
+    "field": 2,
+    "experience": 2,
+    "seniority": 1,
+    "requiredSkills": 3,
+    "preferredSkills": 1,
+    "languages": 1,
+    "education": 1
+  }'::jsonb
 );
 
 CREATE TRIGGER trg_scoring_weights_updated_at
@@ -261,7 +285,17 @@ CREATE TABLE candidates (
   status                   candidate_status NOT NULL DEFAULT 'NEW',
   source_type              candidate_source NOT NULL DEFAULT 'EXTERNAL',
   is_duplicate             BOOLEAN NOT NULL DEFAULT FALSE,
-  duplicate_of             TEXT
+  duplicate_of             TEXT,
+
+  -- Activation / invitation tracking
+  -- activated_at: set when the candidate first logs in (Google OAuth).
+  --   HR-uploaded candidates have activated_at = NULL until the real
+  --   person logs in. Self-registered PLATFORM candidates have it set
+  --   on row creation.
+  -- invitation_sent: visual flag for HR — whether an invitation email
+  --   was "sent" to activate the account.
+  activated_at             TIMESTAMPTZ,
+  invitation_sent          BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TRIGGER trg_candidates_updated_at
@@ -310,6 +344,14 @@ CREATE TABLE jobs (
   required_experience_type TEXT,
   min_years_experience     INTEGER,
   required_education_level education_level,
+  -- TEXT[] list of must-have skills for the role.
+  required_skills          TEXT[] NOT NULL DEFAULT '{}',
+
+  -- Job-anchored matching: structured requirements extracted from the
+  -- JD body by the LLM (Phase 1 of job-anchored matching). The version
+  -- column lets us re-parse when the schema evolves.
+  parsed_requirements         JSONB,
+  parsed_requirements_version INTEGER,
 
   status                   job_status NOT NULL DEFAULT 'OPEN'
 );
@@ -321,6 +363,11 @@ CREATE TRIGGER trg_jobs_updated_at
 CREATE INDEX idx_jobs_status      ON jobs(status);
 CREATE INDEX idx_jobs_external_id ON jobs(external_id);
 CREATE INDEX idx_jobs_type        ON jobs(type);
+-- Partial index: quickly find jobs still needing parsing
+-- (used by the backfill script + post-sync extractor worker).
+CREATE INDEX idx_jobs_parsed_requirements_pending
+  ON jobs (id)
+  WHERE parsed_requirements IS NULL AND source_url IS NOT NULL;
 
 
 -- ----------------------------------------------------------------
@@ -339,10 +386,18 @@ CREATE TABLE experiences (
   description       TEXT,
   is_relevant       BOOLEAN,
   relevance_score   FLOAT,
-  relevance_reason  TEXT
+  relevance_reason  TEXT,
+  -- Canonical Fields of Work this experience maps to (see
+  -- src/client/lib/constants.ts FIELDS_OF_WORK). Emitted by the
+  -- CV parser LLM; powers the per-field years vector used by the
+  -- job-anchored matcher.
+  fields_of_work    TEXT[] NOT NULL DEFAULT '{}'
 );
 
 CREATE INDEX idx_experiences_candidate_id ON experiences(candidate_id);
+-- GIN index for fast "which candidates have experience in field X"
+CREATE INDEX idx_experiences_fields_of_work
+  ON experiences USING GIN (fields_of_work);
 
 -- -------
 
@@ -378,10 +433,17 @@ CREATE TABLE skills (
   id           TEXT PRIMARY KEY,
   candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
-  category     TEXT
+  category     TEXT,
+  -- Skill verification status set by AI Interviewer / HR.
+  -- Values: 'UNVERIFIED' (default) | 'PENDING' | 'PASSED' | 'FAILED' | 'OVERRIDDEN'
+  verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+  verified_at         TIMESTAMPTZ,
+  verified_by         TEXT  -- 'AI' or HR user email
 );
 
 CREATE INDEX idx_skills_candidate_id ON skills(candidate_id);
+CREATE INDEX idx_skills_verification_status
+  ON skills(candidate_id, verification_status);
 
 -- -------
 
@@ -554,6 +616,10 @@ CREATE TABLE interview_sessions (
   candidate_id         TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
   status               interview_session_status NOT NULL DEFAULT 'CREATED',
   target_skill         TEXT,
+  -- Interview mode: 'TECHNICAL' (default) | 'LANGUAGE'.
+  -- TECHNICAL = skill validation Q&A (single-topic enforcement).
+  -- LANGUAGE  = free-form English conversation scored on CEFR rubric.
+  interview_mode       TEXT NOT NULL DEFAULT 'TECHNICAL',
   signed_token_hash    TEXT NOT NULL,
   token_expires_at     TIMESTAMPTZ NOT NULL,
   consent_accepted_at  TIMESTAMPTZ,
