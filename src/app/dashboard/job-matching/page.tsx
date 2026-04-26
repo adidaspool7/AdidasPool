@@ -189,7 +189,7 @@ export default function JobMatchingLandingPage() {
                       {j.country && (
                         <Badge variant="outline" className="gap-1 font-normal">
                           <MapPin className="h-3 w-3" />
-                          {j.country}
+                          {formatCountryLabel(j.country)}
                         </Badge>
                       )}
                     </div>

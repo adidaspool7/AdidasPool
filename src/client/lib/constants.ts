@@ -31,68 +31,86 @@ export const FIELDS_OF_WORK = [
 export type FieldOfWork = (typeof FIELDS_OF_WORK)[number];
 
 /**
- * ISO 3166-1 alpha-2 codes for country names that appear in adidas job
- * postings. Used by filter UIs to display "Portugal — PT". Falls back to
- * the bare name when the country isn't in the map.
+ * ISO 3166-1 alpha-2 code -> full English country name.
+ * The DB stores `jobs.country` as the alpha-2 code (e.g. "PT", "US"),
+ * so this map is the inverse direction of what filter UIs need.
+ *
+ * Note: no per-state breakdown exists for the US in our scraped data
+ * (264 US jobs, all with country = "US"). If we ever start scraping the
+ * state from job locations, we'd want a separate `state` column.
  */
-export const COUNTRY_ISO2: Record<string, string> = {
-  Argentina: "AR",
-  Australia: "AU",
-  Austria: "AT",
-  Belgium: "BE",
-  Brazil: "BR",
-  Canada: "CA",
-  Chile: "CL",
-  China: "CN",
-  Colombia: "CO",
-  "Czech Republic": "CZ",
-  Czechia: "CZ",
-  Denmark: "DK",
-  Finland: "FI",
-  France: "FR",
-  Germany: "DE",
-  Greece: "GR",
-  "Hong Kong": "HK",
-  Hungary: "HU",
-  India: "IN",
-  Indonesia: "ID",
-  Ireland: "IE",
-  Israel: "IL",
-  Italy: "IT",
-  Japan: "JP",
-  Korea: "KR",
-  "South Korea": "KR",
-  Luxembourg: "LU",
-  Malaysia: "MY",
-  Mexico: "MX",
-  Netherlands: "NL",
-  "New Zealand": "NZ",
-  Norway: "NO",
-  Panama: "PA",
-  Peru: "PE",
-  Philippines: "PH",
-  Poland: "PL",
-  Portugal: "PT",
-  Romania: "RO",
-  Russia: "RU",
-  Singapore: "SG",
-  Slovakia: "SK",
-  "South Africa": "ZA",
-  Spain: "ES",
-  Sweden: "SE",
-  Switzerland: "CH",
-  Taiwan: "TW",
-  Thailand: "TH",
-  Turkey: "TR",
-  "United Arab Emirates": "AE",
-  "United Kingdom": "GB",
-  UK: "GB",
-  "United States": "US",
-  USA: "US",
-  Vietnam: "VN",
+export const COUNTRY_NAMES: Record<string, string> = {
+  AE: "United Arab Emirates",
+  AR: "Argentina",
+  AT: "Austria",
+  AU: "Australia",
+  BE: "Belgium",
+  BR: "Brazil",
+  CA: "Canada",
+  CH: "Switzerland",
+  CL: "Chile",
+  CN: "China",
+  CO: "Colombia",
+  CZ: "Czechia",
+  DE: "Germany",
+  DK: "Denmark",
+  EG: "Egypt",
+  ES: "Spain",
+  FI: "Finland",
+  FR: "France",
+  GB: "United Kingdom",
+  GR: "Greece",
+  HK: "Hong Kong",
+  HR: "Croatia",
+  HU: "Hungary",
+  ID: "Indonesia",
+  IE: "Ireland",
+  IL: "Israel",
+  IN: "India",
+  IT: "Italy",
+  JO: "Jordan",
+  JP: "Japan",
+  KH: "Cambodia",
+  KR: "South Korea",
+  KZ: "Kazakhstan",
+  LT: "Lithuania",
+  LU: "Luxembourg",
+  MA: "Morocco",
+  MX: "Mexico",
+  MY: "Malaysia",
+  NL: "Netherlands",
+  NO: "Norway",
+  NZ: "New Zealand",
+  PA: "Panama",
+  PE: "Peru",
+  PH: "Philippines",
+  PK: "Pakistan",
+  PL: "Poland",
+  PT: "Portugal",
+  RO: "Romania",
+  RU: "Russia",
+  SA: "Saudi Arabia",
+  SE: "Sweden",
+  SG: "Singapore",
+  SK: "Slovakia",
+  TH: "Thailand",
+  TR: "Türkiye",
+  TW: "Taiwan",
+  UA: "Ukraine",
+  US: "United States",
+  VN: "Vietnam",
+  ZA: "South Africa",
 };
 
-export function formatCountryLabel(name: string): string {
-  const code = COUNTRY_ISO2[name];
-  return code ? `${name} — ${code}` : name;
+/**
+ * Format a country code coming from the DB as "Full Name — CC".
+ * Falls back to the bare value when we don't have a name for it
+ * (so the UI never silently drops anything).
+ */
+export function formatCountryLabel(code: string): string {
+  const trimmed = code.trim();
+  if (!trimmed) return trimmed;
+  const upper = trimmed.toUpperCase();
+  const name = COUNTRY_NAMES[upper];
+  return name ? `${name} — ${upper}` : trimmed;
 }
