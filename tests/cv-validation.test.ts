@@ -152,12 +152,18 @@ describe("CvExtractionSchema", () => {
     }
   });
 
-  it("should reject invalid CEFR levels", () => {
+  it("should coerce invalid CEFR levels to null (LLM-tolerant)", () => {
+    // Schema is intentionally tolerant: unknown level strings (e.g. "D1")
+    // are coerced to null rather than rejected, so a single bad LLM cell
+    // doesn't fail the whole CV. Validation still passes overall.
     const result = CvExtractionSchema.safeParse({
       ...validPayload,
       languages: [{ language: "Test", level: "D1" }],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.languages[0].level).toBeNull();
+    }
   });
 
   it("should accept valid education levels", () => {

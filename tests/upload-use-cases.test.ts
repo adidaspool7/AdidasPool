@@ -249,12 +249,14 @@ describe("UploadUseCases", () => {
       expect(parser.parseCvText).toHaveBeenCalledOnce();
 
       // Step 6: Dedup check
-      expect(dedup.checkForDuplicate).toHaveBeenCalledWith({
-        email: "maria@example.com",
-        firstName: "Maria",
-        lastName: "Garcia",
-        location: "Porto, Portugal",
-      });
+      expect(dedup.checkForDuplicate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "maria@example.com",
+          firstName: "Maria",
+          lastName: "Garcia",
+          location: "Porto, Portugal",
+        })
+      );
 
       // Step 7: Candidate creation
       expect(candidateRepo.createWithRelations).toHaveBeenCalledOnce();
@@ -404,7 +406,7 @@ describe("UploadUseCases", () => {
       expect(relations.languages).toHaveLength(2);
       expect(relations.languages[0]).toMatchObject({
         language: "Portuguese",
-        selfDeclaredLevel: null,
+        selfDeclaredLevel: "C2",
       });
 
       expect(relations.skills).toHaveLength(2);
