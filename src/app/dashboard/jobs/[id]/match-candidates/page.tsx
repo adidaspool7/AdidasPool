@@ -610,9 +610,8 @@ export default function MatchCandidatesPage({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 text-xs">
-                  Minimum fraction of the JD&apos;s required skills a candidate
-                  must cover for the eligibility chip to read &quot;all reqs met&quot;.
-                  Affects the chip only — every candidate is still ranked.
+                  Minimum fraction of the Job Description&apos;s required skills
+                  a candidate must cover for the eligibility.
                 </PopoverContent>
               </Popover>
             </div>
