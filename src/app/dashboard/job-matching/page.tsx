@@ -17,13 +17,8 @@ import { Card, CardContent } from "@client/components/ui/card";
 import { Input } from "@client/components/ui/input";
 import { Skeleton } from "@client/components/ui/skeleton";
 import { Badge } from "@client/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@client/components/ui/select";
+import { MultiSelectCombobox } from "@client/components/ui/multi-select-combobox";
+import { formatCountryLabel } from "@client/lib/constants";
 import { Search, Target, MapPin, Building2, ArrowRight } from "lucide-react";
 
 interface JobOption {
@@ -39,8 +34,9 @@ export default function JobMatchingLandingPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [country, setCountry] = useState<string>("ALL");
-  const [department, setDepartment] = useState<string>("ALL");
+  // Multi-select filters — empty array means "no filter".
+  const [countries_, setCountries] = useState<string[]>([]);
+  const [departments_, setDepartments] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,15 +77,15 @@ export default function JobMatchingLandingPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return jobs.filter((j) => {
-      if (country !== "ALL" && j.country !== country) return false;
-      if (department !== "ALL" && j.department !== department) return false;
+      if (countries_.length > 0 && (!j.country || !countries_.includes(j.country))) return false;
+      if (departments_.length > 0 && (!j.department || !departments_.includes(j.department))) return false;
       if (q) {
         const hay = `${j.title} ${j.department ?? ""} ${j.country ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [jobs, search, country, department]);
+  }, [jobs, search, countries_, departments_]);
 
   return (
     <div className="space-y-6">
@@ -119,33 +115,25 @@ export default function JobMatchingLandingPage() {
             />
           </div>
 
-          <Select value={country} onValueChange={setCountry}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="All locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All locations</SelectItem>
-              {countries.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectCombobox
+            options={countries.map((c) => ({ value: c, label: formatCountryLabel(c) }))}
+            selected={countries_}
+            onChange={setCountries}
+            placeholder="All locations"
+            searchPlaceholder="Search country…"
+            emptyMessage="No country found."
+            widthClassName="w-full md:w-[220px]"
+          />
 
-          <Select value={department} onValueChange={setDepartment}>
-            <SelectTrigger className="w-full md:w-[220px]">
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectCombobox
+            options={departments.map((d) => ({ value: d, label: d }))}
+            selected={departments_}
+            onChange={setDepartments}
+            placeholder="All departments"
+            searchPlaceholder="Search department…"
+            emptyMessage="No department found."
+            widthClassName="w-full md:w-[240px]"
+          />
         </CardContent>
       </Card>
 
