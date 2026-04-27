@@ -32,7 +32,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "@server/application/use-cases/candidate.use-cases";
-import { JobUseCases } from "@server/application/use-cases/job.use-cases";
+import { JobUseCases, JobClosedError } from "@server/application/use-cases/job.use-cases";
 import { AssessmentUseCases } from "@server/application/use-cases/assessment.use-cases";
 import { UploadUseCases } from "@server/application/use-cases/upload.use-cases";
 import { ExportUseCases } from "@server/application/use-cases/export.use-cases";
@@ -42,7 +42,7 @@ import { ProfileUseCases } from "@server/application/use-cases/profile.use-cases
 import { AnalyticsUseCases } from "@server/application/use-cases/analytics.use-cases";
 
 // Re-export error classes so API routes import from barrel, not deep paths
-export { NotFoundError, ValidationError };
+export { NotFoundError, ValidationError, JobClosedError };
 
 export const candidateUseCases = new CandidateUseCases(candidateRepository, storageService);
 

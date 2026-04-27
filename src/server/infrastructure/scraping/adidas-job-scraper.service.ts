@@ -356,35 +356,62 @@ export class AdidasJobScraperService implements IJobScraperService {
   }
 
   /**
-   * Fetch a single job's detail page and extract plain-text description body.
+   * Fetch a single job's detail page and report its lifecycle state.
    *
    * Used by Phase-1 requirements extraction. Respects FETCH_DELAY_MS when
    * called in batches by the caller (this method itself does not sleep).
    *
+   * Returns:
+   *   - `OPEN`        \u2014 the JD body was extracted; safe to feed to the LLM.
+   *   - `CLOSED`      \u2014 page renders the \"application period closed\" banner;
+   *                    the role no longer accepts applicants.
+   *   - `UNAVAILABLE` \u2014 page reachable but no JD body and no closed banner
+   *                    (e.g. relocated, JS-only render, scraper selectors miss).
+   *   - `ERROR`       \u2014 HTTP/network failure.
+   *
    * @param sourceUrl Absolute or BASE_URL-relative job detail URL
-   * @returns Plain-text description of the job, or null if not extractable
    */
-  async fetchJobDescription(sourceUrl: string): Promise<string | null> {
+  async fetchJobDescription(
+    sourceUrl: string
+  ): Promise<{ status: "OPEN" | "CLOSED" | "UNAVAILABLE" | "ERROR"; body: string | null }> {
     const url = sourceUrl.startsWith("http") ? sourceUrl : `${BASE_URL}${sourceUrl}`;
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+    } catch (err) {
+      console.warn(`[JobScraper] fetchJobDescription network error for ${url}:`, err);
+      return { status: "ERROR", body: null };
+    }
+
     if (!response.ok) {
       console.warn(
         `[JobScraper] fetchJobDescription HTTP ${response.status} for ${url}`
       );
-      return null;
+      return { status: "ERROR", body: null };
     }
 
     const html = await response.text();
     const $ = cheerio.load(html);
+
+    // Closed-banner detection \u2014 adidas serves these at the same URL as
+    // live postings. If we see this exact phrase anywhere on the page we
+    // mark the job CLOSED, regardless of whether a JD body is also present.
+    const fullText = $("body").text().replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    const CLOSED_BANNERS = [
+      /the application period for this role has been closed/i,
+    ];
+    if (CLOSED_BANNERS.some((re) => re.test(fullText))) {
+      return { status: "CLOSED", body: null };
+    }
 
     // The SuccessFactors JD body lives in #job-description (primary)
     // or .jobdescription / #content-wrapper as fallbacks.
@@ -394,7 +421,6 @@ export class AdidasJobScraperService implements IJobScraperService {
       ".jobDescription",
       '[data-automation-id="jobPostingDescription"]',
       "#content-wrapper",
-      "main",
     ];
     for (const sel of candidates) {
       const el = $(sel).first();
@@ -402,13 +428,31 @@ export class AdidasJobScraperService implements IJobScraperService {
       // Remove nav/script/style noise inside the selected region
       el.find("script, style, nav, header, footer").remove();
       const text = el.text().replace(/\u00a0/g, " ").trim();
-      if (text.length > 200) return text;
+      if (this.looksLikeJobDescription(text)) {
+        return { status: "OPEN", body: text };
+      }
     }
 
-    // Last-resort: full body minus the boilerplate navbars
-    const body = $("body").clone();
-    body.find("script, style, nav, header, footer").remove();
-    const bodyText = body.text().replace(/\u00a0/g, " ").trim();
-    return bodyText.length > 200 ? bodyText : null;
+    // No specific selector matched. We deliberately do NOT fall back to
+    // `main` or `body` \u2014 those return cookie banners + nav chrome which
+    // the LLM then hallucinates from.
+    return { status: "UNAVAILABLE", body: null };
+  }
+
+  /**
+   * Heuristic guard against feeding cookie-banner / nav-chrome text to the
+   * LLM when the JD body container is empty or missing.
+   */
+  private looksLikeJobDescription(text: string): boolean {
+    if (text.length < 200) return false;
+    // Pages that render only chrome/JS contain these markers.
+    const chromeMarkers = [
+      /Skip to main content/i,
+      /Search by Keyword/i,
+      /j2w\.init/i,
+      /<!\[CDATA\[/,
+    ];
+    if (chromeMarkers.some((re) => re.test(text))) return false;
+    return true;
   }
 }

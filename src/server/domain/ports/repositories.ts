@@ -197,6 +197,8 @@ export interface IJobRepository {
     parsedRequirements: unknown,
     version: number
   ): Promise<void>;
+  /** Mark a job as no longer accepting applications (detected by scraper). */
+  markClosed(id: string): Promise<void>;
   upsertMatch(
     jobId: string,
     candidateId: string,

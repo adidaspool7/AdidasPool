@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jobUseCases, NotFoundError } from "@server/application";
+import { jobUseCases, NotFoundError, JobClosedError } from "@server/application";
 import { createClient } from "@/lib/supabase/server";
 
 // Always recompute on every request \u2014 the response depends on the
@@ -44,6 +44,14 @@ export async function GET(
   } catch (error) {
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    if (error instanceof JobClosedError) {
+      // 410 Gone — the resource still exists in our DB but has been
+      // retired at the source. Frontend distinguishes this from 404.
+      return NextResponse.json(
+        { error: error.message, code: "JOB_CLOSED" },
+        { status: 410 }
+      );
     }
     console.error("Error matching candidates to job:", error);
     return NextResponse.json(

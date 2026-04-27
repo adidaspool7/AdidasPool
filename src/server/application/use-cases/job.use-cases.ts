@@ -20,6 +20,18 @@ import type { IJobScraperService } from "@server/domain/ports/services";
 import type { CreateJobInput } from "@server/application/dtos";
 import type { UpdateJobInput } from "@server/application/dtos";
 import { NotFoundError } from "./candidate.use-cases";
+
+/**
+ * Thrown when a job’s source posting has been taken down by adidas
+ * ("application period closed" banner). The job has been marked CLOSED
+ * in our DB by the time this is thrown.
+ */
+export class JobClosedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JobClosedError";
+  }
+}
 import {
   JobRequirementsSchema,
   JOB_REQUIREMENTS_SCHEMA_VERSION,
@@ -343,8 +355,15 @@ export class JobUseCases {
           const fetched = await this.jobScraperService.fetchJobDescription(
             job.sourceUrl
           );
-          if (!fetched) throw new Error("Failed to fetch JD body");
-          jdText = fetched;
+          if (fetched.status === "CLOSED") {
+            // Posting was taken down — mark closed and skip the LLM.
+            await this.jobRepo.markClosed(job.id);
+            continue;
+          }
+          if (fetched.status !== "OPEN" || !fetched.body) {
+            throw new Error(`Failed to fetch JD body (status=${fetched.status})`);
+          }
+          jdText = fetched.body;
         }
 
         const extracted = await this.requirementsExtractor.extract(jdText);
@@ -426,10 +445,18 @@ export class JobUseCases {
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
-      if (!fetched) {
-        throw new Error(`Failed to fetch JD body for job ${jobId}`);
+      if (fetched.status === "CLOSED") {
+        await this.jobRepo.markClosed(jobId);
+        throw new JobClosedError(
+          `Job ${jobId} is no longer accepting applications (closed by source).`
+        );
       }
-      jdText = fetched;
+      if (fetched.status !== "OPEN" || !fetched.body) {
+        throw new Error(
+          `Failed to fetch JD body for job ${jobId} (status=${fetched.status})`
+        );
+      }
+      jdText = fetched.body;
     }
 
     const extracted = await this.requirementsExtractor.extract(jdText);
@@ -473,10 +500,18 @@ export class JobUseCases {
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
-      if (!fetched) {
-        throw new Error(`Failed to fetch JD body for job ${jobId}`);
+      if (fetched.status === "CLOSED") {
+        await this.jobRepo.markClosed(jobId);
+        throw new JobClosedError(
+          `Job ${jobId} is no longer accepting applications (closed by source).`
+        );
       }
-      jdText = fetched;
+      if (fetched.status !== "OPEN" || !fetched.body) {
+        throw new Error(
+          `Failed to fetch JD body for job ${jobId} (status=${fetched.status})`
+        );
+      }
+      jdText = fetched.body;
     }
 
     const extracted = await this.requirementsExtractor.extract(jdText);

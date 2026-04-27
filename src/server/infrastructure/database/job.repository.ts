@@ -308,8 +308,13 @@ export class SupabaseJobRepository implements IJobRepository {
         source_url: j.sourceUrl,
         description: j.description ?? null,
         type: j.type ?? "FULL_TIME",
-        status: "OPEN",
       };
+      // Only seed status='OPEN' on first insert. Existing rows keep their
+      // current status so a previously detected CLOSED job isn't silently
+      // re-opened by a subsequent sync of the listing page.
+      if (!existing) {
+        baseRow.status = "OPEN";
+      }
       if (sourceUrlChanged) {
         baseRow.parsed_requirements = null;
         baseRow.parsed_requirements_version = null;
@@ -409,5 +414,19 @@ export class SupabaseJobRepository implements IJobRepository {
       })
       .eq("id", id);
     assertNoError(error, "job.updateParsedRequirements");
+  }
+
+  async markClosed(id: string): Promise<void> {
+    // Also clear any cached parsed_requirements written from a previous
+    // (possibly hallucinated) parse \u2014 the JD body is now gone.
+    const { error } = await db
+      .from("jobs")
+      .update({
+        status: "CLOSED",
+        parsed_requirements: null,
+        parsed_requirements_version: null,
+      })
+      .eq("id", id);
+    assertNoError(error, "job.markClosed");
   }
 }

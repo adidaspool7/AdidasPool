@@ -158,9 +158,19 @@ export interface IJobScraperService {
   scrapeJobs(maxPages?: number): Promise<ScrapedJob[]>;
 
   /**
-   * Fetch the plain-text job description body for a single job detail URL.
-   * Returns null if the page is unreachable or the body cannot be extracted.
-   * Used by the Phase-1 requirements extractor.
+   * Fetch a single job's detail page and report its lifecycle state.
+   *
+   *   - `OPEN`        — page renders the JD body (we return it).
+   *   - `CLOSED`      — page renders the "application period closed" banner;
+   *                    the role is no longer accepting applications.
+   *   - `UNAVAILABLE` — page reachable but no JD body and no closed banner
+   *                    (e.g. relocated, JS-only, or scraper selectors miss).
+   *   - `ERROR`       — HTTP failure, network error, etc.
+   *
+   * `body` is set ONLY when status === 'OPEN'. For everything else the
+   * caller MUST NOT feed `body` to the LLM — it would hallucinate.
    */
-  fetchJobDescription(sourceUrl: string): Promise<string | null>;
+  fetchJobDescription(
+    sourceUrl: string
+  ): Promise<{ status: "OPEN" | "CLOSED" | "UNAVAILABLE" | "ERROR"; body: string | null }>;
 }
