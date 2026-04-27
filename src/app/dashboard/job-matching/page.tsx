@@ -9,9 +9,14 @@
  * This page is intentionally job-centric: no candidate data is fetched
  * here. The Candidates page is the asset/talent-pool view; this is the
  * funnel/Fit view.
+ *
+ * Filter state (search, country, department) is persisted in URL search
+ * params so that the "Back to Job Matching" button on match-candidates
+ * restores the exact previous search via router.back().
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@client/components/ui/card";
 import { Input } from "@client/components/ui/input";
@@ -28,15 +33,47 @@ interface JobOption {
   country: string | null;
 }
 
-export default function JobMatchingLandingPage() {
+function JobMatchingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  // Multi-select filters — empty array means "no filter".
-  const [countries_, setCountries] = useState<string[]>([]);
-  const [departments_, setDepartments] = useState<string[]>([]);
+  // Initialise filter state from URL params so state survives back-navigation.
+  const [search, setSearchState] = useState(() => searchParams.get("q") ?? "");
+  const [countries_, setCountriesState] = useState<string[]>(() => {
+    const v = searchParams.get("country");
+    return v ? v.split(",").filter(Boolean) : [];
+  });
+  const [departments_, setDepartmentsState] = useState<string[]>(() => {
+    const v = searchParams.get("dept");
+    return v ? v.split(",").filter(Boolean) : [];
+  });
+
+  /** Push filter changes into the URL (replace — no extra history entry). */
+  function updateUrl(q: string, countries: string[], depts: string[]) {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (countries.length) params.set("country", countries.join(","));
+    if (depts.length) params.set("dept", depts.join(","));
+    const qs = params.toString();
+    router.replace(`/dashboard/job-matching${qs ? `?${qs}` : ""}`);
+  }
+
+  function setSearch(v: string) {
+    setSearchState(v);
+    updateUrl(v, countries_, departments_);
+  }
+  function setCountries(v: string[]) {
+    setCountriesState(v);
+    updateUrl(search, v, departments_);
+  }
+  function setDepartments(v: string[]) {
+    setDepartmentsState(v);
+    updateUrl(search, countries_, v);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -201,5 +238,13 @@ export default function JobMatchingLandingPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function JobMatchingLandingPage() {
+  return (
+    <Suspense>
+      <JobMatchingContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Card,
@@ -200,6 +201,7 @@ export default function MatchCandidatesPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<MatchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -341,9 +343,9 @@ export default function MatchCandidatesPage({
     const isClosed = errorCode === "JOB_CLOSED";
     return (
       <div className="p-6">
-        <Link href="/dashboard/job-matching" className="inline-flex items-center text-sm text-muted-foreground mb-4">
+        <button onClick={() => router.back()} className="inline-flex items-center text-sm text-muted-foreground mb-4 hover:text-foreground">
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Job Matching
-        </Link>
+        </button>
         <Card className={isClosed ? "border-amber-500" : "border-destructive"}>
           <CardHeader>
             <CardTitle className={isClosed ? "text-amber-700 dark:text-amber-400" : "text-destructive"}>
@@ -361,11 +363,9 @@ export default function MatchCandidatesPage({
                 <RefreshCw className="w-4 h-4 mr-2" /> Retry
               </Button>
             )}
-            <Link href="/dashboard/job-matching">
-              <Button variant={isClosed ? "default" : "ghost"}>
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Job Matching
-              </Button>
-            </Link>
+            <Button variant={isClosed ? "default" : "ghost"} onClick={() => router.back()}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Job Matching
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -383,12 +383,12 @@ export default function MatchCandidatesPage({
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <Link
-          href="/dashboard/job-matching"
+        <button
+          onClick={() => router.back()}
           className="inline-flex items-center text-sm text-muted-foreground mb-2 hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Job Matching
-        </Link>
+        </button>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
