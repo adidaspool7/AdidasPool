@@ -81,6 +81,7 @@ Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 - [x] Omit criteria from breakdown entirely when `applicable === false` (encoded in `applicable` flag on each criterion; UI hides ineligible criteria from the eligibility AND).
 - [x] Keep the `applicable`-aware average (overall = avg of applicable criteria only).
 - [x] Expand tests with fixtures for structured JDs — `tests/job-fit.test.ts` (15 tests).
+- [x] **Fix experience double-counting** (`fe89cf4`, 2026-04-27): `matchExperience` was summing per-field values across required fields, inflating years when a single experience entry was tagged with multiple fields. Fixed by adding `rawExperiences[]` to `CandidateFitInput` and counting each experience entry at most once. 2 regression tests added (155/155 passing).
 
 ## Phase 4 — Quality vs Fit, bidirectional views
 
@@ -94,15 +95,17 @@ Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 ## Phase 5 — Delete dead code & misleading surfaces
 
 - [x] Delete or hide any route / component that still shows a "universal match score" without a job context. — Done: matching engine deleted in `0919b0f`; the only score in HR UI is now labelled "Quality".
-- [ ] Remove `experienceScore` from `MatchInput` if no criterion reads it after Phase 3. — N/A: `MatchInput` is gone; `experienceScore` on candidates is still used by the Quality breakdown sub-bars (kept).
-- [ ] Remove the `candidates.match_score` table column if it is no longer written (confirm not referenced anywhere — audit with grep before dropping). — Deferred; low value, blocks no work.
-- [x] Update `CLAUDE.md` + `AppReport/*.md` to reflect the new model. — `CLAUDE.md` updated; AppReport pending.
+- [x] Remove `experienceScore` from `MatchInput` — N/A: `MatchInput` is gone; `experienceScore` on candidates is still used by the Quality breakdown sub-bars (kept). Closed.
+- [ ] Remove the `candidates.match_score` table column if it is no longer written. — Deferred; low value, blocks no work. Audit with `grep match_score src/` before dropping.
+- [x] Update `CLAUDE.md` to reflect the new model. — Done. `AppReport/*.md` still pending (tracked in Documentation tasks below).
 
 ## Documentation tasks (alongside each phase)
 
+> ⚠️ These are the only remaining open items for this initiative.
+
 - [ ] `AppReport/04_Architecture_Design.md` — add a subsection describing the `fit(candidate, job)` pure-function primitive.
 - [ ] `AppReport/05_Database_Design.md` — add `jobs.parsed_requirements` + `experiences.fields_of_work`.
-- [ ] `AppReport/06_Features_Implementation.md` — split "Candidate Evaluation" vs "Job Matching" sections with the new semantics.
+- [ ] `AppReport/06_Features_Implementation.md` — split "Candidate Evaluation" vs "Job Matching" sections with the new semantics. Also note the Candidates page Assessments column (2026-04-27).
 - [ ] `AppReport/07_API_Documentation.md` — document `/api/jobs/[id]/match-candidates`.
 - [ ] `docs/USER_GUIDE.md` — rewrite HR workflow to "open a job → see ranked candidates" flow.
 

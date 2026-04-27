@@ -88,7 +88,7 @@
 | 6.4 | Advanced recruiter filtering dashboard | 🔄 | Done: search, status, business-area, location, sort, custom weights. Still missing: language-level filter + score-range slider |
 | 6.5 | Candidate tagging system | ⬜ | `candidate_tags` table exists and joined in repo; UI (create/assign/filter by tag) missing |
 | 6.6 | Candidate contact quick-view button | ⬜ | Small popover on candidate list row |
-| 6.7 | Candidate detail manual edit + notes UI | 🔄 | Notes API + read-only display done; add-note form + inline profile edit missing |
+| 6.7 | Candidate detail manual edit + notes UI | 🔄 | Notes API + read-only display + add-note form Dialog all done; inline field editing still missing |
 
 ---
 
@@ -123,8 +123,8 @@
 | # | Task | Status |
 |---|---|---|
 | M.1 | Set `INTERVIEW_BACKEND_URL` in Vercel env vars | ⬜ |
-| M.6 | Run Phase 4 DB migration (`20260414000000_add_interview_mode.sql`) in Supabase SQL editor | ⬜ |
-| M.7 | Run Phase 4b DB migration (`20260415000000_add_skill_verification.sql`) in Supabase SQL editor | ⬜ |
+| M.6 | Run Phase 4 DB migration (`interview_mode` column) in Supabase SQL editor | ✅ | Inlined in canonical `00000000000000_schema.sql` (2026-04-26) |
+| M.7 | Run Phase 4b DB migration (`skill_verification` columns) in Supabase SQL editor | ✅ | Inlined in canonical `00000000000000_schema.sql` (2026-04-26) |
 | M.2 | Create `talent-pool` bucket in Supabase Storage dashboard | ✅ | Auto-created by `ensureBucket()` on first upload |
 | M.3 | Configure Google OAuth consent screen in Google Cloud Console | ⬜ |
 | M.4 | Add `https://adidas-pool.vercel.app` to Supabase Auth URL allowlist | ✅ |
@@ -158,3 +158,6 @@
 | C.20 | Evaluator hardening: `turn_count`, `evidence`-gated FAIL, `max_tokens=500` | 2026-04 |
 | C.21 | Async bulk CV upload via Next.js `after()` + ZIP extraction | 2026-04 |
 | C.22 | HR analytics dashboard (funnel, pipeline, skills, languages, scores) | 2026-04 |
+| C.23 | Job-Anchored Matching initiative (Phases 0–5) — lazy JD parsing, fields-of-work CV tagging, `computeJobFit` pure function, `/jobs/[id]/match-candidates` page, Quality vs Fit UI | 2026-04-27 |
+| C.24 | Fix experience double-counting in `job-fit.service.ts` — `rawExperiences` approach; 2 regression tests added, 155/155 passing (`fe89cf4`) | 2026-04-27 |
+| C.25 | Candidates page redesign — compact language pills (`EN C1`), new Assessments column (scored assessment CEFR, language interview CEFR, technical interview PASS/FAIL) | 2026-04-27 |

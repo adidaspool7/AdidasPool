@@ -1,7 +1,9 @@
 # Job-Anchored Matching — Plan & Design Notes
 
-> **Status:** Proposed · **Owner:** Stratos · **Date:** 2026-04-23
+> **Status:** Implemented ✅ · **Owner:** Stratos · **Proposed:** 2026-04-23 · **Completed:** 2026-04-27
 > **Supersedes:** The "universal candidate score" + candidate→jobs matching shipped in commits `b972f85`, `c0818af`, `849782e`, `c1047ca`.
+> **Implementation commits:** job-anchored redesign (`0919b0f`), JD parsing (lazy), fields-of-work CV tagging, `computeJobFit` pure function, `/match-candidates` page, double-counting fix (`fe89cf4`).
+> This document is a **design reference** — kept for architectural context. See `TODO_JOB_ANCHORED_MATCHING.md` for remaining documentation tasks.
 
 ---
 
