@@ -94,8 +94,19 @@ interface Candidate {
   invitationSent: boolean;
   languages: { language: string; selfDeclaredLevel: string | null }[];
   applications?: { id: string }[];
-  assessments?: { id: string; status: string }[];
-  interviews?: { id: string; finalDecision: string | null }[];
+  assessments?: {
+    id: string;
+    status: string;
+    type: string;
+    result?: { overallScore: number | null; cefrEstimation: string | null; isBorderline: boolean } | null;
+  }[];
+  interviews?: {
+    id: string;
+    finalDecision: string | null;
+    interviewMode: string;
+    status: string;
+    evaluationRationale: Record<string, unknown> | null;
+  }[];
   _count?: { assessments: number; notes: number };
 }
 
@@ -203,9 +214,163 @@ function OverallScoreBadge({ score }: { score: number | null }) {
   );
 }
 
-// ── Business area dropdown ───────────────────────────────────────
+// ── Language compact pills ───────────────────────────────────────
 
-function BusinessAreaDropdown({
+const LANG_CODE: Record<string, string> = {
+  English: "EN", French: "FR", German: "DE", Spanish: "ES",
+  Italian: "IT", Portuguese: "PT", Greek: "EL", Dutch: "NL",
+  Russian: "RU", Chinese: "ZH", Japanese: "JA", Arabic: "AR",
+  Polish: "PL", Czech: "CS", Romanian: "RO", Hungarian: "HU",
+  Turkish: "TR", Swedish: "SV", Danish: "DA", Finnish: "FI",
+  Korean: "KO", Hindi: "HI", Ukrainian: "UK", Catalan: "CA",
+};
+
+function langCode(name: string): string {
+  return LANG_CODE[name] ?? name.slice(0, 2).toUpperCase();
+}
+
+function LanguagePills({
+  languages,
+}: {
+  languages: { language: string; selfDeclaredLevel: string | null }[];
+}) {
+  const MAX_VISIBLE = 3;
+  const visible = languages.slice(0, MAX_VISIBLE);
+  const hidden = languages.slice(MAX_VISIBLE);
+  return (
+    <div className="flex flex-wrap justify-center gap-1">
+      {visible.map((l, i) => (
+        <span
+          key={i}
+          title={`${l.language}${l.selfDeclaredLevel ? ` · ${l.selfDeclaredLevel}` : ""}`}
+          className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] font-medium"
+        >
+          <span className="text-muted-foreground">{langCode(l.language)}</span>
+          {l.selfDeclaredLevel && (
+            <span className="font-semibold text-foreground">{l.selfDeclaredLevel}</span>
+          )}
+        </span>
+      ))}
+      {hidden.length > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent transition-colors"
+            >
+              +{hidden.length}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="center">
+            <div className="flex flex-col gap-1">
+              {languages.map((l, i) => (
+                <span key={i} className="text-xs whitespace-nowrap">
+                  {l.language}
+                  {l.selfDeclaredLevel ? ` · ${l.selfDeclaredLevel}` : ""}
+                </span>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+    </div>
+  );
+}
+
+// ── Assessment / interview results column ────────────────────────
+
+function cefrColourClass(level: string | null | undefined): string {
+  switch (level) {
+    case "A1": case "A2": return "bg-red-500/15 text-red-700";
+    case "B1": return "bg-amber-500/15 text-amber-700";
+    case "B2": return "bg-yellow-500/15 text-yellow-700";
+    case "C1": return "bg-emerald-500/15 text-emerald-700";
+    case "C2": return "bg-emerald-600/20 text-emerald-800";
+    default:   return "bg-muted text-muted-foreground";
+  }
+}
+
+type CandidateAssessment = NonNullable<Candidate["assessments"]>[number];
+type CandidateInterview  = NonNullable<Candidate["interviews"]>[number];
+
+function AssessmentResults({
+  assessments,
+  interviews,
+}: {
+  assessments: Candidate["assessments"];
+  interviews:  Candidate["interviews"];
+}) {
+  const items: React.ReactNode[] = [];
+
+  // Most recent scored/reviewed language assessment
+  const scoredAssessment = (assessments ?? []).findLast(
+    (a: CandidateAssessment) => a.status === "SCORED" || a.status === "REVIEWED"
+  );
+  if (scoredAssessment?.result) {
+    const { cefrEstimation, overallScore, isBorderline } = scoredAssessment.result;
+    const label = cefrEstimation ?? (overallScore != null ? `${Math.round(overallScore)}%` : "?");
+    items.push(
+      <span
+        key="assessment"
+        title={`Language assessment · ${scoredAssessment.type.replace(/_/g, " ")}`}
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${cefrColourClass(cefrEstimation)}`}
+      >
+        <FileText className="h-2.5 w-2.5 shrink-0" />
+        {label}
+        {isBorderline && <span className="opacity-60">~</span>}
+      </span>
+    );
+  }
+
+  // Most recent evaluated LANGUAGE AI interview
+  const langInterview = (interviews ?? []).findLast(
+    (i: CandidateInterview) => i.status === "EVALUATED" && i.interviewMode === "LANGUAGE"
+  );
+  if (langInterview) {
+    const rationale = langInterview.evaluationRationale as Record<string, unknown> | null;
+    const technical = rationale?.technical as Record<string, unknown> | undefined;
+    const cefr = technical?.cefr_level as string | undefined;
+    if (cefr) {
+      items.push(
+        <span
+          key="lang-interview"
+          title={`AI Language Interview · ${cefr}`}
+          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${cefrColourClass(cefr)}`}
+        >
+          <Mic className="h-2.5 w-2.5 shrink-0" />
+          {cefr}
+        </span>
+      );
+    }
+  }
+
+  // Most recent evaluated TECHNICAL AI interview
+  const techInterview = (interviews ?? []).findLast(
+    (i: CandidateInterview) => i.status === "EVALUATED" && i.interviewMode === "TECHNICAL"
+  );
+  if (techInterview?.finalDecision) {
+    const isPass = techInterview.finalDecision === "PASS";
+    items.push(
+      <span
+        key="tech-interview"
+        title={`AI Technical Interview · ${techInterview.finalDecision}`}
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+          isPass ? "bg-emerald-500/15 text-emerald-700" : "bg-red-500/15 text-red-700"
+        }`}
+      >
+        <Mic className="h-2.5 w-2.5 shrink-0" />
+        {isPass ? "PASS" : "FAIL"}
+      </span>
+    );
+  }
+
+  if (items.length === 0) {
+    return <span className="text-[10px] text-muted-foreground">—</span>;
+  }
+  return <div className="flex flex-col items-center gap-1">{items}</div>;
+}
+
+// ── Business area dropdown ───────────────────────────────────────
   value,
   onChange,
 }: {
@@ -763,6 +928,7 @@ export default function CandidatesPage() {
                 </SortableHeader>
                 <TableHead className="text-center">Score Breakdown</TableHead>
                 <TableHead className="text-center">Languages</TableHead>
+                <TableHead className="text-center">Assessments</TableHead>
                 <TableHead className="text-center">Source</TableHead>
                 <SortableHeader field="createdAt" className="text-center">Added</SortableHeader>
                 <TableHead className="w-10" />
@@ -970,14 +1136,15 @@ export default function CandidatesPage() {
 
                     {/* Languages */}
                     <TableCell className="text-center">
-                      <div className="flex flex-wrap gap-1">
-                        {c.languages.map((l, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
-                            {l.language}
-                            {l.selfDeclaredLevel && ` ${l.selfDeclaredLevel}`}
-                          </Badge>
-                        ))}
-                      </div>
+                      <LanguagePills languages={c.languages} />
+                    </TableCell>
+
+                    {/* Assessment / interview results */}
+                    <TableCell className="text-center">
+                      <AssessmentResults
+                        assessments={c.assessments}
+                        interviews={c.interviews}
+                      />
                     </TableCell>
 
                     {/* Source / invitation */}

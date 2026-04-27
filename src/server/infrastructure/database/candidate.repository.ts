@@ -19,8 +19,8 @@ const CANDIDATE_LIST_SELECT = `
   languages:candidate_languages(*),
   tags:candidate_tags(*),
   applications:job_applications(id),
-  assessments(id, status),
-  interviews:interview_sessions(id, final_decision),
+  assessments(id, status, type, result:assessment_results(overall_score, cefr_estimation, is_borderline)),
+  interviews:interview_sessions(id, final_decision, interview_mode, status, evaluation_rationale),
   notes:candidate_notes(id)
 ` as const;
 
