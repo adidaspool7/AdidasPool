@@ -203,6 +203,7 @@ export default function MatchCandidatesPage({
   const [data, setData] = useState<MatchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // HR-tunable scoring config. All persisted on scoring_weights (global).
@@ -238,6 +239,7 @@ export default function MatchCandidatesPage({
   const load = async () => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const res = await fetch(`/api/jobs/${id}/match-candidates`, {
         // Bypass HTTP cache so that re-loading after a Match Settings
@@ -246,6 +248,7 @@ export default function MatchCandidatesPage({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (typeof err?.code === "string") setErrorCode(err.code);
         throw new Error(err.error || `Server error (${res.status})`);
       }
       const json = (await res.json()) as MatchResponse;
@@ -335,20 +338,34 @@ export default function MatchCandidatesPage({
   }
 
   if (error) {
+    const isClosed = errorCode === "JOB_CLOSED";
     return (
       <div className="p-6">
         <Link href="/dashboard/job-matching" className="inline-flex items-center text-sm text-muted-foreground mb-4">
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Job Matching
         </Link>
-        <Card className="border-destructive">
+        <Card className={isClosed ? "border-amber-500" : "border-destructive"}>
           <CardHeader>
-            <CardTitle className="text-destructive">Could not load matches</CardTitle>
-            <CardDescription>{error}</CardDescription>
+            <CardTitle className={isClosed ? "text-amber-700 dark:text-amber-400" : "text-destructive"}>
+              {isClosed ? "This job is closed" : "Could not load matches"}
+            </CardTitle>
+            <CardDescription>
+              {isClosed
+                ? "adidas Careers no longer lists this posting as accepting applications. We’ve marked the job as closed and won’t parse it further. Existing applications and historical data are unaffected."
+                : error}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={load}>
-              <RefreshCw className="w-4 h-4 mr-2" /> Retry
-            </Button>
+          <CardContent className="flex gap-2">
+            {!isClosed && (
+              <Button variant="outline" onClick={load}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Retry
+              </Button>
+            )}
+            <Link href="/dashboard/job-matching">
+              <Button variant={isClosed ? "default" : "ghost"}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Job Matching
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
