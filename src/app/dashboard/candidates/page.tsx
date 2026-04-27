@@ -371,6 +371,8 @@ function AssessmentResults({
 }
 
 // ── Business area dropdown ───────────────────────────────────────
+
+function BusinessAreaDropdown({
   value,
   onChange,
 }: {
