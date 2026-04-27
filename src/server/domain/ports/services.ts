@@ -99,6 +99,13 @@ export interface IEmailService {
     magicLink: string,
     expiresAt: Date
   ): Promise<{ success: boolean; error?: string }>;
+
+  sendContactEmail(
+    to: string,
+    candidateName: string,
+    subject: string,
+    body: string
+  ): Promise<{ success: boolean; error?: string }>;
 }
 
 // ============================================

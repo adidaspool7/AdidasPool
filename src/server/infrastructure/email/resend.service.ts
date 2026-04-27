@@ -46,4 +46,45 @@ export class ResendEmailService implements IEmailService {
       return { success: false, error: message };
     }
   }
+
+  async sendContactEmail(
+    to: string,
+    candidateName: string,
+    subject: string,
+    body: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Sanitise and convert plain-text body to safe HTML
+      const escaped = body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const htmlBody = escaped
+        .split(/\n{2,}/)
+        .map((para) => `<p style="margin:0 0 12px 0">${para.replace(/\n/g, "<br>")}</p>`)
+        .join("");
+
+      await getResendClient().emails.send({
+        from: "adidas Talent Team <noreply@yourdomain.com>",
+        to,
+        subject,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333;line-height:1.6">
+            ${htmlBody}
+            <hr style="margin-top:32px;border:none;border-top:1px solid #eee">
+            <p style="font-size:11px;color:#aaa;margin-top:16px">
+              This message was sent via the adidas Talent Intelligence Platform.
+              If you believe you received this in error, please disregard it.
+            </p>
+          </div>
+        `,
+      });
+
+      return { success: true };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown email error";
+      return { success: false, error: message };
+    }
+  }
 }

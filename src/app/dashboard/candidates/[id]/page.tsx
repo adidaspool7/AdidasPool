@@ -57,7 +57,18 @@ import {
   Upload,
   Trash2,
   Loader2,
+  Send,
 } from "lucide-react";
+import { Textarea } from "@client/components/ui/textarea";
+import { Input } from "@client/components/ui/input";
+import { Label } from "@client/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@client/components/ui/select";
 
 // ── Status helpers ────────────────────────────────────────────────
 
@@ -296,6 +307,292 @@ function ScoreRing({
   );
 }
 
+// ── Email templates ──────────────────────────────────────────────
+
+const EMAIL_TEMPLATES = [
+  {
+    id: "profile_interest",
+    label: "Profile Interest",
+    subject: "Your profile caught our attention — adidas Talent Team",
+    body: `Dear {name},
+
+My name is [Your Name] from the adidas Talent Acquisition team.
+
+I came across your profile and was genuinely impressed by your background. I believe you could be an excellent fit for one or more of our current open positions.
+
+I would love to connect and learn more about your career aspirations, and share more details about the opportunities we have available.
+
+Could we arrange a brief call at your convenience?
+
+Looking forward to hearing from you.
+
+Best regards,
+[Your Name]
+adidas Talent Acquisition`,
+  },
+  {
+    id: "interview_invitation",
+    label: "Interview Invitation",
+    subject: "Interview Invitation — adidas",
+    body: `Dear {name},
+
+Thank you for your interest in joining adidas.
+
+We have reviewed your application and are pleased to invite you to an interview. We would like to learn more about your experience and explore how your skills align with our current opportunities.
+
+Please reply to this email with your availability and we will coordinate a suitable time.
+
+We look forward to speaking with you.
+
+Best regards,
+[Your Name]
+adidas Talent Acquisition`,
+  },
+  {
+    id: "assessment_invitation",
+    label: "Assessment Invitation",
+    subject: "Next Step: Online Assessment — adidas",
+    body: `Dear {name},
+
+Thank you for your interest in adidas.
+
+As the next step in our selection process, we would like to invite you to complete an online assessment. This will help us better understand your skills and suitability for the role.
+
+You will receive a separate message with instructions shortly. Please complete the assessment within 48 hours of receiving it.
+
+If you have any questions, do not hesitate to reach out.
+
+Best regards,
+[Your Name]
+adidas Talent Acquisition`,
+  },
+  {
+    id: "status_update",
+    label: "Application Status Update",
+    subject: "Update on Your Application — adidas",
+    body: `Dear {name},
+
+Thank you for your patience while we review candidates for our open positions.
+
+We wanted to reach out and let you know that your application is currently under active consideration. We appreciate the time and effort you invested in sharing your profile with us.
+
+We will be in touch with further updates shortly.
+
+Best regards,
+[Your Name]
+adidas Talent Acquisition`,
+  },
+  {
+    id: "custom",
+    label: "Custom message",
+    subject: "",
+    body: "",
+  },
+] satisfies { id: string; label: string; subject: string; body: string }[];
+
+type TemplateId = (typeof EMAIL_TEMPLATES)[number]["id"];
+
+// ── Contact candidate dialog ──────────────────────────────────────
+
+function ContactCandidateDialog({
+  candidateId,
+  candidateName,
+  candidateEmail,
+}: {
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"compose" | "confirm">("compose");
+  const [templateId, setTemplateId] = useState<TemplateId>("profile_interest");
+  const [subject, setSubject] = useState(EMAIL_TEMPLATES[0].subject);
+  const [body, setBody] = useState(
+    EMAIL_TEMPLATES[0].body.replace(/\{name\}/g, candidateName)
+  );
+  const [sending, setSending] = useState(false);
+
+  function applyTemplate(id: TemplateId) {
+    setTemplateId(id);
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id)!;
+    setSubject(tpl.subject);
+    setBody(tpl.body.replace(/\{name\}/g, candidateName));
+  }
+
+  function handleOpen(isOpen: boolean) {
+    setOpen(isOpen);
+    if (isOpen) {
+      // Reset to first template each time the dialog opens
+      setStep("compose");
+      applyTemplate("profile_interest");
+    }
+  }
+
+  async function handleSend() {
+    setSending(true);
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, body }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to send");
+      toast.success(`Email sent to ${candidateName}`);
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send email");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const canProceed = subject.trim().length > 0 && body.trim().length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Send className="h-4 w-4 mr-1" />
+          Contact Candidate
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-2xl">
+        {step === "compose" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Contact Candidate</DialogTitle>
+              <DialogDescription>
+                Sending to{" "}
+                <span className="font-medium text-foreground">{candidateName}</span>
+                {" "}·{" "}
+                <span className="font-medium text-foreground">{candidateEmail}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              {/* Template selector */}
+              <div className="space-y-1.5">
+                <Label htmlFor="template-select">Template</Label>
+                <Select
+                  value={templateId}
+                  onValueChange={(v) => applyTemplate(v as TemplateId)}
+                >
+                  <SelectTrigger id="template-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EMAIL_TEMPLATES.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Subject */}
+              <div className="space-y-1.5">
+                <Label htmlFor="email-subject">Subject</Label>
+                <Input
+                  id="email-subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Email subject"
+                  maxLength={200}
+                />
+              </div>
+
+              {/* Body */}
+              <div className="space-y-1.5">
+                <Label htmlFor="email-body">Message</Label>
+                <Textarea
+                  id="email-body"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Write your message here…"
+                  rows={12}
+                  className="resize-y font-mono text-sm"
+                  maxLength={10000}
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {body.length} / 10 000
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!canProceed}
+                onClick={() => setStep("confirm")}
+              >
+                Review &amp; Send
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Confirm Send</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to send this email?
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2">
+              <div className="rounded-md border bg-muted/40 p-4 space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground min-w-[48px]">To:</span>
+                  <span className="font-medium">
+                    {candidateName} &lt;{candidateEmail}&gt;
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground min-w-[48px]">Subject:</span>
+                  <span className="font-medium">{subject}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-muted-foreground min-w-[48px]">Preview:</span>
+                  <span className="text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+                    {body.slice(0, 200)}{body.length > 200 ? "…" : ""}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setStep("compose")}
+                disabled={sending}
+              >
+                Go Back
+              </Button>
+              <Button onClick={handleSend} disabled={sending}>
+                {sending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-1" />
+                    Send Email
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────
 
 export default function CandidateDetailPage({
@@ -460,6 +757,14 @@ export default function CandidateDetailPage({
 
           {/* CV actions */}
           <div className="mt-4 flex flex-wrap gap-2">
+            {c.email && (
+              <ContactCandidateDialog
+                candidateId={c.id}
+                candidateName={`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()}
+                candidateEmail={c.email}
+              />
+            )}
+
             {c.rawCvUrl && (
               <a
                 href={`/api/upload/download?url=${encodeURIComponent(c.rawCvUrl)}`}
