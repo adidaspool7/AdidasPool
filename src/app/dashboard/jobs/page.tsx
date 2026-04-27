@@ -745,6 +745,22 @@ export default function JobsPage() {
     }
   }, [fetchJobs, role]);
 
+  // Debounced live search: re-fetch ~300ms after the user stops typing.
+  useEffect(() => {
+    if (searchInput === searchQuery) return;
+    const t = setTimeout(() => {
+      setSearchQuery(searchInput);
+      fetchJobs(
+        1,
+        searchInput || undefined,
+        departmentFilter.length > 0 ? departmentFilter : undefined,
+        countryFilter.length > 0 ? countryFilter : undefined,
+      );
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
   const handleApply = async (jobId: string) => {
     if (!candidateId || applyingJobId) return;
     setApplyingJobId(jobId);
@@ -916,16 +932,6 @@ export default function JobsPage() {
     }
   };
 
-  const handleSearch = () => {
-    setSearchQuery(searchInput);
-    fetchJobs(
-      1,
-      searchInput || undefined,
-      departmentFilter.length > 0 ? departmentFilter : undefined,
-      countryFilter.length > 0 ? countryFilter : undefined,
-    );
-  };
-
   const handlePageChange = (page: number) => {
     fetchJobs(
       page,
@@ -1020,9 +1026,6 @@ export default function JobsPage() {
             placeholder="Search by title…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSearch();
-            }}
             className="pl-10"
           />
         </div>
@@ -1060,9 +1063,6 @@ export default function JobsPage() {
           emptyMessage="No country found."
           widthClassName="w-[200px]"
         />
-        <Button variant="secondary" onClick={handleSearch}>
-          Search
-        </Button>
       </div>
 
       {/* Job list */}

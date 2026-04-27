@@ -1333,6 +1333,22 @@ export default function InternshipsPage() {
     }
   }, [fetchInternships, fetchApplications, role]);
 
+  // Debounced live search: re-fetch ~300ms after the user stops typing.
+  useEffect(() => {
+    if (searchInput === searchQuery) return;
+    const t = setTimeout(() => {
+      setSearchQuery(searchInput);
+      fetchInternships(
+        1,
+        searchInput || undefined,
+        departmentFilter.length > 0 ? departmentFilter : undefined,
+        countryFilter.length > 0 ? countryFilter : undefined,
+      );
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
   const handleApply = async (jobId: string) => {
     if (!candidateId || applyingJobId) return;
     setApplyingJobId(jobId);
@@ -1351,16 +1367,6 @@ export default function InternshipsPage() {
     } finally {
       setApplyingJobId(null);
     }
-  };
-
-  const handleSearch = () => {
-    setSearchQuery(searchInput);
-    fetchInternships(
-      1,
-      searchInput || undefined,
-      departmentFilter.length > 0 ? departmentFilter : undefined,
-      countryFilter.length > 0 ? countryFilter : undefined,
-    );
   };
 
   const handlePageChange = (page: number) => {
@@ -1445,9 +1451,6 @@ export default function InternshipsPage() {
             placeholder="Search by title…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSearch();
-            }}
             className="pl-10"
           />
         </div>
@@ -1485,9 +1488,6 @@ export default function InternshipsPage() {
           emptyMessage="No country found."
           widthClassName="w-[200px]"
         />
-        <Button variant="secondary" onClick={handleSearch}>
-          Search
-        </Button>
       </div>
 
       {/* Internships list */}
