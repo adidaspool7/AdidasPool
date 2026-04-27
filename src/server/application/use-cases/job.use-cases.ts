@@ -37,6 +37,7 @@ import {
   JOB_REQUIREMENTS_SCHEMA_VERSION,
   type JobRequirements,
 } from "@server/domain/services/job-requirements.schema";
+import { FIELDS_OF_WORK } from "@/client/lib/constants";
 import {
   computeJobFit,
   DEFAULT_FIT_CONFIG,
@@ -351,6 +352,22 @@ export class JobUseCases {
         if (!jdText || jdText.trim().length < 200) {
           // Description not on file — fetch from source page.
           if (!job.sourceUrl) {
+            // Manual job (no source URL): try synthesizing requirements
+            // from whatever structured fields HR filled in on the form.
+            const fullRow = await this.jobRepo.findById(job.id);
+            const manual = fullRow ? this.buildManualRequirements(fullRow) : null;
+            if (manual) {
+              await this.jobRepo.updateParsedRequirements(
+                job.id,
+                manual,
+                JOB_REQUIREMENTS_SCHEMA_VERSION
+              );
+              parsed++;
+              if (i < pending.length - 1 && delayMs > 0) {
+                await new Promise((r) => setTimeout(r, delayMs));
+              }
+              continue;
+            }
             throw new Error("No source_url and no on-file description");
           }
           const fetched = await this.jobScraperService.fetchJobDescription(
@@ -397,6 +414,97 @@ export class JobUseCases {
   }
 
   /**
+   * Synthesize a `JobRequirements` row directly from the structured fields
+   * an HR user filled in via the "Create New Job" form.
+   *
+   * Used for jobs that were created manually (no source_url, no scrape-derived
+   * description body) so that Job Matching still works without ever calling
+   * the LLM. Returns null when there isn't enough manual signal to be useful.
+   */
+  private buildManualRequirements(job: any): JobRequirements | null {
+    const dept: string | null =
+      typeof job.department === "string" ? job.department : null;
+    const skills: string[] = Array.isArray(job.requiredSkills)
+      ? (job.requiredSkills as unknown[]).filter(
+          (s): s is string => typeof s === "string" && s.trim().length > 0
+        )
+      : [];
+    const lang: string | null =
+      typeof job.requiredLanguage === "string" && job.requiredLanguage.trim()
+        ? job.requiredLanguage.trim()
+        : null;
+    const langLevel: string | null =
+      typeof job.requiredLanguageLevel === "string" &&
+      job.requiredLanguageLevel.trim()
+        ? job.requiredLanguageLevel.trim()
+        : null;
+    const eduLevel: string | null =
+      typeof job.requiredEducationLevel === "string" &&
+      job.requiredEducationLevel.trim()
+        ? job.requiredEducationLevel.trim()
+        : null;
+    const minYears: number | null =
+      typeof job.minYearsExperience === "number" ? job.minYearsExperience : null;
+    const description: string | null =
+      typeof job.description === "string" && job.description.trim()
+        ? job.description.trim()
+        : null;
+
+    // If absolutely no structured signal exists, give up — caller will throw.
+    const hasAnySignal =
+      skills.length > 0 ||
+      lang !== null ||
+      eduLevel !== null ||
+      minYears !== null ||
+      description !== null ||
+      dept !== null;
+    if (!hasAnySignal) return null;
+
+    // Match department against the canonical FIELDS_OF_WORK (case-insensitive,
+    // exact). Anything else is dropped — the matcher tolerates an empty array.
+    const fieldsOfWork: string[] = [];
+    if (dept) {
+      const lower = dept.toLowerCase();
+      const hit = FIELDS_OF_WORK.find((f) => f.toLowerCase() === lower);
+      if (hit) fieldsOfWork.push(hit);
+    }
+
+    const allowedCefr = new Set(["A1", "A2", "B1", "B2", "C1", "C2"]);
+    const allowedEdu = new Set([
+      "HIGH_SCHOOL",
+      "VOCATIONAL",
+      "BACHELOR",
+      "MASTER",
+      "PHD",
+      "OTHER",
+    ]);
+
+    const candidate = {
+      fieldsOfWork,
+      seniorityLevel: null,
+      minYearsInField: minYears,
+      requiredSkills: skills,
+      preferredSkills: [],
+      requiredLanguages: lang
+        ? [
+            {
+              language: lang,
+              cefr: langLevel && allowedCefr.has(langLevel) ? langLevel : null,
+            },
+          ]
+        : [],
+      requiredEducationLevel:
+        eduLevel && allowedEdu.has(eduLevel) ? eduLevel : null,
+      responsibilitiesSummary: description,
+      rawExtractionModel: "manual:hr-form",
+      rawExtractionTimestamp: new Date().toISOString(),
+    };
+
+    const parsed = JobRequirementsSchema.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
+  }
+
+  /**
    * Phase 3 lazy-parse wrapper.
    *
    * Returns the JD's structured requirements, parsing inline if the cache
@@ -434,15 +542,26 @@ export class JobUseCases {
 
     let jdText = (job.description as string | null) ?? "";
     if (!jdText || jdText.trim().length < 200) {
+      const sourceUrl = job.sourceUrl as string | null;
+      // Manually-created job (no source URL): synthesize requirements from
+      // the form fields the HR user filled in. Skips the LLM entirely.
+      if (!sourceUrl) {
+        const manual = this.buildManualRequirements(job);
+        if (manual) {
+          await this.jobRepo.updateParsedRequirements(
+            jobId,
+            manual,
+            JOB_REQUIREMENTS_SCHEMA_VERSION
+          );
+          return manual;
+        }
+        throw new Error(
+          `Job ${jobId} has no source_url and no on-file description`
+        );
+      }
       if (!this.jobScraperService) {
         throw new Error(
           `Job ${jobId} has no on-file description and the scraper is not configured`
-        );
-      }
-      const sourceUrl = job.sourceUrl as string | null;
-      if (!sourceUrl) {
-        throw new Error(
-          `Job ${jobId} has no source_url and no on-file description`
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
@@ -489,15 +608,25 @@ export class JobUseCases {
 
     let jdText = (job.description as string | null) ?? "";
     if (!jdText || jdText.trim().length < 200) {
+      const sourceUrl = job.sourceUrl as string | null;
+      // Manual job: synthesize from form fields, persist, return.
+      if (!sourceUrl) {
+        const manual = this.buildManualRequirements(job);
+        if (manual) {
+          await this.jobRepo.updateParsedRequirements(
+            jobId,
+            manual,
+            JOB_REQUIREMENTS_SCHEMA_VERSION
+          );
+          return manual;
+        }
+        throw new Error(
+          `Job ${jobId} has no source_url and no on-file description`
+        );
+      }
       if (!this.jobScraperService) {
         throw new Error(
           `Job ${jobId} has no on-file description and the scraper is not configured`
-        );
-      }
-      const sourceUrl = job.sourceUrl as string | null;
-      if (!sourceUrl) {
-        throw new Error(
-          `Job ${jobId} has no source_url and no on-file description`
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
