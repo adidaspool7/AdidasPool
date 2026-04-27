@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -66,9 +67,12 @@ import {
   StickyNote,
   Download,
   CheckSquare,
+  Send,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 import { useRole } from "@client/components/providers/role-provider";
+import { Textarea } from "@client/components/ui/textarea";
+import { Label } from "@client/components/ui/label";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -162,6 +166,43 @@ const ASSIGNABLE_STATUSES = [
   "REJECTED",
   "HIRED",
 ] as const;
+
+// ── Contact Candidate email templates ───────────────────────────
+
+const EMAIL_TEMPLATES = [
+  {
+    id: "profile_interest",
+    label: "Profile Interest",
+    subject: "Your profile caught our attention — adidas Talent Team",
+    body: `Dear {name},\n\nI hope this message finds you well.\n\nMy name is [Your Name] and I am part of the Talent Acquisition team at adidas. After reviewing your profile, I was genuinely impressed by your background and believe your skills and experience could be a great match for opportunities within our organisation.\n\nI would love to connect with you to explore whether there might be a mutual fit. Would you be open to a brief introductory call at your convenience?\n\nPlease feel free to reply to this email or suggest a time that works best for you.\n\nWarm regards,\n[Your Name]\nadidas Talent Team`,
+  },
+  {
+    id: "interview_invitation",
+    label: "Interview Invitation",
+    subject: "Interview Invitation — adidas",
+    body: `Dear {name},\n\nThank you for your interest in joining adidas. We are pleased to invite you to an interview for a position within our team.\n\nInterview details:\n- Date: [Date]\n- Time: [Time]\n- Format: [In-person / Video call]\n- Location / Link: [Location or meeting link]\n\nPlease confirm your availability by replying to this email. If the proposed time does not work for you, do not hesitate to let us know and we will do our best to accommodate an alternative.\n\nWe look forward to speaking with you.\n\nBest regards,\n[Your Name]\nadidas Talent Team`,
+  },
+  {
+    id: "assessment_invitation",
+    label: "Assessment Invitation",
+    subject: "Next Step: Online Assessment — adidas",
+    body: `Dear {name},\n\nCongratulations on progressing in our selection process!\n\nAs part of the next step, we would like to invite you to complete an online assessment. This will help us better understand your skills and how they align with the role.\n\nAssessment details:\n- Platform: [Platform name]\n- Deadline: [Deadline date]\n- Estimated duration: [Duration]\n- Access link: [Link]\n\nShould you have any questions or technical difficulties, please do not hesitate to reach out.\n\nWe wish you the best of luck!\n\nBest regards,\n[Your Name]\nadidas Talent Team`,
+  },
+  {
+    id: "status_update",
+    label: "Application Status Update",
+    subject: "Update on Your Application — adidas",
+    body: `Dear {name},\n\nThank you for your patience throughout our recruitment process.\n\nWe wanted to take a moment to update you on the status of your application. [Insert update here — e.g., "We are still reviewing applications and expect to reach out by [date]." or "We have moved to the next stage of our selection process."]\n\nWe appreciate your continued interest in adidas and will keep you informed of any further developments.\n\nThank you once again for your time.\n\nBest regards,\n[Your Name]\nadidas Talent Team`,
+  },
+  {
+    id: "custom",
+    label: "Custom message",
+    subject: "",
+    body: "",
+  },
+] satisfies { id: string; label: string; subject: string; body: string }[];
+
+type TemplateId = (typeof EMAIL_TEMPLATES)[number]["id"];
 
 // ── Score helpers ────────────────────────────────────────────────
 
@@ -467,6 +508,14 @@ export default function CandidatesPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
 
+  // ── Row action: Contact Candidate dialog ─────────────────────
+  const [contactDialogFor, setContactDialogFor] = useState<Candidate | null>(null);
+  const [contactStep, setContactStep] = useState<"compose" | "confirm">("compose");
+  const [contactTemplateId, setContactTemplateId] = useState<TemplateId>("profile_interest");
+  const [contactSubject, setContactSubject] = useState(EMAIL_TEMPLATES[0].subject);
+  const [contactBody, setContactBody] = useState(EMAIL_TEMPLATES[0].body);
+  const [contactSending, setContactSending] = useState(false);
+
   // ── Bulk selection ───────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -595,6 +644,43 @@ export default function CandidatesPage() {
       /* silent */
     } finally {
       setNoteSaving(false);
+    }
+  }
+
+  function openContactDialog(c: Candidate) {
+    const name = `${c.firstName} ${c.lastName}`;
+    const firstTpl = EMAIL_TEMPLATES[0];
+    setContactTemplateId("profile_interest");
+    setContactSubject(firstTpl.subject);
+    setContactBody(firstTpl.body.replace(/\{name\}/g, name));
+    setContactStep("compose");
+    setContactDialogFor(c);
+  }
+
+  function applyContactTemplate(id: TemplateId, candidateName: string) {
+    setContactTemplateId(id);
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id)!;
+    setContactSubject(tpl.subject);
+    setContactBody(tpl.body.replace(/\{name\}/g, candidateName));
+  }
+
+  async function sendContactEmail() {
+    if (!contactDialogFor) return;
+    setContactSending(true);
+    try {
+      const res = await fetch(`/api/candidates/${contactDialogFor.id}/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: contactSubject, body: contactBody }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to send");
+      toast.success(`Email sent to ${contactDialogFor.firstName} ${contactDialogFor.lastName}`);
+      setContactDialogFor(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send email");
+    } finally {
+      setContactSending(false);
     }
   }
 
@@ -1172,16 +1258,15 @@ export default function CandidatesPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuItem onClick={() => router.push(`/dashboard/candidates/${c.id}`)}>
-                            <UserCircle className="h-4 w-4 mr-2" /> Open profile
+                            <UserCircle className="h-4 w-4 mr-2" /> See Candidate Profile
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/dashboard/ai-interview?candidateId=${c.id}`)}>
-                            <Mic className="h-4 w-4 mr-2" /> Start interview
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/dashboard/assessments?candidateId=${c.id}`)}>
-                            <FileText className="h-4 w-4 mr-2" /> Assign assessment
-                          </DropdownMenuItem>
+                          {c.email && (
+                            <DropdownMenuItem onClick={() => openContactDialog(c)}>
+                              <Send className="h-4 w-4 mr-2" /> Contact Candidate
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => {
                               setNoteDialogFor(c);
@@ -1189,6 +1274,12 @@ export default function CandidatesPage() {
                             }}
                           >
                             <StickyNote className="h-4 w-4 mr-2" /> Add note
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/assessments?candidateId=${c.id}`)}>
+                            <FileText className="h-4 w-4 mr-2" /> Assign assessment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/ai-interview?candidateId=${c.id}`)}>
+                            <Mic className="h-4 w-4 mr-2" /> Start interview
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1275,6 +1366,142 @@ export default function CandidatesPage() {
               Save note
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Contact Candidate Dialog (row quick-action) ──────────── */}
+      <Dialog
+        open={contactDialogFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setContactDialogFor(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          {contactStep === "compose" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5" />
+                  Contact Candidate
+                </DialogTitle>
+                <DialogDescription>
+                  Sending to{" "}
+                  <span className="font-medium text-foreground">
+                    {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}
+                  </span>
+                  {" · "}
+                  <span className="font-medium text-foreground">
+                    {contactDialogFor?.email ?? ""}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact-template-select">Template</Label>
+                  <Select
+                    value={contactTemplateId}
+                    onValueChange={(v) =>
+                      applyContactTemplate(
+                        v as TemplateId,
+                        contactDialogFor
+                          ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}`
+                          : ""
+                      )
+                    }
+                  >
+                    <SelectTrigger id="contact-template-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EMAIL_TEMPLATES.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact-subject">Subject</Label>
+                  <Input
+                    id="contact-subject"
+                    value={contactSubject}
+                    onChange={(e) => setContactSubject(e.target.value)}
+                    placeholder="Email subject"
+                    maxLength={200}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact-body">Message</Label>
+                  <Textarea
+                    id="contact-body"
+                    value={contactBody}
+                    onChange={(e) => setContactBody(e.target.value)}
+                    placeholder="Write your message here…"
+                    rows={12}
+                    className="resize-y font-mono text-sm"
+                    maxLength={10000}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {contactBody.length} / 10 000
+                  </p>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setContactDialogFor(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!contactSubject.trim() || !contactBody.trim()}
+                  onClick={() => setContactStep("confirm")}
+                >
+                  Review &amp; Send
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Confirm &amp; Send</DialogTitle>
+                <DialogDescription>
+                  Please review your message before sending.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium text-muted-foreground">To: </span>
+                  {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}{" "}
+                  &lt;{contactDialogFor?.email ?? ""}&gt;
+                </div>
+                <div>
+                  <span className="font-medium text-muted-foreground">Subject: </span>
+                  {contactSubject}
+                </div>
+                <div className="rounded-md border bg-muted/40 p-3 text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {contactBody.slice(0, 400)}{contactBody.length > 400 ? "…" : ""}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="ghost"
+                  onClick={() => setContactStep("compose")}
+                  disabled={contactSending}
+                >
+                  Go Back
+                </Button>
+                <Button onClick={sendContactEmail} disabled={contactSending}>
+                  {contactSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  Send Email
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
