@@ -40,6 +40,7 @@ import {
   CheckCircle2,
   Globe,
   Search,
+  Clock,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -52,6 +53,30 @@ import { Input } from "@client/components/ui/input";
 import { useRole } from "@client/components/providers/role-provider";
 import { FIELDS_OF_WORK, formatCountryLabel } from "@client/lib/constants";
 import { MultiSelectCombobox } from "@client/components/ui/multi-select-combobox";
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Format an ISO timestamp as a short relative-time label
+ * ("Today", "Yesterday", "5d ago", "3w ago", "2mo ago", "1y ago").
+ */
+function formatPostedAgo(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const diffMs = Date.now() - then;
+  const day = 24 * 60 * 60 * 1000;
+  const days = Math.floor(diffMs / day);
+  if (days < 0) return "Just posted";
+  if (days === 0) return "Posted today";
+  if (days === 1) return "Posted yesterday";
+  if (days < 7) return `Posted ${days}d ago`;
+  if (days < 30) return `Posted ${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `Posted ${Math.floor(days / 30)}mo ago`;
+  return `Posted ${Math.floor(days / 365)}y ago`;
+}
 
 // ============================================
 // TYPES
@@ -68,6 +93,7 @@ interface Job {
   sourceUrl: string | null;
   externalId: string | null;
   createdAt: string;
+  postedAt?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   stipend?: string | null;
@@ -462,6 +488,15 @@ function JobCard({
                 <span className="flex items-center gap-1">
                   <Globe className="h-3 w-3" />
                   {job.country}
+                </span>
+              )}
+              {job.postedAt && (
+                <span
+                  className="flex items-center gap-1"
+                  title={new Date(job.postedAt).toLocaleDateString()}
+                >
+                  <Clock className="h-3 w-3" />
+                  {formatPostedAgo(job.postedAt)}
                 </span>
               )}
             </CardDescription>

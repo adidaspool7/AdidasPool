@@ -147,6 +147,8 @@ export interface ScrapedJob {
   description?: string | null;
   /** Employment type inferred from the posting (e.g. INTERNSHIP detected from title). */
   type?: "FULL_TIME" | "PART_TIME" | "INTERNSHIP" | "CONTRACT" | null;
+  /** ISO timestamp of when the job was posted, parsed from the listing's "Posted Date" cell. Null if unavailable or unparseable. */
+  postedAt?: string | null;
 }
 
 export interface IJobScraperService {

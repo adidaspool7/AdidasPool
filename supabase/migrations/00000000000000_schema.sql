@@ -337,6 +337,12 @@ CREATE TABLE jobs (
   -- External source
   external_id              TEXT UNIQUE,
   source_url               TEXT,
+  -- When the job was originally posted on the source careers site,
+  -- parsed from the listing's "Posted Date" cell. Captured once on
+  -- first sight and never overwritten on subsequent syncs (so the
+  -- value remains the *original* posting date even if the listing
+  -- re-renders the row weeks later).
+  posted_at                TIMESTAMPTZ,
 
   -- Requirements
   required_language        TEXT,
@@ -363,6 +369,7 @@ CREATE TRIGGER trg_jobs_updated_at
 CREATE INDEX idx_jobs_status      ON jobs(status);
 CREATE INDEX idx_jobs_external_id ON jobs(external_id);
 CREATE INDEX idx_jobs_type        ON jobs(type);
+CREATE INDEX idx_jobs_posted_at   ON jobs(posted_at DESC NULLS LAST);
 -- Partial index: quickly find jobs still needing parsing
 -- (used by the backfill script + post-sync extractor worker).
 CREATE INDEX idx_jobs_parsed_requirements_pending

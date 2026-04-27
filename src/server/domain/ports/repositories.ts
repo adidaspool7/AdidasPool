@@ -163,6 +163,7 @@ export interface IJobRepository {
       sourceUrl: string;
       description?: string | null;
       type?: string | null;
+      postedAt?: string | null;
     }[]
   ): Promise<{ created: number; updated: number }>;
   /**

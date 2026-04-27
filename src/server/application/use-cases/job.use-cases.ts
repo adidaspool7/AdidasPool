@@ -292,6 +292,7 @@ export class JobUseCases {
         // Preserve detected employment type (e.g. INTERNSHIP) so scraped
         // internships land on the Internships page and not Job Openings.
         type: j.type ?? "FULL_TIME",
+        postedAt: j.postedAt ?? null,
       }))
     );
 

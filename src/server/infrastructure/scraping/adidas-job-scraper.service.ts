@@ -96,6 +96,46 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Parse the listing's "Posted Date" cell into an ISO timestamp.
+ *
+ * adidas serves a single global portal (jobs.adidas-group.com) and the
+ * listing renders dates in a stable English short-month format like
+ * "Apr 26, 2026" regardless of the visitor's locale. We parse strictly:
+ * if the format ever drifts (e.g. localized site rolls out, theme
+ * change), we return null rather than guess and persist a wrong date.
+ *
+ * Returns the date at 00:00:00 UTC so two jobs posted on the same
+ * calendar day compare equal regardless of server timezone.
+ */
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+export function parseListingPostedDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const text = raw.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  // Strict: "MMM d, yyyy" or "MMM dd, yyyy". Case-insensitive month.
+  const m = text.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/);
+  if (!m) return null;
+  const month = MONTH_INDEX[m[1].toLowerCase()];
+  if (month === undefined) return null;
+  const day = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (day < 1 || day > 31 || year < 2000 || year > 2100) return null;
+  const d = new Date(Date.UTC(year, month, day));
+  // Sanity check: reject if Date normalized away (e.g. Feb 30 → Mar 2)
+  if (
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() !== month ||
+    d.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return d.toISOString();
+}
+
+/**
  * Detect whether a posting is an internship based on title and department.
  * Adidas uses several languages across their regional careers sites, so we
  * match a wide set of keywords. Matches are word-boundary-safe where possible
@@ -363,6 +403,13 @@ export class AdidasJobScraperService implements IJobScraperService {
       // Cell 2: department (e.g. "Retail", "Finance")
       const department = $(cells[2]).text().trim() || null;
 
+      // Cell 3: posted date (e.g. "Apr 26, 2026"). May be missing on
+      // legacy theme variants — parser returns null on any deviation.
+      const postedAtRaw = cells.length >= 4
+        ? $(cells[3]).find("span.jobDate").text().trim() || $(cells[3]).text().trim()
+        : null;
+      const postedAt = parseListingPostedDate(postedAtRaw);
+
       // Extract country and clean location
       const country = locationRaw ? extractCountry(locationRaw) : null;
       const location = locationRaw ? cleanLocation(locationRaw) : null;
@@ -378,6 +425,7 @@ export class AdidasJobScraperService implements IJobScraperService {
         country,
         sourceUrl: href.startsWith("http") ? href : `${BASE_URL}${href}`,
         type: isInternship ? "INTERNSHIP" : null,
+        postedAt,
       });
     });
 

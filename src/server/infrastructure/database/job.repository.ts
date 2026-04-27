@@ -268,6 +268,7 @@ export class SupabaseJobRepository implements IJobRepository {
       sourceUrl: string;
       description?: string | null;
       type?: string | null;
+      postedAt?: string | null;
     }[]
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
@@ -284,14 +285,14 @@ export class SupabaseJobRepository implements IJobRepository {
     const externalIds = jobs.map((j) => j.externalId);
     const existingMap = new Map<
       string,
-      { id: string; source_url: string | null; status: string }
+      { id: string; source_url: string | null; status: string; posted_at: string | null }
     >();
     const ID_QUERY_CHUNK = 500;
     for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
       const idChunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
       const { data: existing } = await db
         .from("jobs")
-        .select("id, external_id, source_url, status")
+        .select("id, external_id, source_url, status, posted_at")
         .in("external_id", idChunk);
       for (const r of existing ?? []) {
         const row = r as {
@@ -299,11 +300,13 @@ export class SupabaseJobRepository implements IJobRepository {
           external_id: string;
           source_url: string | null;
           status: string;
+          posted_at: string | null;
         };
         existingMap.set(row.external_id, {
           id: row.id,
           source_url: row.source_url,
           status: row.status,
+          posted_at: row.posted_at,
         });
       }
     }
@@ -330,6 +333,11 @@ export class SupabaseJobRepository implements IJobRepository {
         // this column would send explicit NULL via PostgREST and violate
         // the NOT NULL constraint on `jobs.status`.
         status: existing?.status ?? "OPEN",
+        // Preserve the earliest known posted_at: keep the existing value
+        // if we already captured one (the source listing only ever shows
+        // the original posting date). Only fill in from the scrape when
+        // we have nothing yet.
+        posted_at: existing?.posted_at ?? j.postedAt ?? null,
       };
       if (sourceUrlChanged) {
         baseRow.parsed_requirements = null;
