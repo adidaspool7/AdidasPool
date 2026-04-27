@@ -196,6 +196,15 @@ export class AdidasJobScraperService implements IJobScraperService {
   /**
    * Scrape all pages for a given sort direction, adding unique jobs to the
    * shared allJobs array. Returns the totalResults reported by the server.
+   *
+   * Resilience:
+   *   - If the first page returns 0 jobs *and* 0 totalResults we treat the
+   *     response as corrupt (likely a maintenance page or a layout change
+   *     on adidas's side) and bail out early so the sync job records a
+   *     clear failure instead of silently importing nothing.
+   *   - If a subsequent page returns 0 jobs we consider it a transient
+   *     failure, log it, and continue — the overlap (PAGE_STEP < page size)
+   *     plus the asc/desc verification pass usually fills the gap.
    */
   private async scrapeWithSort(
     sortDirection: "asc" | "desc",
@@ -206,6 +215,14 @@ export class AdidasJobScraperService implements IJobScraperService {
     // Fetch first page to get total count
     const firstPageResult = await this.fetchPage(0, sortDirection);
     const totalResults = firstPageResult.totalResults;
+
+    if (firstPageResult.jobs.length === 0 && totalResults === 0) {
+      throw new Error(
+        `[JobScraper] First page (${sortDirection}) returned no jobs and no total-count text — ` +
+          `adidas careers site likely returned an unexpected response. Aborting this pass.`
+      );
+    }
+
     this.addUniqueJobs(allJobs, seenIds, firstPageResult.jobs);
 
     const totalPages = Math.ceil(totalResults / PAGE_STEP);
@@ -217,15 +234,33 @@ export class AdidasJobScraperService implements IJobScraperService {
     );
 
     let currentStep = 1;
+    let consecutiveEmptyPages = 0;
     while (currentStep < pagesToScrape) {
       await sleep(FETCH_DELAY_MS);
       const startRow = currentStep * PAGE_STEP;
       try {
         const pageResult = await this.fetchPage(startRow, sortDirection);
-        this.addUniqueJobs(allJobs, seenIds, pageResult.jobs);
-        console.log(
-          `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total unique: ${allJobs.length})`
-        );
+        if (pageResult.jobs.length === 0) {
+          consecutiveEmptyPages++;
+          console.warn(
+            `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape} returned 0 jobs (empty streak: ${consecutiveEmptyPages})`
+          );
+          // Three empty pages in a row strongly suggests we've walked
+          // off the end of the result set or hit a server-side block.
+          // Stop early rather than hammering for nothing.
+          if (consecutiveEmptyPages >= 3) {
+            console.warn(
+              `[JobScraper] [${sortDirection}] Stopping early after 3 empty pages.`
+            );
+            break;
+          }
+        } else {
+          consecutiveEmptyPages = 0;
+          this.addUniqueJobs(allJobs, seenIds, pageResult.jobs);
+          console.log(
+            `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total unique: ${allJobs.length})`
+          );
+        }
       } catch (err) {
         console.error(
           `[JobScraper] [${sortDirection}] Error fetching page ${currentStep + 1}:`,
@@ -240,6 +275,9 @@ export class AdidasJobScraperService implements IJobScraperService {
 
   /**
    * Fetch and parse a single page of search results.
+   *
+   * Validates the response body length so we don't try to parse a
+   * truncated/empty stream as if it were a real results page.
    */
   private async fetchPage(
     startRow: number,
@@ -264,6 +302,13 @@ export class AdidasJobScraperService implements IJobScraperService {
     }
 
     const html = await response.text();
+    // The real results page is ~80–150KB. Anything substantially smaller is
+    // either an error page, a captcha, or a truncated response.
+    if (html.length < 5000) {
+      throw new Error(
+        `Suspiciously small response (${html.length} bytes) for startrow=${startRow}; treating as failure.`
+      );
+    }
     return this.parsePage(html);
   }
 
@@ -442,17 +487,39 @@ export class AdidasJobScraperService implements IJobScraperService {
   /**
    * Heuristic guard against feeding cookie-banner / nav-chrome text to the
    * LLM when the JD body container is empty or missing.
+   *
+   * A real job description has:
+   *   - at least ~200 chars
+   *   - several full sentences (≥ 3 terminators . ! ?)
+   *   - no obvious chrome markers (cookie / search widget / inline JS)
+   *   - more letter content than punctuation/whitespace noise
    */
   private looksLikeJobDescription(text: string): boolean {
     if (text.length < 200) return false;
+
     // Pages that render only chrome/JS contain these markers.
     const chromeMarkers = [
       /Skip to main content/i,
       /Search by Keyword/i,
+      /Search by Location/i,
       /j2w\.init/i,
       /<!\[CDATA\[/,
+      /Cookies Settings/i,
+      /Accept All Cookies/i,
+      /Privacy Policy/i,
     ];
     if (chromeMarkers.some((re) => re.test(text))) return false;
+
+    // Real prose has multiple sentences. Cookie banners are mostly bullets
+    // or single-line legal blurbs.
+    const sentenceCount = (text.match(/[.!?](\s|$)/g) ?? []).length;
+    if (sentenceCount < 3) return false;
+
+    // Letter-to-total ratio: chrome dumps are heavy on punctuation,
+    // whitespace, and ALL-CAPS labels. Real JDs are mostly letters.
+    const letterCount = (text.match(/[A-Za-z\u00C0-\u024F]/g) ?? []).length;
+    if (letterCount / text.length < 0.55) return false;
+
     return true;
   }
 }
