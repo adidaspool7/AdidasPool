@@ -55,6 +55,14 @@ export interface CandidateFitInput {
   evidenceTexts?: string[];
   /** Optional pre-computed seniority (Phase 5 will compute this). */
   seniorityLevel?: SeniorityLevel | null;
+  /**
+   * Raw per-experience records used to prevent double-counting when an
+   * experience is tagged with multiple fields and the JD also requires
+   * multiple fields. Each entry is independent (one entry per experience
+   * row). `matchExperience` uses this when available; falls back to
+   * `experienceByField` summation otherwise.
+   */
+  rawExperiences?: Array<{ fields: string[]; years: number }>;
 }
 
 export interface CriterionResult {
@@ -243,12 +251,24 @@ export function matchExperience(
   }
   const required = job.minYearsInField;
   const yearsInScope =
-    job.fieldsOfWork.length > 0
-      ? job.fieldsOfWork.reduce(
+    job.fieldsOfWork.length === 0
+      ? candidate.totalYearsExperience
+      : candidate.rawExperiences
+      ? // Preferred path: count each experience at most once, regardless of
+        // how many required fields it is tagged with. Prevents double-counting
+        // when an experience spans e.g. ["Digital", "Technology"] and the JD
+        // also requires both.
+        candidate.rawExperiences.reduce((sum, exp) => {
+          const hasOverlap = exp.fields.some((f) =>
+            job.fieldsOfWork.includes(f)
+          );
+          return hasOverlap ? sum + exp.years : sum;
+        }, 0)
+      : // Legacy path (no rawExperiences): sum per-field (may double-count).
+        job.fieldsOfWork.reduce(
           (sum, f) => sum + (candidate.experienceByField[f] ?? 0),
           0
-        )
-      : candidate.totalYearsExperience;
+        );
 
   const ratio = required <= 0 ? 1 : yearsInScope / required;
   const score = Math.round(Math.min(1, ratio) * 100);

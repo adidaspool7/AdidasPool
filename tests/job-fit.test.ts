@@ -160,6 +160,44 @@ describe("matchExperience", () => {
     );
     expect(r.score).toBe(100);
   });
+
+  it("does NOT double-count an experience tagged with multiple required fields", () => {
+    // Regression: a 10-year experience tagged ["Digital","Technology"] was
+    // previously counted as 10+10=20 when the JD required both fields.
+    const r = matchExperience(
+      { ...baseJob, fieldsOfWork: ["Digital", "Technology"], minYearsInField: 2 },
+      {
+        ...baseCandidate,
+        // experienceByField correctly reflects 10y in each field (concurrent)
+        experienceByField: { Digital: 10, Technology: 10 },
+        totalYearsExperience: 10,
+        // rawExperiences: one job entry spanning both fields
+        rawExperiences: [{ fields: ["Digital", "Technology"], years: 10 }],
+      }
+    );
+    // Should count 10 unique years, NOT 20
+    expect(r.detail).toContain("10.0y");
+    expect(r.met).toBe(true);
+    expect(r.score).toBe(100);
+  });
+
+  it("correctly sums non-overlapping experiences across required fields", () => {
+    // 3y pure Digital + 2y pure Technology = 5y total, no double-counting
+    const r = matchExperience(
+      { ...baseJob, fieldsOfWork: ["Digital", "Technology"], minYearsInField: 4 },
+      {
+        ...baseCandidate,
+        experienceByField: { Digital: 3, Technology: 2 },
+        totalYearsExperience: 5,
+        rawExperiences: [
+          { fields: ["Digital"], years: 3 },
+          { fields: ["Technology"], years: 2 },
+        ],
+      }
+    );
+    expect(r.detail).toContain("5.0y");
+    expect(r.met).toBe(true);
+  });
 });
 
 describe("matchSeniority", () => {

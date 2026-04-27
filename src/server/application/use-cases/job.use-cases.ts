@@ -773,6 +773,7 @@ export class JobUseCases {
 function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
   const experiences = Array.isArray(c.experiences) ? c.experiences : [];
   const experienceByField: Record<string, number> = {};
+  const rawExperiences: Array<{ fields: string[]; years: number }> = [];
   let totalYears = 0;
   for (const exp of experiences) {
     const years = experienceDurationYears(
@@ -783,6 +784,7 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     if (years <= 0) continue;
     totalYears += years;
     const fields: string[] = Array.isArray(exp.fieldsOfWork) ? exp.fieldsOfWork : [];
+    rawExperiences.push({ fields, years: Math.round(years * 10) / 10 });
     for (const f of fields) {
       experienceByField[f] = (experienceByField[f] ?? 0) + years;
     }
@@ -830,6 +832,7 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     evidenceTexts: experiences
       .map((exp: any) => String(exp.title ?? ""))
       .filter((s: string) => s.length > 0),
+    rawExperiences,
   };
 }
 
