@@ -53,6 +53,7 @@ import {
   Copy,
   Trash2,
   MoreHorizontal,
+  Clock,
 } from "lucide-react";
 import { Input } from "@client/components/ui/input";
 import { useRole } from "@client/components/providers/role-provider";
@@ -94,6 +95,23 @@ interface Internship {
   minYearsExperience: number | null;
   requiredEducationLevel: string | null;
   _count?: { matches: number; assessments: number };
+  postedAt?: string | null;
+}
+
+function formatPostedAgo(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const diffMs = Date.now() - then;
+  const day = 24 * 60 * 60 * 1000;
+  const days = Math.floor(diffMs / day);
+  if (days < 0) return "Just posted";
+  if (days === 0) return "Posted today";
+  if (days === 1) return "Posted yesterday";
+  if (days < 7) return `Posted ${days}d ago`;
+  if (days < 30) return `Posted ${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `Posted ${Math.floor(days / 30)}mo ago`;
+  return `Posted ${Math.floor(days / 365)}y ago`;
 }
 
 interface Pagination {
@@ -1012,6 +1030,12 @@ function InternshipCard({
                   <span className="flex items-center gap-1">
                     <Globe className="h-3 w-3" />
                     {internship.country}
+                  </span>
+                )}
+                {formatPostedAgo(internship.postedAt) && (
+                  <span className="flex items-center gap-1 text-muted-foreground" title={internship.postedAt ? new Date(internship.postedAt).toLocaleDateString() : undefined}>
+                    <Clock className="h-3 w-3" />
+                    {formatPostedAgo(internship.postedAt)}
                   </span>
                 )}
               </CardDescription>
