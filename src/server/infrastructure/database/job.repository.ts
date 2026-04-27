@@ -272,22 +272,39 @@ export class SupabaseJobRepository implements IJobRepository {
   ): Promise<{ created: number; updated: number }> {
     if (jobs.length === 0) return { created: 0, updated: 0 };
 
-    // Get existing jobs (id + external_id + source_url) in chunked queries to avoid PostgREST row limits.
-    // We need the existing id to avoid overwriting PKs that have FK references,
-    // and the existing source_url to detect changes that should invalidate
-    // any cached parsed_requirements (Phase 1.5 sync invalidation).
+    // Get existing jobs (id + external_id + source_url + status) in chunked queries
+    // to avoid PostgREST row limits.
+    // We need:
+    //   - the existing id to avoid overwriting PKs that have FK references,
+    //   - the existing source_url to detect changes that should invalidate
+    //     any cached parsed_requirements (Phase 1.5 sync invalidation),
+    //   - the existing status so we don't accidentally re-OPEN a job that we
+    //     previously marked CLOSED (and so we don't send NULL into a NOT NULL
+    //     column when the row pre-exists).
     const externalIds = jobs.map((j) => j.externalId);
-    const existingMap = new Map<string, { id: string; source_url: string | null }>();
+    const existingMap = new Map<
+      string,
+      { id: string; source_url: string | null; status: string }
+    >();
     const ID_QUERY_CHUNK = 500;
     for (let i = 0; i < externalIds.length; i += ID_QUERY_CHUNK) {
       const idChunk = externalIds.slice(i, i + ID_QUERY_CHUNK);
       const { data: existing } = await db
         .from("jobs")
-        .select("id, external_id, source_url")
+        .select("id, external_id, source_url, status")
         .in("external_id", idChunk);
       for (const r of existing ?? []) {
-        const row = r as { id: string; external_id: string; source_url: string | null };
-        existingMap.set(row.external_id, { id: row.id, source_url: row.source_url });
+        const row = r as {
+          id: string;
+          external_id: string;
+          source_url: string | null;
+          status: string;
+        };
+        existingMap.set(row.external_id, {
+          id: row.id,
+          source_url: row.source_url,
+          status: row.status,
+        });
       }
     }
 
@@ -308,13 +325,12 @@ export class SupabaseJobRepository implements IJobRepository {
         source_url: j.sourceUrl,
         description: j.description ?? null,
         type: j.type ?? "FULL_TIME",
+        // Always include status: preserve existing (so a previously-detected
+        // CLOSED job stays CLOSED), default to OPEN for new rows. Omitting
+        // this column would send explicit NULL via PostgREST and violate
+        // the NOT NULL constraint on `jobs.status`.
+        status: existing?.status ?? "OPEN",
       };
-      // Only seed status='OPEN' on first insert. Existing rows keep their
-      // current status so a previously detected CLOSED job isn't silently
-      // re-opened by a subsequent sync of the listing page.
-      if (!existing) {
-        baseRow.status = "OPEN";
-      }
       if (sourceUrlChanged) {
         baseRow.parsed_requirements = null;
         baseRow.parsed_requirements_version = null;
