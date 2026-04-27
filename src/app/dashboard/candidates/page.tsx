@@ -234,12 +234,9 @@ function LanguagePills({
 }: {
   languages: { language: string; selfDeclaredLevel: string | null }[];
 }) {
-  const MAX_VISIBLE = 3;
-  const visible = languages.slice(0, MAX_VISIBLE);
-  const hidden = languages.slice(MAX_VISIBLE);
   return (
-    <div className="flex flex-wrap justify-center gap-1">
-      {visible.map((l, i) => (
+    <div className="flex flex-col items-center gap-0.5">
+      {languages.map((l, i) => (
         <span
           key={i}
           title={`${l.language}${l.selfDeclaredLevel ? ` · ${l.selfDeclaredLevel}` : ""}`}
@@ -251,28 +248,6 @@ function LanguagePills({
           )}
         </span>
       ))}
-      {hidden.length > 0 && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent transition-colors"
-            >
-              +{hidden.length}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" align="center">
-            <div className="flex flex-col gap-1">
-              {languages.map((l, i) => (
-                <span key={i} className="text-xs whitespace-nowrap">
-                  {l.language}
-                  {l.selfDeclaredLevel ? ` · ${l.selfDeclaredLevel}` : ""}
-                </span>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
     </div>
   );
 }
