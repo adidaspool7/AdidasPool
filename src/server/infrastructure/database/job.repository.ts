@@ -383,18 +383,24 @@ export class SupabaseJobRepository implements IJobRepository {
 
   async findUnparsedJobs(
     limit: number
-  ): Promise<Array<{ id: string; sourceUrl: string | null; description: string | null }>> {
+  ): Promise<Array<{ id: string; title: string; sourceUrl: string | null; description: string | null }>> {
     const { data, error } = await db
       .from("jobs")
-      .select("id, source_url, description")
+      .select("id, title, source_url, description")
       .is("parsed_requirements", null)
       .not("source_url", "is", null)
       .limit(limit);
     assertNoError(error, "job.findUnparsedJobs");
     return (data ?? []).map((r) => {
-      const row = r as { id: string; source_url: string | null; description: string | null };
+      const row = r as {
+        id: string;
+        title: string;
+        source_url: string | null;
+        description: string | null;
+      };
       return {
         id: row.id,
+        title: row.title,
         sourceUrl: row.source_url,
         description: row.description,
       };

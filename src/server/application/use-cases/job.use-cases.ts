@@ -50,7 +50,7 @@ import {
  * infrastructure class directly.
  */
 export interface IJobRequirementsExtractor {
-  extract(jdText: string): Promise<Record<string, unknown>>;
+  extract(jdText: string, jobTitle?: string): Promise<Record<string, unknown>>;
   readonly schemaVersion: number;
 }
 
@@ -366,7 +366,7 @@ export class JobUseCases {
           jdText = fetched.body;
         }
 
-        const extracted = await this.requirementsExtractor.extract(jdText);
+        const extracted = await this.requirementsExtractor.extract(jdText, job.title);
         await this.jobRepo.updateParsedRequirements(
           job.id,
           extracted,
@@ -459,7 +459,7 @@ export class JobUseCases {
       jdText = fetched.body;
     }
 
-    const extracted = await this.requirementsExtractor.extract(jdText);
+    const extracted = await this.requirementsExtractor.extract(jdText, job.title);
     await this.jobRepo.updateParsedRequirements(
       jobId,
       extracted,
@@ -514,7 +514,7 @@ export class JobUseCases {
       jdText = fetched.body;
     }
 
-    const extracted = await this.requirementsExtractor.extract(jdText);
+    const extracted = await this.requirementsExtractor.extract(jdText, job.title);
     await this.jobRepo.updateParsedRequirements(
       jobId,
       extracted,

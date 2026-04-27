@@ -171,7 +171,7 @@ export interface IJobRepository {
    * script and the post-sync extractor worker.
    */
   findUnparsedJobs(limit: number): Promise<
-    Array<{ id: string; sourceUrl: string | null; description: string | null }>
+    Array<{ id: string; title: string; sourceUrl: string | null; description: string | null }>
   >;
   /**
    * Lightweight list of all jobs for searchable pickers/dropdowns.

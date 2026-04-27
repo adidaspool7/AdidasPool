@@ -18,8 +18,18 @@
 import { z } from "zod";
 import { FIELDS_OF_WORK } from "@/client/lib/constants";
 
-/** Current schema version. Bump when the shape changes incompatibly. */
-export const JOB_REQUIREMENTS_SCHEMA_VERSION = 1;
+/**
+ * Current schema version. Bump when the shape changes incompatibly OR when
+ * the extraction prompt changes in a way that produces materially different
+ * output (so cached rows become stale and lazy-parse re-runs).
+ *
+ * v2 (2026-04-27): multilingual prompt — LLM now reads PT/ES/FR/DE/IT
+ * job descriptions and writes the *output* strings in English, normalizes
+ * education terms (Licenciatura/Diplom/Diplôme → BACHELOR), maps
+ * "B2 inglés"-style language requirements, infers requirements from
+ * sectionless prose, and uses title-based seniority hints.
+ */
+export const JOB_REQUIREMENTS_SCHEMA_VERSION = 2;
 
 export const SeniorityLevelSchema = z.enum([
   "INTERN",
