@@ -102,7 +102,7 @@ CREATE TYPE notification_type AS ENUM (
   'HR_APPLICATION_RECEIVED', 'HR_APPLICATION_WITHDRAWN',
   'HR_ASSESSMENT_COMPLETED', 'HR_CV_UPLOADED',
   'PROMOTIONAL', 'CV_UPLOADED', 'STATUS_CHANGE',
-  'JOB_INVITATION'
+  'JOB_INVITATION', 'CONTACT_EMAIL_SENT'
 );
 
 CREATE TYPE parsing_job_status AS ENUM (
@@ -737,6 +737,9 @@ CREATE TABLE notifications (
   message        TEXT NOT NULL,
   read           BOOLEAN NOT NULL DEFAULT FALSE,
   archived       BOOLEAN NOT NULL DEFAULT FALSE,
+  read_at        TIMESTAMPTZ,
+  created_by     TEXT,
+  metadata       JSONB,
   target_role    TEXT,
   job_id         TEXT REFERENCES jobs(id) ON DELETE CASCADE,
   candidate_id   TEXT REFERENCES candidates(id) ON DELETE CASCADE,
