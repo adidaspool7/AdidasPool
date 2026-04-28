@@ -8,14 +8,29 @@
  * Contains NO direct database or framework calls.
  */
 
-import type { ICandidateRepository, CandidateRelationsInput } from "@server/domain/ports/repositories";
+import type { ICandidateRepository, CandidateRelationsInput, INotificationRepository } from "@server/domain/ports/repositories";
 import type { IStorageService } from "@server/domain/ports/services";
 import type { CandidateFilter } from "@server/application/dtos";
+
+// Status messages sent to candidates when HR manually changes their status.
+// Only statuses that HR assigns via the candidates table are listed here.
+// System-set statuses (NEW, PARSED) are excluded intentionally.
+const STATUS_NOTIFICATION_MESSAGE: Record<string, string> = {
+  SCREENED:             "Your profile has been reviewed by our recruitment team.",
+  BORDERLINE:           "Your application is under further consideration.",
+  ON_IMPROVEMENT_TRACK: "You have been placed on an improvement track by our team.",
+  OFFER_SENT:           "Great news — an offer has been proposed to you. Please check your email.",
+  REJECTED:             "After careful consideration, we will not be moving forward with your application at this time.",
+  HIRED:                "Congratulations! You have been selected to join us.",
+  INVITED:              "You have been invited to the next stage of our process.",
+  SHORTLISTED:          "You have been shortlisted for a position.",
+};
 
 export class CandidateUseCases {
   constructor(
     private readonly candidateRepo: ICandidateRepository,
-    private readonly storageService?: IStorageService
+    private readonly storageService?: IStorageService,
+    private readonly notificationRepo?: INotificationRepository
   ) {}
 
   /**
@@ -58,7 +73,26 @@ export class CandidateUseCases {
    * Update candidate data (manual edits by recruiter).
    */
   async updateCandidate(id: string, data: Record<string, unknown>) {
-    return this.candidateRepo.update(id, data);
+    const updated = await this.candidateRepo.update(id, data);
+
+    // Fire a STATUS_CHANGE notification whenever HR changes the candidate status
+    if (data.status && typeof data.status === "string" && this.notificationRepo) {
+      const message = STATUS_NOTIFICATION_MESSAGE[data.status];
+      if (message) {
+        try {
+          await this.notificationRepo.create({
+            type: "STATUS_CHANGE",
+            message,
+            targetRole: "CANDIDATE",
+            candidateId: id,
+          });
+        } catch (err) {
+          console.error("Failed to create status-change notification:", err);
+        }
+      }
+    }
+
+    return updated;
   }
 
   /**
