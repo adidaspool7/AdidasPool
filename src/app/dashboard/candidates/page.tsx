@@ -276,9 +276,11 @@ function langCode(name: string): string {
 function DepartmentPills({ areas }: { areas: string[] }) {
   if (!areas || areas.length === 0)
     return <span className="text-xs text-muted-foreground">—</span>;
+  const visible = areas.slice(0, 3);
+  const hidden = areas.slice(3);
   return (
     <div className="flex flex-col items-center gap-0.5">
-      {areas.map((area, i) => (
+      {visible.map((area, i) => (
         <span
           key={i}
           title={area}
@@ -287,6 +289,32 @@ function DepartmentPills({ areas }: { areas: string[] }) {
           {area.length > 16 ? area.slice(0, 15) + "…" : area}
         </span>
       ))}
+      {hidden.length > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              +{hidden.length}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="right"
+            className="w-auto p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-1">
+              {hidden.map((area, i) => (
+                <span key={i} className="text-xs whitespace-nowrap">
+                  {area}
+                </span>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 }
