@@ -16,6 +16,7 @@ import type {
 
 const CANDIDATE_LIST_SELECT = `
   *,
+  experiences(fields_of_work),
   languages:candidate_languages(*),
   tags:candidate_tags(*),
   applications:job_applications(id),
@@ -111,6 +112,22 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
         assessments: Array.isArray(c.assessments) ? c.assessments.length : 0,
         notes: Array.isArray(c.notes) ? c.notes.length : 0,
       };
+      // Derive unique business areas from experience fields_of_work
+      const seen = new Set<string>();
+      if (Array.isArray(c.experiences)) {
+        for (const exp of c.experiences) {
+          const fw = (exp as any).fieldsOfWork ?? (exp as any).fields_of_work;
+          if (Array.isArray(fw)) {
+            for (const f of fw) {
+              if (typeof f === "string" && f.trim()) seen.add(f.trim());
+            }
+          }
+        }
+      }
+      if (seen.size === 0 && c.primaryBusinessArea) seen.add(c.primaryBusinessArea);
+      c.businessAreas = Array.from(seen);
+      // Strip raw experiences — not needed on the list page
+      delete c.experiences;
       return c;
     });
 

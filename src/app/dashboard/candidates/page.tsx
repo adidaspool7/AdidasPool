@@ -91,6 +91,7 @@ interface Candidate {
   locationScore: number | null;
   languageScore: number | null;
   primaryBusinessArea: string | null;
+  businessAreas: string[];
   needsReview: boolean | null;
   sourceType: string;
   createdAt: string;
@@ -268,6 +269,26 @@ const LANG_CODE: Record<string, string> = {
 
 function langCode(name: string): string {
   return LANG_CODE[name] ?? name.slice(0, 2).toUpperCase();
+}
+
+// ── Department compact pills ────────────────────────────────────
+
+function DepartmentPills({ areas }: { areas: string[] }) {
+  if (!areas || areas.length === 0)
+    return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      {areas.map((area, i) => (
+        <span
+          key={i}
+          title={area}
+          className="inline-flex items-center rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+        >
+          {area.length > 16 ? area.slice(0, 15) + "…" : area}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function LanguagePills({
@@ -1134,18 +1155,7 @@ export default function CandidatesPage() {
 
                     {/* Department */}
                     <TableCell className="text-center">
-                      {c.primaryBusinessArea ? (
-                        <Badge
-                          variant="outline"
-                          className="text-xs font-normal whitespace-nowrap"
-                        >
-                          {c.primaryBusinessArea.length > 18
-                            ? c.primaryBusinessArea.slice(0, 16) + "…"
-                            : c.primaryBusinessArea}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <DepartmentPills areas={c.businessAreas ?? (c.primaryBusinessArea ? [c.primaryBusinessArea] : [])} />
                     </TableCell>
 
                     {/* Status — clickable dropdown to change */}
