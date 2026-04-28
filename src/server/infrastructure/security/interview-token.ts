@@ -17,9 +17,6 @@ function assertSecret(): string {
   return SECRET;
 }
 
-// Fail fast at module load for clearer startup-time feedback.
-assertSecret();
-
 function b64url(input: string): string {
   return Buffer.from(input, "utf-8").toString("base64url");
 }
