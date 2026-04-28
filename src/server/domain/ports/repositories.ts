@@ -253,12 +253,18 @@ export interface CreateNotificationData {
   candidateId?: string;
   applicationId?: string;
   campaignId?: string;
+  /** HR user email / display name who triggered this notification */
+  createdBy?: string;
+  /** Arbitrary JSON payload — e.g. { subject, body } for CONTACT_EMAIL_SENT */
+  metadata?: Record<string, unknown>;
 }
 
 export interface INotificationRepository {
   findForCandidate(candidateId: string, filters?: NotificationFilters): Promise<any[]>;
   findForHR(filters?: NotificationFilters): Promise<any[]>;
   countUnread(candidateId?: string, targetRole?: string): Promise<number>;
+  /** Returns full interaction history for a candidate, all types + archived, newest first. */
+  findInteractionHistory(candidateId: string): Promise<any[]>;
 
   findAll(): Promise<any[]>;
   findUnread(): Promise<any[]>;

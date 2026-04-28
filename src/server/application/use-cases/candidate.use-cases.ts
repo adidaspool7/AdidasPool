@@ -71,8 +71,9 @@ export class CandidateUseCases {
 
   /**
    * Update candidate data (manual edits by recruiter).
+   * @param createdBy  HR user email to attribute the notification to (optional).
    */
-  async updateCandidate(id: string, data: Record<string, unknown>) {
+  async updateCandidate(id: string, data: Record<string, unknown>, createdBy?: string) {
     const updated = await this.candidateRepo.update(id, data);
 
     // Fire a STATUS_CHANGE notification whenever HR changes the candidate status
@@ -85,6 +86,8 @@ export class CandidateUseCases {
             message,
             targetRole: "CANDIDATE",
             candidateId: id,
+            createdBy: createdBy ?? undefined,
+            metadata: { newStatus: data.status },
           });
         } catch (err) {
           console.error("Failed to create status-change notification:", err);

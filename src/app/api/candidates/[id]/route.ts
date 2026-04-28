@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { candidateUseCases, NotFoundError } from "@server/application";
 import { UpdateCandidateSchema, CandidateRelationsUpdateSchema } from "@server/application/dtos";
 import type { CandidateRelationsInput } from "@server/domain/ports/repositories";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/candidates/[id]
@@ -42,6 +43,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // Resolve the authenticated HR user for attribution in notifications
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const createdBy = user?.email ?? user?.user_metadata?.name ?? undefined;
 
     // Separate personal fields from relations
     const { experiences, education, languages, skills, ...personalFields } = body;
@@ -84,7 +90,7 @@ export async function PATCH(
       return NextResponse.json(candidate);
     }
 
-    const candidate = await candidateUseCases.updateCandidate(id, parsed.data);
+    const candidate = await candidateUseCases.updateCandidate(id, parsed.data, createdBy);
     return NextResponse.json(candidate);
   } catch (error) {
     if (error instanceof NotFoundError) {

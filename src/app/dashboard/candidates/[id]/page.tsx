@@ -58,6 +58,7 @@ import {
   Trash2,
   Loader2,
   Send,
+  ChevronDown,
 } from "lucide-react";
 import { Textarea } from "@client/components/ui/textarea";
 import { Input } from "@client/components/ui/input";
@@ -1109,7 +1110,244 @@ export default function CandidateDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* ── Interaction History ──────────────────────────────────── */}
+      <InteractionHistory candidateId={c.id} />
     </div>
+  );
+}
+
+// ── Interaction History component ────────────────────────────────
+
+interface HistoryItem {
+  id: string;
+  type: string;
+  message: string;
+  createdAt: string | Date;
+  createdBy?: string | null;
+  read: boolean;
+  readAt?: string | Date | null;
+  metadata?: Record<string, unknown> | null;
+  campaign?: { id: string; title: string } | null;
+  job?: { id: string; title: string } | null;
+}
+
+const HISTORY_TYPE_CONFIG: Record<
+  string,
+  { label: string; bgClass: string; textClass: string }
+> = {
+  STATUS_CHANGE:              { label: "Status Change",       bgClass: "bg-blue-100 dark:bg-blue-950",   textClass: "text-blue-800 dark:text-blue-300"   },
+  CONTACT_EMAIL_SENT:         { label: "Email Sent",          bgClass: "bg-purple-100 dark:bg-purple-950",textClass: "text-purple-800 dark:text-purple-300" },
+  PROMOTIONAL:                { label: "Campaign",            bgClass: "bg-orange-100 dark:bg-orange-950",textClass: "text-orange-800 dark:text-orange-300" },
+  ASSESSMENT_INVITE:          { label: "Assessment Invite",   bgClass: "bg-teal-100 dark:bg-teal-950",   textClass: "text-teal-800 dark:text-teal-300"   },
+  APPLICATION_STATUS_CHANGED: { label: "Application Update", bgClass: "bg-indigo-100 dark:bg-indigo-950",textClass: "text-indigo-800 dark:text-indigo-300" },
+  ASSESSMENT_COMPLETED:       { label: "Assessment Done",     bgClass: "bg-green-100 dark:bg-green-950",  textClass: "text-green-800 dark:text-green-300"  },
+  CV_UPLOADED:                { label: "CV Uploaded",         bgClass: "bg-muted",                        textClass: "text-muted-foreground"               },
+  JOB_POSTED:                 { label: "Job Posted",          bgClass: "bg-sky-100 dark:bg-sky-950",     textClass: "text-sky-800 dark:text-sky-300"     },
+  INTERNSHIP_POSTED:          { label: "Internship Posted",   bgClass: "bg-sky-100 dark:bg-sky-950",     textClass: "text-sky-800 dark:text-sky-300"     },
+  JOB_STATE_CHANGED:          { label: "Job Update",          bgClass: "bg-sky-100 dark:bg-sky-950",     textClass: "text-sky-800 dark:text-sky-300"     },
+};
+
+function InteractionHistory({ candidateId }: { candidateId: string }) {
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/candidates/${candidateId}/interaction-history`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setHistory(data);
+        else setFetchError("Failed to load history");
+      })
+      .catch(() => setFetchError("Failed to load history"))
+      .finally(() => setLoading(false));
+  }, [candidateId]);
+
+  function fmtDate(d: string | Date | null | undefined) {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function typeConfig(type: string) {
+    return (
+      HISTORY_TYPE_CONFIG[type] ?? {
+        label: type,
+        bgClass: "bg-muted",
+        textClass: "text-muted-foreground",
+      }
+    );
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Interaction History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          Interaction History ({history.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {fetchError && (
+          <p className="text-sm text-destructive">{fetchError}</p>
+        )}
+        {!fetchError && history.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No interactions recorded yet.
+          </p>
+        )}
+        {history.length > 0 && (
+          <div className="relative">
+            {/* Vertical timeline line */}
+            <div
+              className="absolute left-3.5 top-3 bottom-3 w-px bg-border"
+              aria-hidden
+            />
+            <div className="space-y-4">
+              {history.map((item) => {
+                const cfg = typeConfig(item.type);
+                const isEmail = item.type === "CONTACT_EMAIL_SENT";
+                const expanded = expandedEmail === item.id;
+                const newStatus = item.metadata?.newStatus as string | undefined;
+                const campaignTitle = item.campaign?.title;
+                const readDate = item.readAt ? fmtDate(item.readAt) : null;
+
+                return (
+                  <div key={item.id} className="flex gap-4 pl-8 relative">
+                    {/* Timeline dot */}
+                    <div className="absolute left-2.5 top-3 w-2.5 h-2.5 rounded-full bg-border border-2 border-background" />
+
+                    <div className="flex-1 rounded-md border p-3 text-sm space-y-2">
+                      {/* ── Header row: type badge + date ── */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            cfg.bgClass
+                          } ${cfg.textClass}`}
+                        >
+                          {cfg.label}
+                        </span>
+
+                        {/* Status label for STATUS_CHANGE */}
+                        {newStatus && STATUS_LABEL[newStatus] && (
+                          <span className="text-xs text-muted-foreground">
+                            &rarr;{" "}
+                            <span className="font-medium text-foreground">
+                              {STATUS_LABEL[newStatus]}
+                            </span>
+                          </span>
+                        )}
+
+                        {/* Campaign title for PROMOTIONAL */}
+                        {campaignTitle && (
+                          <span className="text-xs text-muted-foreground">
+                            &ldquo;
+                            <span className="font-medium text-foreground">
+                              {campaignTitle}
+                            </span>
+                            &rdquo;
+                          </span>
+                        )}
+
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                          {fmtDate(item.createdAt)}
+                        </span>
+                      </div>
+
+                      {/* ── Message / subject ── */}
+                      {isEmail ? (
+                        <p className="text-muted-foreground">
+                          Subject:{" "}
+                          <span className="font-medium text-foreground">
+                            {item.message}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">{item.message}</p>
+                      )}
+
+                      {/* ── Expandable email body ── */}
+                      {isEmail && item.metadata != null && typeof item.metadata.body === "string" && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedEmail(expanded ? null : item.id)
+                            }
+                            className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                          >
+                            <ChevronDown
+                              className={`h-3 w-3 transition-transform ${
+                                expanded ? "rotate-180" : ""
+                              }`}
+                            />
+                            {expanded ? "Hide email body" : "View email body"}
+                          </button>
+                          {expanded && (
+                            <pre className="mt-2 rounded-md bg-muted/50 border p-3 text-xs whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">
+                              {item.metadata.body}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Footer: sent by + read status ── */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5 border-t border-border/50">
+                        {item.createdBy ? (
+                          <span className="text-xs text-muted-foreground">
+                            By:{" "}
+                            <span className="font-medium">{item.createdBy}</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">System</span>
+                        )}
+
+                        {isEmail ? (
+                          <span className="text-xs text-muted-foreground italic">
+                            Email delivered &middot; read receipt unavailable
+                          </span>
+                        ) : item.read ? (
+                          <span className="text-xs text-green-600 dark:text-green-400">
+                            ✓ Read{readDate ? ` · ${readDate}` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Not yet read
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

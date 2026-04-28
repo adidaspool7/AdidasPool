@@ -56,6 +56,11 @@ export class NotificationUseCases {
     return this.notificationRepo.createMany(data);
   }
 
+  /** Full interaction history for a candidate profile — all types, archived included. */
+  async getInteractionHistory(candidateId: string) {
+    return this.notificationRepo.findInteractionHistory(candidateId);
+  }
+
   // ── Mark-as-read ────────────────────────────────────────
 
   async markAsRead(id: string) {

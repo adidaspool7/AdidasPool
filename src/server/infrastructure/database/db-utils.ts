@@ -28,6 +28,8 @@ const JSONB_KEYS = new Set([
   // inside (e.g. rawExtractionTimestamp) get coerced to Date objects
   // and the Zod schema (z.string()) rejects the cache on reload.
   "parsedRequirements",
+  // Notification metadata — arbitrary JSON stored for audit/display
+  "metadata",
 ]);
 
 // ----------------------------------------------------------------

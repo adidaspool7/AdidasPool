@@ -107,6 +107,8 @@ export class SupabaseNotificationRepository implements INotificationRepository {
         candidate_id: data.candidateId ?? null,
         application_id: data.applicationId ?? null,
         campaign_id: data.campaignId ?? null,
+        created_by: data.createdBy ?? null,
+        metadata: data.metadata ?? null,
       })
       .select()
       .single();
@@ -125,6 +127,8 @@ export class SupabaseNotificationRepository implements INotificationRepository {
         candidate_id: d.candidateId ?? null,
         application_id: d.applicationId ?? null,
         campaign_id: d.campaignId ?? null,
+        created_by: d.createdBy ?? null,
+        metadata: d.metadata ?? null,
       }))
     );
     assertNoError(error, "notification.createMany");
@@ -134,7 +138,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   async markAsRead(id: string) {
     const { data, error } = await db
       .from("notifications")
-      .update({ read: true })
+      .update({ read: true, read_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single();
@@ -145,7 +149,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   async markAllAsRead(candidateId?: string, targetRole?: string) {
     let query = db
       .from("notifications")
-      .update({ read: true })
+      .update({ read: true, read_at: new Date().toISOString() })
       .eq("read", false);
     if (candidateId) query = query.eq("candidate_id", candidateId);
     if (targetRole)
@@ -157,7 +161,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   async archiveNotification(id: string) {
     const { data, error } = await db
       .from("notifications")
-      .update({ archived: true, read: true })
+      .update({ archived: true, read: true, read_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single();
@@ -168,10 +172,29 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   async archiveMany(ids: string[]) {
     const { error } = await db
       .from("notifications")
-      .update({ archived: true, read: true })
+      .update({ archived: true, read: true, read_at: new Date().toISOString() })
       .in("id", ids);
     assertNoError(error, "notification.archiveMany");
     return ids.length;
+  }
+
+  /**
+   * Returns the full interaction history for a candidate:
+   * all notification types, including archived, newest-first.
+   * Joins campaign title for PROMOTIONAL entries.
+   */
+  async findInteractionHistory(candidateId: string) {
+    const { data, error } = await db
+      .from("notifications")
+      .select(`
+        *,
+        job:jobs(id, title),
+        campaign:promo_campaigns(id, title)
+      `)
+      .eq("candidate_id", candidateId)
+      .order("created_at", { ascending: false });
+    assertNoError(error, "notification.findInteractionHistory");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
   async deleteNotification(id: string) {
