@@ -744,7 +744,7 @@ CREATE TABLE notifications (
   job_id         TEXT REFERENCES jobs(id) ON DELETE CASCADE,
   candidate_id   TEXT REFERENCES candidates(id) ON DELETE CASCADE,
   application_id TEXT,
-  campaign_id    TEXT
+  campaign_id    TEXT REFERENCES promo_campaigns(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_notifications_candidate_id ON notifications(candidate_id);
