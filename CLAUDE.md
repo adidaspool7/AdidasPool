@@ -18,7 +18,7 @@
 
 ---
 
-## Current Tech Stack (as of 2026-04-13)
+## Current Tech Stack (as of 2026-04-30)
 
 | Layer | Technology |
 |---|---|
@@ -68,7 +68,7 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 ### Key Conventions
 - DB columns: `snake_case`. JS objects: `camelCase`.
 - Conversion utilities: `camelizeKeys()` / `snakeifyKeys()` in `src/server/infrastructure/database/db-utils.ts`
-- JSONB fields are **excluded from recursive camelization**: `parsedData`, `evaluationRationale`, `errorLog`, `result`, `breakdown`, `rawAiResponse`, `details`, `parsingConfidence`
+- JSONB fields are **excluded from recursive camelization**: `parsedData`, `evaluationRationale`, `errorLog`, `result`, `breakdown`, `rawAiResponse`, `details`, `parsingConfidence`, `metadata`
 - IDs: `TEXT PRIMARY KEY`, generated with `crypto.randomUUID()` via `generateId()`
 - `updated_at`: handled by PostgreSQL trigger `set_updated_at()` — no app-level timestamp management
 - Migration file: `supabase/migrations/00000000000000_schema.sql` — single canonical schema file. Consolidated 2026-04-26: every prior per-feature delta has been inlined. Run once in Supabase SQL Editor for fresh databases.
@@ -193,6 +193,36 @@ The "universal candidate match score" was deleted. Matching is now always
 
 ---
 
+## Notifications & Interaction History (as of 2026-04-29)
+
+### Schema additions on `notifications`
+- `read_at TIMESTAMPTZ` — set when a notification is marked read/archived
+- `created_by TEXT` — HR user email/name who triggered the action (null = system)
+- `metadata JSONB` — type-specific payload (e.g. `{ subject, body }` for `CONTACT_EMAIL_SENT`, `{ newStatus }` for `STATUS_CHANGE`)
+- `campaign_id` — now has FK constraint to `promo_campaigns(id) ON DELETE SET NULL` (PostgREST requires the FK to resolve `campaign:promo_campaigns(...)` join syntax)
+
+### New enum value
+- `notification_type::CONTACT_EMAIL_SENT` — recorded when HR sends a candidate email via `/api/candidates/[id]/contact`
+
+### Status change notifications
+- `CandidateUseCases.updateCandidate(id, data, createdBy?)` fires `STATUS_CHANGE` notification to candidate when `data.status` changes. `createdBy` is extracted in the PATCH route via `supabase.auth.getUser()` and persisted on the notification.
+
+### Interaction history panel
+- HR candidate profile page (`/dashboard/candidates/[id]`) renders an `InteractionHistory` component below Recruiter Notes.
+- API: `GET /api/candidates/[id]/interaction-history` → all notifications for the candidate (no role/archived filter), joined with `campaign(id, title)` and `job(id, title)`, ordered DESC.
+- Repo method: `INotificationRepository.findInteractionHistory(candidateId)`.
+- Use case: `NotificationUseCases.getInteractionHistory(candidateId)`.
+- Renders: type badge, status (for `STATUS_CHANGE`), campaign title (for `PROMOTIONAL`), expandable email body (for `CONTACT_EMAIL_SENT`), HR sender, read/read_at status.
+
+---
+
+## Build / Runtime Notes
+
+- **`interview-token.ts`**: secret lookup is **call-time only** — no module-load `assertSecret()`. This is intentional. It allows local `next build` to complete without `INTERVIEW_SESSION_TOKEN_SECRET` set, while still failing fast at request time on the deployed env. All 5 interview routes (`session/`, `realtime/`, `realtime/turn/`, `realtime/terminate/`, `proctoring/`) import this module.
+- **Local build vs Vercel build**: Vercel has all env vars set; local `.env.local` may not. `npx tsc --noEmit` is the trustworthy local validation step.
+
+---
+
 ## Environment Variables (Vercel)
 
 ```
@@ -232,3 +262,18 @@ After any session that:
 - Changes the tech stack → update the stack table
 
 **Do NOT** append raw session transcripts. Synthesize only the delta.
+
+---
+
+## Working Preferences (for AI assistants)
+
+- **Production URL** is `https://adidas-pool.vercel.app` — never invent another (e.g. don't propagate `githubrepo-mocha.vercel.app`).
+- **Validate locally with `npx tsc --noEmit`**, not `npm run build`. The local build crashes on `INTERVIEW_*` routes because Vercel-only env vars aren't set; this is expected and not a regression.
+- **PowerShell on Windows**: chain commands with `;` (never `&&`).
+- **Path aliases**: `@server/` → `src/server/`, `@client/` → `src/client/`, `@/lib/` → `src/lib/` (note the slash before `lib`).
+- **Schema changes**: update both `supabase/migrations/00000000000000_schema.sql` (canonical) AND give the user the exact `ALTER` / `CREATE` statements to run in Supabase SQL Editor.
+- **PostgREST joins**: any `relation:table(cols)` join requires a real foreign key constraint in the DB. If the join fails with 500/PGRST200, add the FK.
+- **Commit style**: `feat: <short>`, `fix: <short>`, `chore: <short>`, `refactor: <short>`. One logical change per commit.
+- **Markdown docs**: do not create new ones unless explicitly asked. Prefer editing existing files (`CLAUDE.md`, `TODO.md`, `INSTRUCTIONS.md`).
+- **Architecture rule** (enforced): use cases never import from `infrastructure/`. Domain has zero external deps. See `INSTRUCTIONS.md`.
+- **JSONB camelization**: when adding a new JSONB column, add its key to `JSONB_KEYS` in `db-utils.ts` to prevent recursive camelization.

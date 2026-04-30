@@ -1,7 +1,6 @@
 # Codebase Audit — What to Check & Improve
 
-> Last updated: 2026-04-22 — prototype-friendly security pass + cleanup applied.
-> Remaining items are tracked below; completed items are struck through.
+> Last updated: 2026-04-30 — superseded by [docs/audit-2026-04-26.md](audit-2026-04-26.md). Items here predate the GDPR plan, the interaction history panel, the notifications schema additions, and the interview-token fix. Treat this file as a historical reference.
 
 ## 1. DEAD CODE
 

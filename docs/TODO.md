@@ -2,7 +2,20 @@
 
 > Tracks all planned work. Status legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ❌ Blocked
 > Keep this file updated after every session. Do not delete completed items — move them to the bottom "Completed" section.
-> Last audited: 2026-04-22 — synced status flags with actual codebase state.
+> Last audited: 2026-04-30 — synced with notification system updates and interview-token fix.
+
+---
+
+## Recent Work (2026-04-26 → 2026-04-30)
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| R.1 | `STATUS_CHANGE` notification fires on candidate status update | ✅ | `CandidateUseCases.updateCandidate(id, data, createdBy?)` — commit `d5eeae1` |
+| R.2 | Notifications: add `read_at`, `created_by`, `metadata` columns | ✅ | Schema + repo + use case wired; canonical schema updated |
+| R.3 | New enum value `CONTACT_EMAIL_SENT` | ✅ | HR contact emails recorded as notifications with `{ subject, body }` metadata |
+| R.4 | Interaction History panel on HR candidate profile | ✅ | `GET /api/candidates/[id]/interaction-history` + `<InteractionHistory />` component |
+| R.5 | FK `notifications.campaign_id → promo_campaigns(id)` | ✅ | Required by PostgREST for `campaign:promo_campaigns(...)` join |
+| R.6 | `interview-token.ts` — remove eager `assertSecret()` at module load | ✅ | Local `next build` no longer crashes on `INTERVIEW_*` routes |
 
 ---
 

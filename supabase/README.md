@@ -3,9 +3,9 @@
 ## 1. Run the SQL Migration
 
 Go to your Supabase project → **SQL Editor** → paste the contents of:
-`supabase/migrations/20260413000000_initial_schema.sql`
+`supabase/migrations/00000000000000_schema.sql`
 
-Run it. This creates all tables, enums, indexes, and triggers.
+Run it. This creates all tables, enums, indexes, and triggers (consolidated canonical schema).
 
 ## 2. Configure Authentication
 
@@ -31,7 +31,7 @@ In Vercel → Project Settings → Environment Variables, confirm these are set:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon public` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role secret` key |
 
-Keep `DATABASE_URL` and `DATABASE_URL_UNPOOLED` for now — Prisma still uses them until Step 3 of the migration is complete.
+(Prisma has been fully removed — no `DATABASE_URL` is required.)
 
 ## 4. Google Cloud Console
 
@@ -46,8 +46,8 @@ In Google Cloud Console → **APIs & Services** → **Credentials** → your OAu
 | Step | Description | Status |
 |------|-------------|--------|
 | 1 | Supabase client utils + auth middleware + login pages | ✅ Done |
-| 2 | SQL schema migration | ✅ Done — run manually in SQL Editor |
-| 3 | Replace Prisma repositories with Supabase client | ⏳ Next |
-| 4 | Replace Vercel Blob with Supabase Storage | ⏳ Pending |
-| 5 | Wire Google OAuth into dashboard flows | ⏳ Pending |
-| 6 | Remove Prisma dependency | ⏳ Pending |
+| 2 | SQL schema migration (canonical `00000000000000_schema.sql`) | ✅ Done |
+| 3 | Replace Prisma repositories with Supabase client | ✅ Done |
+| 4 | Replace Vercel Blob with Supabase Storage | ✅ Done |
+| 5 | Wire Google OAuth into dashboard flows | ✅ Done |
+| 6 | Remove Prisma dependency | ✅ Done |

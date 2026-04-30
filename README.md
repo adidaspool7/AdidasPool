@@ -2,8 +2,8 @@
 
 > **Academic Project** — Multinational recruitment screening platform built for an adidas-like context.
 
-**Live Demo:** [githubrepo-mocha.vercel.app](https://githubrepo-mocha.vercel.app)  
-**Repository:** [github.com/Frsoul7/adidas-talent-pool](https://github.com/Frsoul7/adidas-talent-pool)
+**Live Demo:** [adidas-pool.vercel.app](https://adidas-pool.vercel.app)  
+**Repository:** [github.com/adidaspool7/AdidasPool](https://github.com/adidaspool7/AdidasPool)
 
 ---
 

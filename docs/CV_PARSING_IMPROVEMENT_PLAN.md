@@ -2,8 +2,8 @@
 
 > **Status**: Proposal — awaiting approval before implementation
 > **Scope**: Candidate single-upload, HR single-upload, and HR bulk upload flows
-> **Owner**: Stratos
-> **Last updated**: 2026-04-22
+> **Owner**: Fernando
+> **Last updated**: 2026-04-30
 
 ---
 

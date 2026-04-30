@@ -1,7 +1,7 @@
 # adidas Talent Intelligence Platform — User Guide
 
 > **Version:** 1.1 — April 2026
-> **Platform URL:** [githubrepo-mocha.vercel.app](https://githubrepo-mocha.vercel.app)
+> **Platform URL:** [adidas-pool.vercel.app](https://adidas-pool.vercel.app)
 
 ---
 

@@ -3,7 +3,7 @@
 > **Status**: Proposal — awaiting approval before implementation
 > **Scope**: Entire Talent Intelligence & Language Verification Platform, with special focus on CV parsing, AI interviews, and assessments
 > **Owner**: Stratos
-> **Last updated**: 2026-04-22
+> **Last updated**: 2026-04-30
 > **Legal reference**: Regulation (EU) 2016/679 — General Data Protection Regulation
 
 ---
