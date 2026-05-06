@@ -495,3 +495,36 @@ export interface IShortlistRepository {
   findCachedFitScore(jobId: string, candidateId: string): Promise<number | null>;
 }
 
+// ============================================
+// HR DASHBOARD WIDGET REPOSITORY PORT
+// ============================================
+
+export interface DashboardWidget {
+  id: string;
+  userId: string;
+  title: string;
+  spec: Record<string, unknown>;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IDashboardWidgetRepository {
+  listForUser(userId: string): Promise<DashboardWidget[]>;
+  findById(id: string): Promise<DashboardWidget | null>;
+  create(data: {
+    userId: string;
+    title: string;
+    spec: Record<string, unknown>;
+    position?: number;
+  }): Promise<DashboardWidget>;
+  update(
+    id: string,
+    userId: string,
+    data: Partial<{ title: string; spec: Record<string, unknown>; position: number }>
+  ): Promise<DashboardWidget | null>;
+  delete(id: string, userId: string): Promise<boolean>;
+  /** Returns highest existing position for the user (or -1 if none). */
+  maxPositionForUser(userId: string): Promise<number>;
+}
+

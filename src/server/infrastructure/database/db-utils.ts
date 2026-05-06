@@ -30,6 +30,8 @@ const JSONB_KEYS = new Set([
   "parsedRequirements",
   // Notification metadata — arbitrary JSON stored for audit/display
   "metadata",
+  // HR custom analytics widget spec — server-validated JSON
+  "spec",
 ]);
 
 // ----------------------------------------------------------------

@@ -217,6 +217,60 @@ HR's working pick list of candidates being actively considered for a
 
 ---
 
+## HR Custom Analytics Widgets ("My charts")
+
+TrackBuddy-style per-user dashboards on `/dashboard/analytics`. The 7
+default charts stay pinned on top; HR can add saved custom charts below.
+
+### Architecture (constrained-builder, NOT freeform SQL)
+
+- **Catalog** (`src/server/domain/services/analytics-catalog.ts`):
+  Zod-validated single source of truth for what HR can plot —
+  4 metrics (`candidates`, `applications`, `jobs`, `assessments`),
+  whitelisted dimensions per metric, allowed chart types per dimension
+  family (`categorical`/`temporal`/`none`), whitelisted filter keys.
+  `WidgetSpecSchema.strict()` rejects unknown top-level keys.
+- **Query service** (`src/server/infrastructure/database/widget-query.service.ts`):
+  hand-written runner per metric — fetches one column then in-memory
+  `groupCount` + sort + topN. Mirrors `analytics.repository.ts` style.
+  Time-series buckets: day (ISO), week (ISO YYYY-Www), month (YYYY-MM).
+- **Repository** (`src/server/infrastructure/database/dashboard-widget.repository.ts`):
+  CRUD on `hr_dashboard_widgets`, scoped by `user_id`.
+- **Use cases** (`src/server/application/use-cases/dashboard-widget.use-cases.ts`):
+  validates spec on every read AND write, never trusts client.
+
+### DB
+- Table `hr_dashboard_widgets`: `id`, `user_id` (UUID FK auth.users),
+  `title`, `spec` JSONB (validated), `position` (ordering), timestamps.
+  Indexed on `(user_id, position)`. `spec` added to `JSONB_KEYS` opt-out
+  in `db-utils.ts` so dimension/metric keys aren't camelized.
+
+### Endpoints (all HR-only via `requireHr()`)
+- `GET  /api/analytics/catalog` — returns the public catalog
+- `POST /api/analytics/query` — validate spec → run → `{ data: [{label, value}] }`
+- `GET  /api/analytics/widgets` — list current user's saved widgets
+- `POST /api/analytics/widgets` — create (validates spec)
+- `PATCH  /api/analytics/widgets/[id]` — update title/spec/position
+- `DELETE /api/analytics/widgets/[id]` — remove
+
+### UI
+- `src/client/components/analytics/chart-from-spec.tsx` — universal
+  `{ label, value }[]` renderer (bar/hbar/pie/line/area/stat).
+- `src/client/components/analytics/widget-builder-dialog.tsx` —
+  metric → dimension → chart type → top-N/lookback → title pickers
+  with debounced live preview against POST /api/analytics/query.
+- `src/client/components/analytics/my-charts-section.tsx` — saved
+  widgets grid; `+ Add chart` button; per-card Edit/Delete.
+- Mounted at the bottom of `src/app/dashboard/analytics/page.tsx`,
+  AFTER the existing 7 default charts.
+
+### Tests
+- `tests/analytics-catalog.test.ts` — 16 tests covering valid combos,
+  invalid metric/dimension/chartType combos, unknown filter keys,
+  limit bounds, strict mode rejecting injected keys.
+
+---
+
 ## Improvement Tracks
 
 - Auto-created when `finalDecision = "FAIL"` on an assessment result (Phase 5)

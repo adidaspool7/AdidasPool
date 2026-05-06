@@ -550,6 +550,31 @@ CREATE INDEX idx_job_shortlists_candidate_id ON job_shortlists(candidate_id);
 
 
 -- ----------------------------------------------------------------
+-- 6b. HR DASHBOARD WIDGETS (custom analytics charts, per-user)
+-- ----------------------------------------------------------------
+
+-- Per-HR-user saved analytics widgets. The `spec` JSONB is validated
+-- server-side against the analytics catalog (see
+-- src/server/domain/services/analytics-catalog.ts) before being stored
+-- or executed. Clients never name a database column directly.
+CREATE TABLE hr_dashboard_widgets (
+  id          TEXT PRIMARY KEY,
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  spec        JSONB NOT NULL,
+  position    INT NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_hr_dashboard_widgets_updated_at
+  BEFORE UPDATE ON hr_dashboard_widgets
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_hr_dashboard_widgets_user ON hr_dashboard_widgets(user_id, position);
+
+
+-- ----------------------------------------------------------------
 -- 7. ASSESSMENT TEMPLATES
 -- ----------------------------------------------------------------
 

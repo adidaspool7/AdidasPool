@@ -25,6 +25,7 @@ import {
   Funnel,
   LabelList,
 } from "recharts";
+import { MyChartsSection } from "@client/components/analytics/my-charts-section";
 
 // ── Colour palettes ──────────────────────────────────────────────
 const FUNNEL_COLORS = [
@@ -370,6 +371,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── My Charts (custom widgets) ─────────────────────────── */}
+      <MyChartsSection />
     </div>
   );
 }
