@@ -10,15 +10,12 @@ export default function ImprovementPage() {
         </p>
       </div>
 
-      {/* TODO:
-          - Active tracks list (enrolled, in progress, completed)
-          - Track detail view (14-day progress)
-          - Reassessment trigger
-          - Content management
-      */}
-      <div className="rounded-lg border bg-card p-8 text-center">
-        <p className="text-muted-foreground">
-          Improvement track management will be implemented here.
+      <div className="rounded-lg border border-dashed bg-muted/40 p-8 text-center">
+        <h2 className="text-lg font-semibold mb-2">Feature in development</h2>
+        <p className="text-sm text-muted-foreground">
+          The improvement track workflow has not been released yet. Tracks are
+          recorded automatically when an assessment is failed and will appear
+          here once the management UI is available.
         </p>
       </div>
     </div>

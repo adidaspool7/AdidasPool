@@ -460,17 +460,9 @@ function AssessmentResults({
               <p className="text-sm text-orange-700 mt-1">
                 Your score falls in the borderline range (45–60). You are
                 eligible for a 2-week micro-learning improvement track to
-                strengthen your skills before reassessment.
+                strengthen your skills before reassessment. Your recruiter
+                will reach out with the next steps.
               </p>
-              <Link href="/dashboard/improvement">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 gap-2 border-orange-300 text-orange-700 hover:bg-orange-100"
-                >
-                  View Improvement Tracks <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
