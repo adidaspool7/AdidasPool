@@ -7,13 +7,29 @@
  * Orchestrates candidate job application operations.
  */
 
-import type { IJobApplicationRepository, INotificationRepository } from "@server/domain/ports/repositories";
+import type {
+  IJobApplicationRepository,
+  INotificationRepository,
+  IJobRepository,
+} from "@server/domain/ports/repositories";
 
 export class ApplicationUseCases {
   constructor(
     private readonly applicationRepo: IJobApplicationRepository,
-    private readonly notificationRepo: INotificationRepository
+    private readonly notificationRepo: INotificationRepository,
+    private readonly jobRepo?: IJobRepository
   ) {}
+
+  /** Look up jobType (FULL_TIME, INTERNSHIP, ...) for metadata stamping. */
+  private async lookupJobType(jobId: string): Promise<string | null> {
+    if (!this.jobRepo) return null;
+    try {
+      const job = await this.jobRepo.findById(jobId);
+      return (job as { type?: string | null } | null)?.type ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * List all applications for a candidate.
@@ -71,23 +87,27 @@ export class ApplicationUseCases {
   async withdrawApplication(applicationId: string) {
     const updated = await this.applicationRepo.updateStatus(applicationId, "WITHDRAWN");
     try {
+      const jobId = (updated as any).jobId as string;
+      const candidateId = (updated as any).candidateId as string;
+      const jobType = await this.lookupJobType(jobId);
       // Confirm withdrawal to candidate
       await this.notificationRepo.create({
         type: "APPLICATION_WITHDRAWN",
         message: "Your application has been withdrawn.",
         targetRole: "CANDIDATE",
         applicationId: updated.id,
-        candidateId: (updated as any).candidateId,
-        jobId: (updated as any).jobId,
+        candidateId,
+        jobId,
       });
-      // Notify HR about withdrawal
+      // Notify HR about withdrawal (stamp jobType for tab routing)
       await this.notificationRepo.create({
         type: "HR_APPLICATION_WITHDRAWN",
         message: "A candidate has withdrawn their application.",
         targetRole: "HR",
         applicationId: updated.id,
-        candidateId: (updated as any).candidateId,
-        jobId: (updated as any).jobId,
+        candidateId,
+        jobId,
+        metadata: jobType ? { jobType } : undefined,
       });
     } catch (err) {
       console.error("Failed to create withdrawal notification:", err);
@@ -132,7 +152,9 @@ export class ApplicationUseCases {
     applicationId: string
   ) {
     try {
-      // HR notification
+      const jobType = await this.lookupJobType(jobId);
+      // HR notification (stamp jobType so the Notifications page can route to
+      // the Applications vs Internships tab without re-joining)
       await this.notificationRepo.create({
         type: "HR_APPLICATION_RECEIVED",
         message: "A candidate has applied to a job position.",
@@ -140,6 +162,7 @@ export class ApplicationUseCases {
         jobId,
         candidateId,
         applicationId,
+        metadata: jobType ? { jobType } : undefined,
       });
       // Candidate confirmation
       await this.notificationRepo.create({

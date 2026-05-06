@@ -5,6 +5,7 @@ import {
   hashInterviewToken,
   verifyInterviewRuntimeToken,
 } from "@server/infrastructure/security/interview-token";
+import { notificationUseCases } from "@server/application";
 
 function getInterviewBackendUrl(): string {
   const url = process.env.INTERVIEW_BACKEND_URL;
@@ -273,6 +274,25 @@ export async function POST(request: NextRequest) {
           skillName: interview.targetSkill as string,
           decision: finalDecision,
         });
+      }
+
+      // Notify HR — assessment complete (best-effort, non-blocking).
+      try {
+        await notificationUseCases.create({
+          type: "HR_ASSESSMENT_COMPLETED",
+          message: `A candidate completed an interview assessment (${finalDecision}).`,
+          targetRole: "HR",
+          candidateId: interview.candidateId as string,
+          metadata: {
+            mode: sessionMode,
+            finalDecision,
+            technicalDecision,
+            integrityStatus,
+            targetSkill: interview.targetSkill ?? null,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to create HR_ASSESSMENT_COMPLETED notification:", err);
       }
     }
 

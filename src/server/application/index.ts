@@ -68,11 +68,11 @@ export const uploadUseCases = new UploadUseCases(
 
 export const exportUseCases = new ExportUseCases(candidateRepository);
 
-export const applicationUseCases = new ApplicationUseCases(jobApplicationRepository, notificationRepository);
+export const applicationUseCases = new ApplicationUseCases(jobApplicationRepository, notificationRepository, jobRepository);
 
 export const notificationUseCases = new NotificationUseCases(notificationRepository, candidateRepository);
 
-export const profileUseCases = new ProfileUseCases(candidateRepository, storageService);
+export const profileUseCases = new ProfileUseCases(candidateRepository, storageService, notificationRepository);
 
 export const analyticsUseCases = new AnalyticsUseCases(analyticsRepository);
 

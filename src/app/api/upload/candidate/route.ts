@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { uploadUseCases } from "@server/application";
+import { uploadUseCases, notificationUseCases } from "@server/application";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +26,23 @@ export async function POST(request: NextRequest) {
       file,
       candidateId ?? undefined
     );
+
+    // Notify HR — candidate self-uploaded a CV. Distinguish first upload
+    // ("created") vs re-upload ("updated") so the HR feed can show context.
+    try {
+      const isReupload = result.status === "updated";
+      await notificationUseCases.create({
+        type: "HR_CV_UPLOADED",
+        message: isReupload
+          ? "A candidate uploaded a new version of their CV."
+          : "A new candidate CV was added to the talent pool.",
+        targetRole: "HR",
+        candidateId: result.candidateId,
+        metadata: { isReupload, source: "candidate-self-upload" },
+      });
+    } catch (err) {
+      console.error("Failed to create HR_CV_UPLOADED notification:", err);
+    }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: unknown) {

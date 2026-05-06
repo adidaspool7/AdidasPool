@@ -8,7 +8,10 @@
  * Resolves the current candidate via Supabase Auth user_id.
  */
 
-import type { ICandidateRepository } from "@server/domain/ports/repositories";
+import type {
+  ICandidateRepository,
+  INotificationRepository,
+} from "@server/domain/ports/repositories";
 import type { UpdateProfileInput } from "@server/application/dtos";
 import { NotFoundError } from "@server/application/use-cases/candidate.use-cases";
 import type { IStorageService } from "@server/domain/ports/services";
@@ -51,7 +54,8 @@ const PROFILE_SELECT = {
 export class ProfileUseCases {
   constructor(
     private readonly candidateRepo: ICandidateRepository,
-    private readonly storageService: IStorageService
+    private readonly storageService: IStorageService,
+    private readonly notificationRepo?: INotificationRepository
   ) {}
 
   /**
@@ -86,11 +90,29 @@ export class ProfileUseCases {
       updateData.linkedinUrl = linkedinUrl === "" ? null : linkedinUrl;
     }
 
-    return this.candidateRepo.updateWithSelect(
+    const result = await this.candidateRepo.updateWithSelect(
       existing.id,
       updateData,
       PROFILE_SELECT
     );
+
+    // Notify HR — candidate edited their own profile (best-effort).
+    // Stamp the field names that changed for context.
+    if (this.notificationRepo && Object.keys(updateData).length > 0) {
+      try {
+        await this.notificationRepo.create({
+          type: "HR_PROFILE_UPDATED",
+          message: "A candidate updated their profile.",
+          targetRole: "HR",
+          candidateId: existing.id,
+          metadata: { fields: Object.keys(updateData), source: "profile-edit" },
+        });
+      } catch (err) {
+        console.error("Failed to create HR_PROFILE_UPDATED notification:", err);
+      }
+    }
+
+    return result;
   }
 
   async deleteCurrentCv() {

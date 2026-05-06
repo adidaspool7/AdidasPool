@@ -21,6 +21,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "@client/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@client/components/ui/select";
 import { useRole } from "@client/components/providers/role-provider";
 import {
   Bell,
@@ -39,6 +46,8 @@ import {
   Settings,
   Globe,
   Filter,
+  UserCog,
+  Users,
 } from "lucide-react";
 
 // ============================================
@@ -75,6 +84,7 @@ interface Notification {
   job: NotificationJob | null;
   candidate: NotificationCandidate | null;
   applicationId: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface NotificationPreferences {
@@ -85,6 +95,37 @@ interface NotificationPreferences {
   promotionalNotifications: boolean;
 }
 
+// HR view filters
+type HrTypeTab = "applications" | "internships" | "assessments" | "talent_pool" | "other";
+type HrStatusFilter = "unread" | "read" | "archived" | "all";
+
+/** Map a notification to one of the HR type tabs. */
+function hrTabFor(n: Notification): HrTypeTab {
+  const t = n.type;
+  const meta = (n.metadata ?? {}) as { jobType?: string | null };
+  const jobType = meta.jobType ?? n.job?.type ?? null;
+  if (t === "HR_APPLICATION_RECEIVED" || t === "HR_APPLICATION_WITHDRAWN") {
+    return jobType === "INTERNSHIP" ? "internships" : "applications";
+  }
+  if (t === "HR_ASSESSMENT_COMPLETED") return "assessments";
+  if (t === "HR_CV_UPLOADED" || t === "HR_PROFILE_UPDATED") return "talent_pool";
+  return "other";
+}
+
+function emptyMessageForHrTab(tab: HrTypeTab, status: HrStatusFilter): string {
+  if (status === "archived") return "No archived notifications in this category.";
+  const base = {
+    applications: "No job application notifications",
+    internships: "No internship application notifications",
+    assessments: "No assessment notifications",
+    talent_pool: "No talent pool notifications",
+    other: "No notifications",
+  }[tab];
+  if (status === "unread") return `${base} to read.`;
+  if (status === "read") return `${base} marked as read.`;
+  return `${base} yet.`;
+}
+
 // ============================================
 // NOTIFICATION TYPE HELPERS
 // ============================================
@@ -92,6 +133,8 @@ interface NotificationPreferences {
 function getNotificationIcon(type: string) {
   if (type === "PROMOTIONAL") return <Megaphone className="h-4 w-4 text-purple-500" />;
   if (type === "JOB_INVITATION") return <Briefcase className="h-4 w-4 text-emerald-600" />;
+  if (type === "HR_PROFILE_UPDATED") return <UserCog className="h-4 w-4 text-cyan-600" />;
+  if (type === "HR_CV_UPLOADED" || type === "CV_UPLOADED") return <FileText className="h-4 w-4 text-cyan-600" />;
   if (type.includes("INTERNSHIP")) return <GraduationCap className="h-4 w-4 text-blue-500" />;
   if (type.includes("APPLICATION")) return <FileText className="h-4 w-4 text-green-500" />;
   if (type.includes("ASSESSMENT")) return <AlertCircle className="h-4 w-4 text-orange-500" />;
@@ -114,6 +157,7 @@ function getNotificationLabel(type: string): string {
     HR_APPLICATION_WITHDRAWN: "Application Withdrawn",
     HR_ASSESSMENT_COMPLETED: "Assessment Complete",
     HR_CV_UPLOADED: "CV Uploaded",
+    HR_PROFILE_UPDATED: "Profile Updated",
     PROMOTIONAL: "Announcement",
     CV_UPLOADED: "CV Uploaded",
     STATUS_CHANGE: "Status Change",
@@ -519,6 +563,9 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [candidateId, setCandidateId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
+  // HR-only: type tab + status filter (independent of candidate `activeTab`)
+  const [hrTypeTab, setHrTypeTab] = useState<HrTypeTab>("applications");
+  const [hrStatusFilter, setHrStatusFilter] = useState<HrStatusFilter>("unread");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Resolve candidate ID for candidate role
@@ -531,16 +578,18 @@ export default function NotificationsPage() {
     }
   }, [role]);
 
-  const fetchNotifications = useCallback(async (tab?: string) => {
+  const fetchNotifications = useCallback(async () => {
     setLoading(true);
-    const currentTab = tab ?? activeTab;
     try {
       let url = "/api/notifications";
       if (role === "candidate" && candidateId) {
         url += `?role=candidate&candidateId=${encodeURIComponent(candidateId)}`;
       } else if (role === "hr") {
         url += "?role=hr";
-        if (currentTab === "archived") {
+        // For HR, the status filter (not the type tab) decides whether we
+        // fetch archived rows. Type tabs filter client-side from the same
+        // fetched dataset so per-tab unread counts stay accurate.
+        if (hrStatusFilter === "archived") {
           url += "&archived=true";
         }
       }
@@ -559,7 +608,7 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [role, candidateId, activeTab]);
+  }, [role, candidateId, hrStatusFilter]);
 
   useEffect(() => {
     if (role === "hr" || (role === "candidate" && candidateId)) {
@@ -567,10 +616,10 @@ export default function NotificationsPage() {
     }
   }, [role, candidateId, fetchNotifications]);
 
-  // Clear selection when tab changes
+  // Clear selection when tab or HR filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [activeTab]);
+  }, [activeTab, hrTypeTab, hrStatusFilter]);
 
   async function handleMarkRead(id: string) {
     try {
@@ -663,13 +712,6 @@ export default function NotificationsPage() {
     });
   }
 
-  function handleTabChange(tab: string) {
-    setActiveTab(tab);
-    if (role === "hr") {
-      fetchNotifications(tab);
-    }
-  }
-
   // Filter notifications by active tab (for non-archived tabs)
   const filtered = notifications.filter((n) => {
     if (activeTab === "archived") return true; // archived tab fetches from API
@@ -682,8 +724,34 @@ export default function NotificationsPage() {
     return true;
   });
 
+  // HR view: status filter narrows the fetched list, then type tab narrows further.
+  const hrStatusFiltered = notifications.filter((n) => {
+    if (hrStatusFilter === "all" || hrStatusFilter === "archived") return true;
+    if (hrStatusFilter === "unread") return !n.read;
+    if (hrStatusFilter === "read") return n.read;
+    return true;
+  });
+
+  const hrFiltered = hrStatusFiltered.filter((n) => hrTabFor(n) === hrTypeTab);
+
+  // Per-tab unread counts (always derived from non-archived data)
+  const hrTabUnreadCounts: Record<HrTypeTab, number> = {
+    applications: 0,
+    internships: 0,
+    assessments: 0,
+    talent_pool: 0,
+    other: 0,
+  };
+  if (hrStatusFilter !== "archived") {
+    notifications.forEach((n) => {
+      if (n.read) return;
+      hrTabUnreadCounts[hrTabFor(n)]++;
+    });
+  }
+
   const isCandidate = role === "candidate";
   const allSelected = filtered.length > 0 && filtered.every((n) => selectedIds.has(n.id));
+  const hrAllSelected = hrFiltered.length > 0 && hrFiltered.every((n) => selectedIds.has(n.id));
 
   return (
     <div className="space-y-6">
@@ -752,19 +820,67 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* HR VIEW — Compact with tabs */}
+      {/* HR VIEW — Type tabs + status filter */}
       {role === "hr" && (
-        <div>
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <div className="space-y-3">
+          {/* Status filter row */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Status</span>
+            <Select
+              value={hrStatusFilter}
+              onValueChange={(v) => setHrStatusFilter(v as HrStatusFilter)}
+            >
+              <SelectTrigger className="w-[160px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unread">Unread</SelectItem>
+                <SelectItem value="read">Read</SelectItem>
+                <SelectItem value="all">All (active)</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Tabs value={hrTypeTab} onValueChange={(v) => setHrTypeTab(v as HrTypeTab)}>
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="unread">Unread</TabsTrigger>
-              <TabsTrigger value="read">Read</TabsTrigger>
-              <TabsTrigger value="archived">Archived</TabsTrigger>
+              <TabsTrigger value="applications" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Job Applications
+                {hrTabUnreadCounts.applications > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
+                    {hrTabUnreadCounts.applications}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="internships" className="gap-1.5">
+                <GraduationCap className="h-3.5 w-3.5" /> Internships
+                {hrTabUnreadCounts.internships > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
+                    {hrTabUnreadCounts.internships}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="assessments" className="gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" /> Assessments
+                {hrTabUnreadCounts.assessments > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
+                    {hrTabUnreadCounts.assessments}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="talent_pool" className="gap-1.5">
+                <Users className="h-3.5 w-3.5" /> Talent Pool
+                {hrTabUnreadCounts.talent_pool > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
+                    {hrTabUnreadCounts.talent_pool}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
-            {/* Bulk action bar */}
-            {selectedIds.size > 0 && activeTab !== "archived" && (
+            {/* Bulk action bar — hidden when viewing archived */}
+            {selectedIds.size > 0 && hrStatusFilter !== "archived" && (
               <div className="flex items-center gap-3 mt-3 px-3 py-2 bg-muted rounded-md">
                 <span className="text-sm font-medium">
                   {selectedIds.size} selected
@@ -788,29 +904,25 @@ export default function NotificationsPage() {
               </div>
             )}
 
-            <TabsContent value={activeTab} className="mt-3">
+            <TabsContent value={hrTypeTab} className="mt-3">
               <HRNotificationList
-                notifications={filtered}
+                notifications={hrFiltered}
                 loading={loading}
                 onMarkRead={handleMarkRead}
                 onArchive={handleArchive}
                 onClick={handleNotificationClick}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
-                allSelected={allSelected}
+                allSelected={hrAllSelected}
                 onSelectAll={(checked) => {
                   if (checked) {
-                    setSelectedIds(new Set(filtered.map((n) => n.id)));
+                    setSelectedIds(new Set(hrFiltered.map((n) => n.id)));
                   } else {
                     setSelectedIds(new Set());
                   }
                 }}
-                isArchiveTab={activeTab === "archived"}
-                emptyMessage={
-                  activeTab === "archived"
-                    ? "No archived notifications."
-                    : "No notifications yet. They will appear here when candidates apply to job openings."
-                }
+                isArchiveTab={hrStatusFilter === "archived"}
+                emptyMessage={emptyMessageForHrTab(hrTypeTab, hrStatusFilter)}
               />
             </TabsContent>
           </Tabs>
