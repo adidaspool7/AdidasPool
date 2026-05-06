@@ -14,6 +14,18 @@
 -- ----------------------------------------------------------------
 -- 0. SHARED TRIGGER FUNCTION FOR updated_at
 -- ----------------------------------------------------------------
+--
+-- Note: `SET search_path = pg_catalog, public` pins the resolution
+-- order so a malicious user with CREATE on another schema cannot
+-- shadow built-ins. Required by the Supabase Security Advisor
+-- ("Function Search Path Mutable").
+--
+-- Note 2: this project intentionally does NOT install the
+-- `rls_auto_enable()` SECURITY DEFINER helper or the `ensure_rls`
+-- event trigger that Supabase Studio can auto-create. RLS is
+-- deliberately disabled on every application table — all DB
+-- access is server-side via the service role key. See CLAUDE.md
+-- ("Database → RLS: Disabled on all tables").
 
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
@@ -21,7 +33,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = pg_catalog, public;
 
 
 -- ----------------------------------------------------------------
