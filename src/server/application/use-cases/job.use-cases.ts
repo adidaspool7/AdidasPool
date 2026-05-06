@@ -691,7 +691,9 @@ export class JobUseCases {
 
     const requirements = await this.getOrParseRequirements(jobId);
 
-    const candidates = await this.candidateRepo.findForMatching();
+    const candidates = await this.candidateRepo.findForMatching({
+      fieldsOfWork: requirements.fieldsOfWork,
+    });
 
     const fitConfig = {
       ...DEFAULT_FIT_CONFIG,

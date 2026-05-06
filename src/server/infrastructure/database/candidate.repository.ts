@@ -244,14 +244,42 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     assertNoError(error, "candidate.updateStatus");
   }
 
-  async findForMatching() {
+  async findForMatching(opts?: { fieldsOfWork?: string[] }) {
+    // Audit H2: when the JD specifies fields-of-work, pre-filter to only
+    // candidates with at least one experience tagged with one of those
+    // fields. The `experiences.fields_of_work` column is GIN-indexed, so
+    // this query short-circuits the matcher's per-candidate work for jobs
+    // with a strong field signal (most jobs).
+    let candidateIdFilter: string[] | null = null;
+    if (opts?.fieldsOfWork && opts.fieldsOfWork.length > 0) {
+      const { data: expRows, error: expError } = await db
+        .from("experiences")
+        .select("candidate_id")
+        .overlaps("fields_of_work", opts.fieldsOfWork);
+      assertNoError(expError, "candidate.findForMatching.fieldFilter");
+      const ids = new Set<string>();
+      for (const row of expRows ?? []) {
+        const cid = (row as { candidate_id?: string }).candidate_id;
+        if (cid) ids.add(cid);
+      }
+      candidateIdFilter = [...ids];
+      // No candidate has experience in any of the requested fields -> return
+      // an empty pool early instead of fetching all candidates and scoring
+      // each one to zero.
+      if (candidateIdFilter.length === 0) return [];
+    }
+
     // Filter out status=NEW and hard duplicates. Tolerate is_duplicate=NULL
     // (rows imported from legacy sources may not have the default applied).
-    const { data, error } = await db
+    let query = db
       .from("candidates")
       .select(`*, languages:candidate_languages(*), education(*), skills(*), experiences(*)`)
       .neq("status", "NEW")
       .or("is_duplicate.is.null,is_duplicate.eq.false");
+    if (candidateIdFilter) {
+      query = query.in("id", candidateIdFilter);
+    }
+    const { data, error } = await query;
     assertNoError(error, "candidate.findForMatching");
     return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
