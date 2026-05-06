@@ -89,9 +89,9 @@ Never use the anon key for privileged DB operations. Never use the service role 
 ## 4. Auth Conventions
 
 - The only auth provider is Google OAuth via Supabase.
-- User role (`"candidate"` | `"hr"`) is stored in `user_metadata.role`. Never store roles in the DB or in cookies separately.
+- User role (`"candidate"` | `"hr"`) is stored in **`app_metadata.role`** (server-set by the admin client, immutable from the client). Never store roles in the DB or in cookies separately. `user_metadata` is reserved for display fields (`name`, `full_name`) — never trust it for authorization.
 - A candidate's DB record is linked to their auth user via `candidates.user_id`. Resolution happens in `ProfileUseCases.resolveCurrentCandidate()` — do not duplicate this logic elsewhere.
-- Middleware handles session refresh and route protection. Do not add redundant auth checks inside individual route handlers unless there is a specific reason (e.g., HMAC token validation for interview sessions).
+- Middleware handles session refresh and route protection: `/api/*` returns 401 for unauthenticated callers and 403 for non-HR callers hitting `HR_ONLY_API_PREFIXES`. Do not add redundant auth checks inside individual route handlers unless there is a specific reason (e.g., HMAC token validation for interview sessions, or defense-in-depth on the skill-verification route).
 
 ---
 

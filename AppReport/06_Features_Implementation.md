@@ -65,7 +65,7 @@ The system processes CV files (PDF, DOCX, TXT) into structured candidate records
 
 #### Stage 2: File Storage
 - Upload original file to `cvs/candidates/{timestamp}-{filename}` (or `cvs/bulk/...` for batch uploads)
-- Uses `IStorageService` (Vercel Blob in production, local filesystem in development)
+- Uses `IStorageService` (Supabase Storage in production via `talent-pool` bucket; local filesystem in development)
 - Returns URL for the stored file
 
 #### Stage 3: Text Extraction

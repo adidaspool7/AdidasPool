@@ -1,11 +1,9 @@
 # Job-Anchored Matching — TODO
 
-> Checklist for implementing the plan in [`docs/JOB_ANCHORED_MATCHING_PLAN.md`](docs/JOB_ANCHORED_MATCHING_PLAN.md).
+> 🗄️ **ARCHIVED 2026-05-08** — Initiative shipped (Phases 0–5). See `## Job-Anchored Matching` in [CLAUDE.md](../../CLAUDE.md) for the live spec. Any residual doc-update tasks have been folded into [docs/TODO.md](../TODO.md). This file is kept as historical reference only.
+>
+> Checklist for implementing the plan in [`docs/JOB_ANCHORED_MATCHING_PLAN.md`](../JOB_ANCHORED_MATCHING_PLAN.md).
 > Phases are ordered so each one is independently deployable.
-
----
-
-## Phase 0 — Stop misleading HR (ship first, small, safe)
 
 - [x] Relabel the candidates-evaluation table columns: rename score badge to **"Quality"** with tooltip *"profile completeness · not a hiring signal; use Match Jobs for job fit"*.
 - [x] ~~In the Match Jobs dialog, **hide** criteria whose `applicable === false`~~ — N/A, dialog deleted in `0919b0f`.

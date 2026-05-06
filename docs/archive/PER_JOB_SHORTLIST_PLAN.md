@@ -1,6 +1,7 @@
 # Per-Job Shortlist Plan
 
-> **Status**: Proposal — awaiting approval before implementation
+> **Status**: 🗄️ **ARCHIVED 2026-05-08** — Implemented ✅. See `## Per-Job Shortlist` in [CLAUDE.md](../../CLAUDE.md) for the live spec (`job_shortlists` table, 4 endpoints, tabs UI, tests). This file is kept as design history only.
+> **Original status**: Proposal — awaiting approval before implementation
 > **Scope**: Replace/augment the global "starred candidate" boolean with proper per-job shortlists
 > **Owner**: Stratos
 > **Last updated**: 2026-05-01

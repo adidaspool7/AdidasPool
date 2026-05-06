@@ -18,11 +18,11 @@
 
 ---
 
-## Current Tech Stack (as of 2026-04-30)
+## Current Tech Stack (as of 2026-05-08)
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16.1.6 — App Router, TypeScript |
+| Framework | Next.js 16.1.6 — App Router, TypeScript, Turbopack on Vercel |
 | UI | shadcn/ui + Tailwind CSS 4 |
 | Auth | Supabase Auth — Google OAuth only |
 | Database | Supabase PostgreSQL (migrated from Neon/Prisma) |
@@ -36,8 +36,12 @@
 | Validation | Zod 4.3.6 |
 | Email | Resend 6.9.2 + copy-link fallback |
 | CSV export | papaparse |
-| Charts | Recharts 3.7 |
-| Testing | Vitest 4.0.18 (unit) |
+| Charts | Recharts 3.7 (`react-is@19.2.3` pinned as a direct peer because `.npmrc` sets `legacy-peer-deps=true`) |
+| Logging | In-house `createLogger(scope)` from `@server/infrastructure/logging/logger` — replaced raw `console.*` in all `src/app/api/**` routes |
+| Testing | Vitest 4.1.5 (unit) + `@vitest/coverage-v8` — coverage uploaded as CI artifact |
+| UI primitives docs | Storybook 10.3.6 (`@storybook/nextjs-vite`) for `src/client/components/ui/*` |
+| CI | GitHub Actions (Node 20) — `tsc --noEmit` + `vitest run --coverage` + coverage artifact upload |
+| Repo policy | `.npmrc` → `legacy-peer-deps=true` (mirrors local `npm i --legacy-peer-deps`); peers must therefore be pinned explicitly when transitively required |
 
 ---
 
@@ -81,8 +85,8 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 ## Auth
 
 - **Provider**: Supabase Google OAuth only
-- **Role**: stored in `user_metadata.role` — either `"candidate"` or `"hr"`. Set at first login via `/auth/select-role`.
-- **Middleware** (`middleware.ts`): refreshes session, protects `/dashboard/*`, redirects new users to `/auth/select-role`
+- **Role**: stored in `app_metadata.role` (server-set via service role key, immutable from the client) — either `"candidate"` or `"hr"`. Set on first sign-in by `src/app/auth/callback/route.ts`. Legacy `user_metadata.role` is read once for migration only. `user_metadata` is otherwise used only for display fields (`name`, `full_name`).
+- **Middleware** (`middleware.ts`): refreshes session, gates `/api/*` (401 unauth, 403 non-HR on `HR_ONLY_API_PREFIXES`), protects `/dashboard/*`.
 - **Candidate ↔ User link**: `candidates.user_id UUID REFERENCES auth.users(id)`. `ProfileUseCases.resolveCurrentCandidate()` looks up by `user_id`, auto-creates PLATFORM candidate if none exists.
 - **Role context** (`src/client/components/providers/role-provider.tsx`): reads from `supabase.auth.getUser()`, exposes `userEmail`, `userName`. `clearRole()` calls `supabase.auth.signOut()`.
 

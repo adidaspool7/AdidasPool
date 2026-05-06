@@ -75,7 +75,7 @@ In a project with an Onion Architecture and 19 database models, type safety is n
 
 1. **Port interfaces** (`IJobRepository`, `ICandidateRepository`) — TypeScript interfaces define contracts that infrastructure must satisfy. The compiler catches missing methods or wrong return types.
 2. **Zod schema inference** — `z.infer<typeof CreateJobSchema>` generates TypeScript types from validation schemas. Request validation and type checking are unified.
-3. **Prisma type generation** — `prisma generate` produces types for every model, enum, and relation. Database queries are fully typed.
+3. **Supabase + Zod typing** — DB rows are camelized via `camelizeKeys()` and validated/inferred from Zod schemas (`z.infer<typeof CvExtractionSchema>`). With no ORM, type safety is enforced at the Zod boundary and at hand-written port interfaces in `src/server/domain/ports/`.
 4. **Refactoring safety** — Renaming a field in a DTO automatically surfaces every location that must change.
 
 **Why not JavaScript?** With 7 repository implementations and 40+ use-case methods, runtime type errors would be discovered too late. TypeScript catches them at build time.

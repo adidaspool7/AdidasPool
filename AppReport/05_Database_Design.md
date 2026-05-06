@@ -110,7 +110,7 @@ The full LLM extraction result is stored as a JSON column alongside the normaliz
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `jobTitle` | String | Position title |
+| `jobTitle` | String | Position title (DB column: `job_title`) |
 | `company` | String? | Employer name |
 | `location` | String? | Job location |
 | `startDate` | String? | Start date (stored as string — CV dates vary: "2020", "Jan 2020", "01/2020") |
@@ -118,6 +118,7 @@ The full LLM extraction result is stored as a JSON column alongside the normaliz
 | `isCurrent` | Boolean | Currently in this role |
 | `description` | String? | Role description |
 | `isRelevant` | Boolean? | AI-classified relevance to target roles |
+| `fieldsOfWork` | String[] | Canonical Fields of Work (DB column: `fields_of_work TEXT[]`, GIN-indexed) tagged by the CV parser — powers job-anchored matching |
 | `relevanceScore` | Float? | 0-100 relevance score |
 | `relevanceReason` | String? | LLM explanation of classification |
 
@@ -258,7 +259,7 @@ Reusable assessment configuration: instructions, audio URLs, reading texts, prom
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `type` | NotificationType | 16 distinct types across system + promotional |
+| `type` | NotificationType | 17 distinct types across system + promotional |
 | `message` | String | Notification text (or HTML for campaign notifications) |
 | `read` | Boolean | Read/unread state |
 | `targetRole` | String? | "CANDIDATE", "HR", or null (global) |
@@ -267,13 +268,14 @@ Reusable assessment configuration: instructions, audio URLs, reading texts, prom
 | `applicationId` | String? | Related application |
 | `campaignId` | String? | Source campaign |
 
-**Enum `NotificationType` (16 values):**
+**Enum `NotificationType` (17 values):**
 
 | Category | Types |
 |----------|-------|
 | Candidate-facing | `JOB_POSTED`, `INTERNSHIP_POSTED`, `JOB_STATE_CHANGED`, `APPLICATION_RECEIVED`, `APPLICATION_STATUS_CHANGED`, `APPLICATION_WITHDRAWN`, `ASSESSMENT_INVITE`, `ASSESSMENT_COMPLETED` |
 | HR-facing | `HR_APPLICATION_RECEIVED`, `HR_APPLICATION_WITHDRAWN`, `HR_ASSESSMENT_COMPLETED`, `HR_CV_UPLOADED` |
 | Promotional | `PROMOTIONAL` |
+| HR → Candidate | `CONTACT_EMAIL_SENT` (HR sent direct email; body persisted in `metadata.body`) |
 | Legacy | `CV_UPLOADED`, `STATUS_CHANGE` |
 
 ### 5.3.13 NotificationPreference
@@ -289,7 +291,7 @@ One-to-one with Candidate. Controls what notifications a candidate receives.
 | `promotionalNotifications` | Boolean (default true) | Receive promotional campaigns |
 
 **Design Decision — `fieldFilters` as String Array:**
-PostgreSQL arrays provide a simple, queryable mechanism for storing a candidate's preferred departments without requiring a junction table. Prisma supports array fields natively.
+PostgreSQL arrays provide a simple, queryable mechanism for storing a candidate's preferred departments without requiring a junction table. They are read/written through the Supabase JS client as plain JS arrays.
 
 ### 5.3.14 PromoCampaign
 
@@ -354,6 +356,82 @@ Stores saved scoring configurations that HR can recall with one click.
 
 **Unique Constraint:** `name` is unique — prevents duplicate preset names.
 
+### 5.3.18 Job-Anchored Matching Columns (added 2026-04-23)
+
+The job-anchored matching initiative added structured requirements + per-experience field tagging:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `jobs.parsed_requirements` | `JSONB` | Lazy-extracted structured requirements (fields of work, seniority, languages, education, required/preferred skills, years). Schema in [src/server/domain/services/job-requirements.schema.ts](../src/server/domain/services/job-requirements.schema.ts). |
+| `jobs.parsed_requirements_version` | `INT` | Cache invalidation key. `JOB_REQUIREMENTS_SCHEMA_VERSION = 2` today. Bumped when prompt or schema changes incompatibly. |
+| `experiences.fields_of_work` | `TEXT[]` | One or more canonical Fields of Work (16 values) tagged on every experience by the CV parser. GIN-indexed (`idx_experiences_fields_of_work`) for `.contains()` / `.overlaps()` queries. |
+
+These feed the pure-function `computeJobFit(job, candidate)` at [src/server/domain/services/job-fit.service.ts](../src/server/domain/services/job-fit.service.ts), whose results are persisted as a cache in `job_matches`.
+
+### 5.3.19 JobShortlist (per-job HR pick list)
+
+HR's working pick list of candidates being actively considered for a **specific job**, distinct from the global watchlist (`candidates.shortlisted`) and the application lifecycle stage (`application_status.SHORTLISTED`).
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `jobId` | TEXT FK | Target job |
+| `candidateId` | TEXT FK | Shortlisted candidate |
+| `addedBy` | TEXT | HR user email/name who added |
+| `addedAt` | TIMESTAMPTZ | When added |
+| `fitScoreAtAdd` | NUMERIC | Snapshot of the cached `job_matches.match_score` at add time — survives later re-ranking |
+| `notes` | TEXT? | HR-private note |
+
+**Unique Constraint:** `(job_id, candidate_id)` — idempotent add (POST returns 200 on conflict, 201 on insert).
+
+### 5.3.20 HrDashboardWidget (custom analytics charts)
+
+TrackBuddy-style per-user saved widgets on `/dashboard/analytics`. The 7 default charts are pinned on top; custom widgets render below.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `userId` | UUID FK → `auth.users` | Owner (CASCADE on user delete) |
+| `title` | TEXT | HR-given chart title |
+| `spec` | JSONB | Validated against the analytics catalog (`metric` × `dimension` × `chartType` × filters × limit). Strict mode rejects unknown keys. |
+| `position` | INT | Display ordering |
+
+Indexed on `(user_id, position)`. The `spec` key is added to the `JSONB_KEYS` opt-out in `db-utils.ts` so dimension/metric keys aren't camelized.
+
+### 5.3.21 JdParsingTelemetry (observability)
+
+Fire-and-forget observability for the JD requirements extractor. One row per `JobRequirementsExtractorService.extract()` call.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `jobId` | TEXT FK → `jobs(id) ON DELETE CASCADE` | Optional source job |
+| `attemptedAt` | TIMESTAMPTZ | Call time |
+| `provider` | TEXT | `groq` or `openai` |
+| `model` | TEXT | Concrete model id (e.g., `llama-3.3-70b-versatile`) |
+| `success` | BOOLEAN | Final outcome of the extract call |
+| `durationMs` | INT | Wall-clock time of the LLM call |
+| `promptTokens` / `completionTokens` / `totalTokens` | INT? | OpenAI-SDK `usage` block |
+| `fallbackUsed` | BOOLEAN | TRUE when Groq failed and OpenAI was tried |
+| `schemaVersion` | INT | `JOB_REQUIREMENTS_SCHEMA_VERSION` at the time |
+| `inputChars` | INT | Length of JD text fed to the LLM |
+| `errorKind` | TEXT? | `rate_limit` \| `invalid_json` \| `schema_validation` \| `llm_empty` \| `input_too_short` \| `other` |
+| `errorMessage` | TEXT? | Truncated error string (debugging) |
+
+Indexes: `attempted_at DESC`, `job_id`, `success`. Insert failures are logged via `createLogger` and swallowed — telemetry never breaks the parse path.
+
+### 5.3.22 InterviewSession Columns (added 2026-04-14 / 2026-04-15)
+
+The AI Interviewer dual-mode rollout introduced these columns on `interview_sessions`:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `interviewMode` | `TECHNICAL` \| `LANGUAGE` | Mode picked on `/dashboard/ai-interview` |
+| `targetSkill` | TEXT? | Persisted skill scope for technical mode (enforced by realtime API + FastAPI prompt) |
+| `tokenHash` / `tokenExpiresAt` | TEXT / TIMESTAMPTZ | HMAC-SHA256 token (10-min TTL) for popup access |
+| `evaluationRationale` | JSONB | Stores `turn_count`, `evidence` array, and language-mode CEFR subscores (`grammar`, `vocabulary`, `fluency`) |
+
+The `skills` table also gained `verification_status` / `verified_at` / `verified_by` so HR can override AI verdicts; HR overrides are distinguished by `verified_by !== "AI"`.
+
+Notification columns added 2026-04-29: `read_at`, `created_by`, `metadata` JSONB, plus a real FK `notifications.campaign_id → promo_campaigns(id) ON DELETE SET NULL` (required by the PostgREST `campaign:promo_campaigns(...)` join).
+
 ---
 
 ## 5.4 Index Strategy
@@ -409,18 +487,34 @@ All child records cascade-delete when their parent is removed:
 
 ## 5.6 Migration History
 
-The database schema was originally iterated via `prisma db push` / `prisma migrate dev`, then consolidated into plain SQL migrations when the project migrated to Supabase. The canonical migration log now lives under `supabase/migrations/`.
+The database schema was originally iterated via `prisma db push` / `prisma migrate dev`. After the migration off Prisma in 2026-04-13, the team ran ~10 per-feature SQL deltas, then consolidated everything into a single canonical schema on 2026-04-26.
 
-| Migration File | Tables / Columns Affected | Change |
+Today the canonical schema lives in **one file**:
+
+| File | Purpose |
+|------|---------|
+| `supabase/migrations/00000000000000_schema.sql` | Full schema — every per-feature delta inlined. Run once in the Supabase SQL Editor for a fresh database. |
+
+For reference, the per-feature deltas that were inlined include:
+
+| Inlined delta | Tables / Columns Affected | Change |
 |----------------|---------------------------|--------|
-| `20260413000000_initial_schema.sql` | 20+ tables | Full schema ported from the Prisma-era models: candidates, jobs, assessments, applications, notifications, parsing jobs, scoring weights/presets, and supporting tables |
-| `20260414000000_add_interview_mode.sql` | `assessments` | Added dual assessment mode (`WRITTEN` / `INTERVIEW`), `evaluation_rationale` JSONB, and interview-specific fields |
-| `20260415000000_add_skill_verification.sql` | `skill_verifications` | New table capturing per-skill verification outcomes with AI-generated rationale |
-| `20260419000000_add_activation_and_invitation.sql` | `candidates`, invitation tables | Candidate activation flow + HR invitation tracking |
+| Initial Supabase port (2026-04-13) | 20+ tables | Full schema ported from the Prisma-era models |
+| Interview mode (2026-04-14) | `interview_sessions` | Added `interview_mode` (`TECHNICAL` \| `LANGUAGE`), `target_skill`, `token_hash`, `token_expires_at`, `evaluation_rationale` JSONB |
+| Skill verification (2026-04-15) | `skills` | Added `verification_status`, `verified_at`, `verified_by` |
+| Notification additions (2026-04-29) | `notifications` | Added `read_at`, `created_by`, `metadata` JSONB; FK `campaign_id → promo_campaigns(id)` |
+| Job-anchored matching (2026-04-23) | `jobs`, `experiences` | Added `jobs.parsed_requirements` JSONB + `parsed_requirements_version` INT; `experiences.fields_of_work TEXT[]` + GIN index |
+| Per-job shortlist (2026-04-30) | new `job_shortlists` | HR pick list per job, snapshots `fit_score_at_add` |
+| HR custom analytics (2026-05-06) | new `hr_dashboard_widgets` | Per-user saved analytics charts; `spec` JSONB validated against the catalog |
+| JD parser telemetry (2026-05-08) | new `jd_parsing_telemetry` | Fire-and-forget observability for the JD requirements extractor |
 
-### RLS Policies
+### Row-Level Security
 
-Candidate-owned tables (candidates, applications, notifications, assessments, skill verifications) have Row-Level Security enabled with policies keyed on `auth.uid()`. HR users bypass RLS via the service-role key used server-side for privileged operations.
+**RLS is disabled on every application table.** All DB access goes through server-side code holding the `SUPABASE_SERVICE_ROLE_KEY`. Authorization is enforced one layer up, in the API surface:
+
+- Middleware ([middleware.ts](../middleware.ts)) returns `401` for unauthenticated `/api/*` requests and `403` for non-HR callers hitting `HR_ONLY_API_PREFIXES`.
+- The `requireHr()` helper at [src/lib/auth/require-hr.ts](../src/lib/auth/require-hr.ts) is used by routes that need defense-in-depth (per-job shortlist, analytics widgets, skill verification override).
+- Role is sourced from `app_metadata.role` (server-set, immutable from the client). `user_metadata` is never trusted for authorization.
 
 ---
 

@@ -78,6 +78,20 @@
 | 43 | POST | `/api/interview/realtime/session` | Create a real-time AI interview session (proxied to FastAPI) |
 | 44 | POST | `/api/interview/realtime/turn` | Submit a turn; persists `turn_count` + `evidence` into `evaluation_rationale` |
 | 45 | POST | `/api/interview/realtime/complete` | Finalize the interview and persist the rubric result |
+| 46 | POST | `/api/interview/realtime/terminate` | Terminate an in-progress interview session early |
+| 47 | POST | `/api/interview/proctoring` | Log proctoring events (tab-switch, fullscreen exit, etc.) |
+| 48 | POST | `/api/jobs/[id]/match-candidates` | Job-anchored ranking — lazy JD parse + `computeJobFit` over all candidates |
+| 49 | POST | `/api/jobs/[id]/reparse-requirements` | Force re-parse of a job's requirements (HR-only, bypasses the version cache) |
+| 50 | GET / POST | `/api/jobs/[id]/shortlist` | List / add to per-job HR shortlist (idempotent on conflict) |
+| 51 | DELETE / PATCH | `/api/jobs/[id]/shortlist/[candidateId]` | Remove from / update notes on per-job shortlist |
+| 52 | GET | `/api/candidates/[id]/shortlists` | List jobs this candidate is on (HR-only; 403 for candidate viewers) |
+| 53 | POST | `/api/candidates/[id]/contact` | Send HR → candidate email; logs `CONTACT_EMAIL_SENT` notification with body |
+| 54 | GET | `/api/candidates/[id]/interaction-history` | Full interaction history feed for a candidate |
+| 55 | GET | `/api/analytics/catalog` | Public catalog of allowed metric × dimension × chartType combinations |
+| 56 | POST | `/api/analytics/query` | Run a validated `WidgetSpec` and return `{ data: [{label, value}] }` |
+| 57 | GET / POST | `/api/analytics/widgets` | List / create the current HR user's saved analytics widgets |
+| 58 | PATCH / DELETE | `/api/analytics/widgets/[id]` | Update or delete a saved widget |
+| 59 | GET | `/api/me/export` | GDPR data-export bundle for the current candidate |
 
 ### Middleware-Level Authorization
 
@@ -92,9 +106,12 @@ All `/api/**` routes (except the `PUBLIC_API_PREFIXES` list in `middleware.ts`) 
 /api/jobs/sync
 /api/upload/bulk
 /api/analytics
+/api/analytics/widgets
 ```
 
-Unauthenticated requests \u2192 `401`. Authenticated non-HR requests to HR-only paths \u2192 `403`. Route handlers themselves do not re-implement these checks (except the skill-verification route which double-checks role as defense-in-depth).
+> **Note**: role is read from `app_metadata.role` (server-set, immutable from the client). `user_metadata` is never trusted for authorization. A handful of HR-only routes outside the prefixes — per-job shortlist CRUD, JD reparse, skill-verification override, candidate contact email — use the `requireHr()` helper in [src/lib/auth/require-hr.ts](../src/lib/auth/require-hr.ts) for defense-in-depth.
+
+Unauthenticated requests → `401`. Authenticated non-HR requests to HR-only paths → `403`. Route handlers themselves do not re-implement the middleware checks (except the routes mentioned above which double-check role).
 
 ---
 
@@ -652,3 +669,96 @@ export async function GET(req: NextRequest) {
 | Zod `.safeParse()` (returns result) | Profile updates — allows custom error formatting |
 | Zod `.strict()` (rejects extra fields) | Update schemas — prevents mass-assignment |
 | Manual validation | Simple checks (e.g., `if (!candidateId)`) |
+| `dateOfBirth` | string \| null (converted to Date) |
+
+---
+
+### 7.3.9 Job-Anchored Matching & Per-Job Shortlist
+
+#### `POST /api/jobs/[id]/match-candidates` *(HR-only)*
+
+Runs `JobUseCases.matchCandidatesToJob(jobId)`:
+1. Lazy-parse the JD into `parsed_requirements` if missing or stale (schema version bump).
+2. Load all candidates with experiences/languages/education/skills.
+3. Run `computeJobFit(job, candidate)` per candidate.
+4. Persist top-100 to `job_matches` (cache).
+
+**Response 200:** `{ matchesCount, jobId, parsedRequirements }`. UI consumes this on `/dashboard/jobs/[id]/match-candidates`.
+
+#### `POST /api/jobs/[id]/reparse-requirements` *(HR-only)*
+
+Force re-parse even if `parsed_requirements_version` is current. Useful after prompt tweaks or tutoring the LLM. Records a row in `jd_parsing_telemetry`.
+
+#### `GET /api/jobs/[id]/shortlist` *(HR-only)*
+
+Returns shortlisted candidates with `fit_score_at_add` snapshot vs the current cached `job_matches.match_score`.
+
+#### `POST /api/jobs/[id]/shortlist` *(HR-only)*
+
+**Body:** `{ candidateId: string, notes?: string }`. Returns `200` if the row already existed (idempotent), `201` on insert. Captures current cached fit as `fit_score_at_add`.
+
+#### `DELETE /api/jobs/[id]/shortlist/[candidateId]` *(HR-only)*
+
+Removes the candidate from the per-job shortlist.
+
+#### `PATCH /api/jobs/[id]/shortlist/[candidateId]` *(HR-only)*
+
+**Body:** `{ notes: string | null }`. Inline note edit from the UI.
+
+#### `GET /api/candidates/[id]/shortlists` *(HR-only)*
+
+Lists all jobs the candidate appears on. Returns `403` for candidate viewers — the candidate profile page silently hides the section.
+
+---
+
+### 7.3.10 HR Custom Analytics ("My charts")
+
+All HR-only. Spec is validated against the catalog on every read AND write — the client is never trusted.
+
+#### `GET /api/analytics/catalog`
+
+Returns the public catalog: 4 metrics (`candidates`, `applications`, `jobs`, `assessments`), whitelisted dimensions per metric (categorical / temporal / none), allowed chart types per dimension family, whitelisted filter keys.
+
+#### `POST /api/analytics/query`
+
+**Body:** a `WidgetSpec`. Validates with `WidgetSpecSchema.strict()` (rejects unknown top-level keys), runs the hand-written query for the metric, and returns `{ data: [{ label, value }] }`. Time-series buckets: day (ISO), week (ISO YYYY-Www), month (YYYY-MM).
+
+#### `GET / POST /api/analytics/widgets`
+
+List or create the current user's saved widgets. POST validates the spec.
+
+#### `PATCH / DELETE /api/analytics/widgets/[id]`
+
+Update title/spec/position or remove. PATCH revalidates the spec.
+
+---
+
+### 7.3.11 Candidate Contact + Interaction History
+
+#### `POST /api/candidates/[id]/contact` *(HR-only)*
+
+**Body:** `{ subject: string, body: string }`. Sends an email via Resend (with copy-link fallback) and records a `CONTACT_EMAIL_SENT` notification with `metadata: { subject, body }` and `created_by` set to the HR user.
+
+#### `GET /api/candidates/[id]/interaction-history` *(HR-only)*
+
+Returns every notification for the candidate (no role/archived filter), joined with `campaign:promo_campaigns(id, title)` and `job:jobs(id, title)`, ordered DESC. Powers the `InteractionHistory` panel on `/dashboard/candidates/[id]`.
+
+---
+
+### 7.3.12 Real-Time Interview — Termination & Proctoring
+
+#### `POST /api/interview/realtime/terminate`
+
+Marks an in-progress session as terminated and prevents further turns. Used when the candidate closes the popup early or hits a hard stop condition.
+
+#### `POST /api/interview/proctoring`
+
+**Body:** `{ sessionId, kind, occurredAt, details? }`. Persists into `interview_proctoring_events`. `kind` examples: `tab_switch`, `fullscreen_exit`, `multiple_faces`, `no_face`, `audio_silent`.
+
+---
+
+### 7.3.13 GDPR Data Export
+
+#### `GET /api/me/export`
+
+Returns a JSON bundle of the current candidate's data (profile, experiences, education, languages, skills, applications, assessments, notifications). Used for the GDPR self-service export on the candidate dashboard.
