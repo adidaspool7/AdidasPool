@@ -8,6 +8,18 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov", "html"],
+      reportsDirectory: "./coverage",
+      include: ["src/server/**/*.ts", "src/lib/**/*.ts"],
+      exclude: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.d.ts",
+        "src/server/infrastructure/database/supabase-client.ts",
+      ],
+    },
   },
   resolve: {
     alias: {
