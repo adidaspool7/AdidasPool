@@ -67,7 +67,7 @@ Always generate IDs with `generateId()` from `db-utils.ts` (wraps `crypto.random
 Supabase JS client does not support transactions. Use `Promise.all()` for parallel operations. Acknowledge that this means partial failure is possible — design accordingly (idempotent operations where possible).
 
 ### 2.6 No Prisma
-Prisma is fully removed. `prisma-client.ts` throws on import as a safety net. Do not add `@prisma/client` or `prisma` back to `package.json`.
+Prisma is fully removed. The `prisma/` directory and the safety-net `prisma-client.ts` were deleted on 2026-04-30. Do not add `@prisma/client` or `prisma` back to `package.json`, and do not re-introduce a `prisma/schema.prisma` file — `supabase/migrations/00000000000000_schema.sql` is the single source of truth.
 
 ### 2.7 RLS
 RLS is disabled on all tables. All DB access is server-side via `supabase-client.ts` (service role key). Never expose the service role key to the client.
