@@ -1034,7 +1034,7 @@ export default function CandidatesPage() {
                 <SortableHeader
                   field="overallCvScore"
                   className="text-center"
-                  title="Profile score — CV-intrinsic, independent of any job. Measures experience relevance, years, education, location, and languages against the configured weights."
+                  title="Profile completeness — CV-intrinsic score, independent of any job. Measures experience relevance, years, education, location, and languages against the configured weights. Useful as a prefilter, not a hiring signal — pick a job to see Fit."
                 >
                   Profile
                 </SortableHeader>
