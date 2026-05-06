@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
         <StatCard label="Total Candidates" value={data.overview.totalCandidates} />
         <StatCard label="Open Positions" value={data.overview.openPositions} />
         <StatCard label="Applications" value={data.overview.totalApplications} />
-        <StatCard label="Shortlisted" value={data.overview.shortlisted} />
+        <StatCard label="Watchlist" value={data.overview.shortlisted} />
         <StatCard label="Assessments" value={data.overview.assessments} />
       </div>
 

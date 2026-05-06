@@ -522,6 +522,32 @@ CREATE INDEX idx_job_matches_job_id       ON job_matches(job_id);
 CREATE INDEX idx_job_matches_candidate_id ON job_matches(candidate_id);
 CREATE INDEX idx_job_matches_score        ON job_matches(match_score);
 
+-- -------
+
+-- Per-job shortlists. Distinct from candidates.shortlisted (now reframed
+-- as the global "Watchlist") and from application_status.SHORTLISTED
+-- (an application-lifecycle stage). This is HR's working pick list of
+-- candidates being actively considered for a specific job.
+CREATE TABLE job_shortlists (
+  id                TEXT PRIMARY KEY,
+  job_id            TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  candidate_id      TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  added_by          TEXT,
+  added_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fit_score_at_add  FLOAT,
+  notes             TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(job_id, candidate_id)
+);
+
+CREATE TRIGGER trg_job_shortlists_updated_at
+  BEFORE UPDATE ON job_shortlists
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_job_shortlists_job_id       ON job_shortlists(job_id);
+CREATE INDEX idx_job_shortlists_candidate_id ON job_shortlists(candidate_id);
+
 
 -- ----------------------------------------------------------------
 -- 7. ASSESSMENT TEMPLATES

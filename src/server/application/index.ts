@@ -19,6 +19,7 @@ import {
   scoringWeightsRepository,
   scoringPresetRepository,
   analyticsRepository,
+  shortlistRepository,
   cvParserService,
   emailService,
   jobScraperService,
@@ -40,6 +41,7 @@ import { ApplicationUseCases } from "@server/application/use-cases/application.u
 import { NotificationUseCases } from "@server/application/use-cases/notification.use-cases";
 import { ProfileUseCases } from "@server/application/use-cases/profile.use-cases";
 import { AnalyticsUseCases } from "@server/application/use-cases/analytics.use-cases";
+import { ShortlistUseCases } from "@server/application/use-cases/shortlist.use-cases";
 
 // Re-export error classes so API routes import from barrel, not deep paths
 export { NotFoundError, ValidationError, JobClosedError };
@@ -73,6 +75,12 @@ export const notificationUseCases = new NotificationUseCases(notificationReposit
 export const profileUseCases = new ProfileUseCases(candidateRepository, storageService);
 
 export const analyticsUseCases = new AnalyticsUseCases(analyticsRepository);
+
+export const shortlistUseCases = new ShortlistUseCases(
+  shortlistRepository,
+  jobRepository,
+  candidateRepository
+);
 
 // Direct repository exports (for simple config endpoints that don't need use-case wrapping)
 export { scoringWeightsRepository };

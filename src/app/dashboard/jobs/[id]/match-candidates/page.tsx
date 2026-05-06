@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, use } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Card,
@@ -13,6 +13,12 @@ import {
 import { Badge } from "@client/components/ui/badge";
 import { Button } from "@client/components/ui/button";
 import { Separator } from "@client/components/ui/separator";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@client/components/ui/tabs";
 import {
   ArrowLeft,
   Briefcase,
@@ -26,6 +32,8 @@ import {
   ExternalLink,
   SlidersHorizontal,
   MoreHorizontal,
+  Star,
+  Trash2,
 } from "lucide-react";
 import {
   Popover,
@@ -85,6 +93,27 @@ interface MatchResponse {
     responsibilitiesSummary?: string | null;
   };
   matches: RankedMatch[];
+}
+
+// Per-job shortlist row as returned by /api/jobs/[id]/shortlist.
+interface ShortlistRow {
+  id: string;
+  jobId: string;
+  candidateId: string;
+  addedBy: string | null;
+  addedAt: string;
+  fitScoreAtAdd: number | null;
+  notes: string | null;
+  candidate: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    location: string | null;
+    country: string | null;
+    overallCvScore: number | null;
+  };
+  currentFitScore: number | null;
 }
 
 // ============================================
@@ -202,11 +231,19 @@ export default function MatchCandidatesPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get("tab") === "shortlist" ? "shortlist" : "ranked";
+  const [activeTab, setActiveTab] = useState<"ranked" | "shortlist">(initialTab);
   const [data, setData] = useState<MatchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Per-job shortlist state. Map<candidateId, ShortlistRow>.
+  const [shortlist, setShortlist] = useState<Map<string, ShortlistRow>>(new Map());
+  const [shortlistLoading, setShortlistLoading] = useState(false);
+  const [shortlistBusy, setShortlistBusy] = useState<Set<string>>(new Set());
 
   // HR-tunable scoring config. All persisted on scoring_weights (global).
   const [threshold, setThreshold] = useState<number>(0.5);
@@ -266,6 +303,97 @@ export default function MatchCandidatesPage({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Load the per-job shortlist alongside the ranked candidates.
+  const loadShortlist = async () => {
+    setShortlistLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/shortlist`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = (await res.json()) as { entries: ShortlistRow[] };
+      const map = new Map<string, ShortlistRow>();
+      for (const e of json.entries) map.set(e.candidateId, e);
+      setShortlist(map);
+    } catch {
+      // Non-fatal: page still works without star state populated.
+    } finally {
+      setShortlistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShortlist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const toggleShortlist = async (
+    candidateId: string,
+    optimisticRow?: Partial<ShortlistRow["candidate"]>
+  ) => {
+    if (shortlistBusy.has(candidateId)) return;
+    setShortlistBusy((prev) => new Set(prev).add(candidateId));
+    const wasOn = shortlist.has(candidateId);
+    try {
+      if (wasOn) {
+        const res = await fetch(`/api/jobs/${id}/shortlist/${candidateId}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          setShortlist((prev) => {
+            const next = new Map(prev);
+            next.delete(candidateId);
+            return next;
+          });
+        }
+      } else {
+        const res = await fetch(`/api/jobs/${id}/shortlist`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateId }),
+        });
+        if (res.ok) {
+          // Re-pull just this row to get full candidate enrichment.
+          await loadShortlist();
+          // Optimistic placeholder fallback if loadShortlist failed silently.
+          setShortlist((prev) => {
+            if (prev.has(candidateId)) return prev;
+            const placeholder: ShortlistRow = {
+              id: `tmp-${candidateId}`,
+              jobId: id,
+              candidateId,
+              addedBy: null,
+              addedAt: new Date().toISOString(),
+              fitScoreAtAdd: null,
+              notes: null,
+              candidate: {
+                id: candidateId,
+                firstName: optimisticRow?.firstName ?? "",
+                lastName: optimisticRow?.lastName ?? "",
+                email: null,
+                location: optimisticRow?.location ?? null,
+                country: optimisticRow?.country ?? null,
+                overallCvScore: null,
+              },
+              currentFitScore: null,
+            };
+            const next = new Map(prev);
+            next.set(candidateId, placeholder);
+            return next;
+          });
+        }
+      }
+    } finally {
+      setShortlistBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(candidateId);
+        return next;
+      });
+    }
+  };
+
+  const removeFromShortlist = async (candidateId: string) => {
+    await toggleShortlist(candidateId);
+  };
 
   const toggle = (cid: string) => {
     setExpanded((prev) => {
@@ -670,7 +798,22 @@ export default function MatchCandidatesPage({
         )}
       </Card>
 
-      {/* Ranking summary + score floor (UI-only filter, not persisted) */}
+      {/* Tabs: Ranked candidates / Shortlist */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "ranked" | "shortlist")}
+        className="space-y-4"
+      >
+        <TabsList>
+          <TabsTrigger value="ranked">Ranked candidates</TabsTrigger>
+          <TabsTrigger value="shortlist">
+            <Star className="w-3.5 h-3.5 mr-1.5" />
+            Shortlist ({shortlist.size})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ranked" className="space-y-4">
+        {/* Ranking summary + score floor (UI-only filter, not persisted) */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{visible.length}</span>{" "}
@@ -712,9 +855,35 @@ export default function MatchCandidatesPage({
               visible.map((m, i) => {
                 const isOpen = expanded.has(m.candidate.id);
                 const missing = missingSkillsSummary(m.fit.breakdown);
+                const isShortlisted = shortlist.has(m.candidate.id);
+                const isStarBusy = shortlistBusy.has(m.candidate.id);
                 return (
                   <div key={m.candidate.id} className="px-4 py-3">
                     <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleShortlist(m.candidate.id, {
+                            firstName: m.candidate.firstName,
+                            lastName: m.candidate.lastName,
+                            location: m.candidate.location,
+                            country: m.candidate.country,
+                          })
+                        }
+                        disabled={isStarBusy}
+                        className={cn(
+                          "shrink-0 transition-colors",
+                          isShortlisted
+                            ? "text-amber-500 hover:text-amber-600"
+                            : "text-muted-foreground hover:text-amber-500"
+                        )}
+                        title={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                        aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                      >
+                        <Star
+                          className={cn("w-4 h-4", isShortlisted && "fill-amber-400")}
+                        />
+                      </button>
                       <button
                         onClick={() => toggle(m.candidate.id)}
                         className="text-muted-foreground hover:text-foreground"
@@ -804,7 +973,216 @@ export default function MatchCandidatesPage({
         </CardContent>
       </Card>
 
+      </TabsContent>
+
+      <TabsContent value="shortlist" className="space-y-4">
+        <ShortlistTab
+          jobId={id}
+          loading={shortlistLoading}
+          rows={Array.from(shortlist.values())}
+          busy={shortlistBusy}
+          onRemove={removeFromShortlist}
+          onReload={loadShortlist}
+        />
+      </TabsContent>
+      </Tabs>
+
       <Separator />
     </div>
+  );
+}
+
+// ============================================
+// SHORTLIST TAB
+// ============================================
+
+function ShortlistTab({
+  jobId,
+  loading,
+  rows,
+  busy,
+  onRemove,
+  onReload,
+}: {
+  jobId: string;
+  loading: boolean;
+  rows: ShortlistRow[];
+  busy: Set<string>;
+  onRemove: (candidateId: string) => Promise<void>;
+  onReload: () => Promise<void>;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+
+  const sorted = useMemo(
+    () =>
+      [...rows].sort((a, b) => {
+        const sa = b.currentFitScore ?? b.fitScoreAtAdd ?? -1;
+        const sb = a.currentFitScore ?? a.fitScoreAtAdd ?? -1;
+        return sa - sb;
+      }),
+    [rows]
+  );
+
+  const saveNote = async (candidateId: string) => {
+    setSavingNote(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/shortlist/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: draftNote.trim() === "" ? null : draftNote }),
+      });
+      if (res.ok) {
+        await onReload();
+        setEditingId(null);
+      }
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  if (loading && rows.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+        Loading shortlist…
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          <Star className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
+          <p className="font-medium text-foreground">No candidates shortlisted yet</p>
+          <p className="mt-1">
+            Click the star next to a ranked candidate to add them to this job&apos;s shortlist.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {sorted.map((r) => {
+            const fullName = `${r.candidate.firstName} ${r.candidate.lastName}`.trim();
+            const snapshot = r.fitScoreAtAdd != null ? Math.round(r.fitScoreAtAdd) : null;
+            const current = r.currentFitScore != null ? Math.round(r.currentFitScore) : null;
+            const isBusy = busy.has(r.candidateId);
+            const isEditing = editingId === r.candidateId;
+            return (
+              <div key={r.id} className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{fullName || "Unnamed candidate"}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[r.candidate.location, r.candidate.country].filter(Boolean).join(" · ") || "—"}
+                      {r.addedBy && (
+                        <>
+                          {" "}· Added by{" "}
+                          <span className="font-medium text-foreground">{r.addedBy}</span>
+                        </>
+                      )}
+                      {" "}·{" "}
+                      <span title={new Date(r.addedAt).toLocaleString()}>
+                        {new Date(r.addedAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="text-right text-xs tabular-nums"
+                      title={
+                        snapshot != null
+                          ? `Fit at time of add: ${snapshot}` +
+                            (current != null && current !== snapshot
+                              ? ` · Current fit: ${current}`
+                              : "")
+                          : undefined
+                      }
+                    >
+                      <div className="text-muted-foreground">Fit</div>
+                      <div className="font-semibold">
+                        {current != null ? current : snapshot != null ? snapshot : "—"}
+                      </div>
+                    </div>
+                    <Link href={`/dashboard/candidates/${r.candidateId}`}>
+                      <Button variant="ghost" size="sm">
+                        <ExternalLink className="w-3 h-3 mr-1" /> Open
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isBusy}
+                      onClick={() => onRemove(r.candidateId)}
+                      title="Remove from shortlist"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Note row */}
+                <div className="mt-2 ml-7">
+                  {isEditing ? (
+                    <div className="flex items-start gap-2">
+                      <textarea
+                        value={draftNote}
+                        onChange={(e) => setDraftNote(e.target.value)}
+                        rows={2}
+                        maxLength={2000}
+                        className="flex-1 text-sm rounded-md border bg-background px-2 py-1"
+                        placeholder="Why this candidate?"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={savingNote}
+                          onClick={() => saveNote(r.candidateId)}
+                        >
+                          {savingNote ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          disabled={savingNote}
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(r.candidateId);
+                        setDraftNote(r.notes ?? "");
+                      }}
+                      className="text-xs text-left text-muted-foreground hover:text-foreground"
+                    >
+                      {r.notes ? r.notes : <span className="italic">+ Add a note</span>}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

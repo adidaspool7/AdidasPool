@@ -434,3 +434,64 @@ export interface IScoringPresetRepository {
   }): Promise<ScoringPresetData>;
   delete(id: string): Promise<void>;
 }
+
+// ============================================
+// JOB SHORTLIST REPOSITORY PORT
+// ============================================
+
+export interface ShortlistEntry {
+  id: string;
+  jobId: string;
+  candidateId: string;
+  addedBy: string | null;
+  addedAt: Date;
+  fitScoreAtAdd: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ShortlistEntryWithCandidate extends ShortlistEntry {
+  candidate: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    location: string | null;
+    country: string | null;
+    overallCvScore: number | null;
+  };
+  /** Current fit score from the cache (job_matches), if present. May differ from fitScoreAtAdd. */
+  currentFitScore: number | null;
+}
+
+export interface ShortlistEntryWithJob extends ShortlistEntry {
+  job: {
+    id: string;
+    title: string;
+    department: string | null;
+    location: string | null;
+    country: string | null;
+    status: string | null;
+  };
+}
+
+export interface IShortlistRepository {
+  /** Idempotent insert. Returns the existing row on UNIQUE conflict. */
+  add(data: {
+    jobId: string;
+    candidateId: string;
+    addedBy: string | null;
+    fitScoreAtAdd: number | null;
+    notes: string | null;
+  }): Promise<{ entry: ShortlistEntry; created: boolean }>;
+  remove(jobId: string, candidateId: string): Promise<boolean>;
+  findByJob(jobId: string): Promise<ShortlistEntryWithCandidate[]>;
+  findByCandidate(candidateId: string): Promise<ShortlistEntryWithJob[]>;
+  findOne(jobId: string, candidateId: string): Promise<ShortlistEntry | null>;
+  updateNote(jobId: string, candidateId: string, notes: string | null): Promise<ShortlistEntry | null>;
+  countByJob(jobId: string): Promise<number>;
+  /** Lookup the cached fit score for snapshot at add-time. */
+  findCachedFitScore(jobId: string, candidateId: string): Promise<number | null>;
+}
+

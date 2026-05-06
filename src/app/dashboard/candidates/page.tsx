@@ -926,7 +926,7 @@ export default function CandidatesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="SHORTLISTED_FILTER">⭐ Shortlisted</SelectItem>
+            <SelectItem value="SHORTLISTED_FILTER">⭐ Watchlist</SelectItem>
             {Object.entries(STATUS_LABEL).map(([val, label]) => (
               <SelectItem key={val} value={val}>
                 {label}
@@ -1094,7 +1094,7 @@ export default function CandidatesPage() {
                         <button
                           type="button"
                           className="mt-0.5 shrink-0 focus:outline-none"
-                          title={c.shortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                          title={c.shortlisted ? "Remove from Watchlist" : "Add to Watchlist"}
                           onClick={(e) => toggleShortlisted(e, c.id, c.shortlisted)}
                         >
                           <Star

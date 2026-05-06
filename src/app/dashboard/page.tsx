@@ -66,7 +66,7 @@ function HRDashboard() {
       icon: ClipboardCheck,
     },
     {
-      title: "Shortlisted",
+      title: "Watchlist",
       value: loading ? "–" : overview.shortlisted.toLocaleString(),
       description: "Ready for interview",
       icon: TrendingUp,

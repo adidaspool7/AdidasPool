@@ -18,6 +18,7 @@ import { SupabaseParsingJobRepository } from "@server/infrastructure/database/pa
 import { SupabaseScoringWeightsRepository } from "@server/infrastructure/database/scoring-weights.repository";
 import { SupabaseScoringPresetRepository } from "@server/infrastructure/database/scoring-preset.repository";
 import { SupabaseAnalyticsRepository } from "@server/infrastructure/database/analytics.repository";
+import { SupabaseShortlistRepository } from "@server/infrastructure/database/shortlist.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
 import { JobRequirementsExtractorService } from "@server/infrastructure/ai/job-requirements-extractor.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
@@ -38,6 +39,7 @@ import type {
   IScoringWeightsRepository,
   IScoringPresetRepository,
   IAnalyticsRepository,
+  IShortlistRepository,
 } from "@server/domain/ports/repositories";
 import type {
   ICvParserService,
@@ -80,6 +82,9 @@ export const scoringPresetRepository: IScoringPresetRepository =
 
 export const analyticsRepository: IAnalyticsRepository =
   new SupabaseAnalyticsRepository();
+
+export const shortlistRepository: IShortlistRepository =
+  new SupabaseShortlistRepository();
 
 // ============================================
 // SERVICE INSTANCES

@@ -1113,6 +1113,7 @@ export default function CandidateDetailPage({
 
       {/* ── Interaction History ──────────────────────────────────── */}
       <InteractionHistory candidateId={c.id} />
+      <ShortlistedFor candidateId={c.id} />
     </div>
   );
 }
@@ -1370,6 +1371,116 @@ function DetailSkeleton() {
       </Card>
       <Skeleton className="h-[300px]" />
     </div>
+  );
+}
+
+// ── Shortlisted For component (HR-only) ─────────────────────────
+// Lists all jobs this candidate has been shortlisted on. Hits an HR-only
+// API; renders nothing for candidate viewers (403) or empty results.
+
+interface ShortlistedForRow {
+  id: string;
+  jobId: string;
+  candidateId: string;
+  addedBy: string | null;
+  addedAt: string;
+  fitScoreAtAdd: number | null;
+  notes: string | null;
+  job: {
+    id: string;
+    title: string;
+    department: string | null;
+    location: string | null;
+    country: string | null;
+    status: string | null;
+  };
+}
+
+function ShortlistedFor({ candidateId }: { candidateId: string }) {
+  const [rows, setRows] = useState<ShortlistedForRow[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/candidates/${candidateId}/shortlists`)
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return (await r.json()) as { entries: ShortlistedForRow[] };
+      })
+      .then((j) => {
+        if (!alive) return;
+        setRows(j?.entries ?? []);
+      })
+      .catch(() => {
+        if (alive) setRows([]);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [candidateId]);
+
+  if (loading || !rows || rows.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          Shortlisted For ({rows.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {rows.map((r) => {
+            const fit = r.fitScoreAtAdd != null ? Math.round(r.fitScoreAtAdd) : null;
+            return (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={`/dashboard/jobs/${r.jobId}/match-candidates?tab=shortlist`}
+                    className="font-medium hover:underline truncate inline-block max-w-full"
+                  >
+                    {r.job.title}
+                  </a>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {[r.job.department, r.job.location, r.job.country]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                    {r.addedBy && (
+                      <>
+                        {" "}· Added by{" "}
+                        <span className="font-medium text-foreground">{r.addedBy}</span>
+                      </>
+                    )}
+                    {" "}·{" "}
+                    {new Date(r.addedAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </div>
+                  {r.notes && (
+                    <div className="text-xs text-muted-foreground italic mt-1 truncate">
+                      &ldquo;{r.notes}&rdquo;
+                    </div>
+                  )}
+                </div>
+                {fit != null && (
+                  <Badge variant="outline" className="tabular-nums">
+                    Fit {fit}
+                  </Badge>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 

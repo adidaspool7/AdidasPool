@@ -74,7 +74,7 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - Migration file: `supabase/migrations/00000000000000_schema.sql` — single canonical schema file. Consolidated 2026-04-26: every prior per-feature delta has been inlined. Run once in Supabase SQL Editor for fresh databases.
 
 ### Key Tables
-`candidates`, `experiences`, `education`, `candidate_languages`, `skills`, `candidate_tags`, `candidate_notes`, `jobs`, `job_applications`, `job_matches`, `assessment_templates`, `assessments`, `assessment_results`, `interview_sessions`, `interview_transcript_turns`, `interview_proctoring_events`, `improvement_tracks`, `improvement_progress`, `notifications`, `notification_preferences`, `promo_campaigns`, `parsing_jobs`, `scoring_weights`, `scoring_presets`, `sync_jobs`
+`candidates`, `experiences`, `education`, `candidate_languages`, `skills`, `candidate_tags`, `candidate_notes`, `jobs`, `job_applications`, `job_matches`, `job_shortlists`, `assessment_templates`, `assessments`, `assessment_results`, `interview_sessions`, `interview_transcript_turns`, `interview_proctoring_events`, `improvement_tracks`, `improvement_progress`, `notifications`, `notification_preferences`, `promo_campaigns`, `parsing_jobs`, `scoring_weights`, `scoring_presets`, `sync_jobs`
 
 ---
 
@@ -181,6 +181,39 @@ The "universal candidate match score" was deleted. Matching is now always
 - `scripts/backfill-job-requirements.ts` — re-parse jobs with stale schema version.
 - `scripts/backfill-experience-fields.ts` — tag historical experiences.
   Invoke: `npx tsx --env-file=.env.local scripts/<name>.ts [batch] [delay]`
+
+---
+
+## Per-Job Shortlist (Phase 1 — 2026-04-30)
+
+HR's working pick list of candidates being actively considered for a
+**specific job**. Distinct from:
+
+- `candidates.shortlisted` (now framed as the **Watchlist** in UI labels —
+  global "follow this candidate" flag, unchanged).
+- `application_status.SHORTLISTED` (lifecycle stage on `job_applications`).
+
+### Schema
+- Table `job_shortlists`: `(job_id, candidate_id)` UNIQUE, `added_by`,
+  `added_at`, `fit_score_at_add` (snapshot of `job_matches.match_score`
+  at the time of add — survives re-ranking), `notes`.
+
+### Endpoints (all HR-only via inline `requireHr()` helper in `src/lib/auth/require-hr.ts`)
+- `GET    /api/jobs/[id]/shortlist` — list with candidate basics + current cached fit
+- `POST   /api/jobs/[id]/shortlist` — idempotent add (returns 200 on conflict, 201 on insert)
+- `DELETE /api/jobs/[id]/shortlist/[candidateId]` — remove
+- `PATCH  /api/jobs/[id]/shortlist/[candidateId]` — update HR note
+- `GET    /api/candidates/[id]/shortlists` — list jobs this candidate is on
+
+### UI surfaces
+- **`/dashboard/jobs/[id]/match-candidates`** — Tabs `[Ranked candidates] [Shortlist (N)]`
+  (URL `?tab=shortlist`). Star button next to each ranked row toggles membership.
+  Shortlist tab shows snapshot vs current fit, HR notes (inline edit), remove.
+- **`/dashboard/candidates/[id]`** — `Shortlisted For` card lists the jobs.
+  Renders nothing for candidate viewers (API returns 403 → component bails).
+
+### Tests
+- `tests/job-shortlist-use-cases.test.ts` — idempotent add, fit snapshot, NotFoundError.
 
 ---
 
