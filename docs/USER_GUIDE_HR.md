@@ -1,6 +1,6 @@
 # adidas Talent Intelligence Platform — HR Manager User Guide
 
-> **Version:** 1.2 — May 2026
+> **Version:** 1.3 — May 2026
 > **Platform URL:** [adidas-pool.vercel.app](https://adidas-pool.vercel.app)
 > **Audience:** HR managers, recruiters, hiring coordinators.
 > **Candidate counterpart:** [USER_GUIDE_CANDIDATE.md](USER_GUIDE_CANDIDATE.md)
@@ -328,6 +328,7 @@ The candidate detail page displays:
 - **Interaction History** — every notification, status change, email, and campaign linked to the candidate, with HR sender attribution and read tracking.
 - **Contact Candidate** — send an email directly; the message is recorded as a `CONTACT_EMAIL_SENT` event in the interaction history with the subject and expandable body.
 
+> **Email delivery note:** the contact-email pipeline is fully wired (Zod validation → Resend → interaction-history logging) but **outbound delivery requires a verified Resend sender domain**. Until that is configured, the API returns an error and the message is not delivered. See [CONTACT_EMAIL_OPTION_B_SETUP.md](CONTACT_EMAIL_OPTION_B_SETUP.md) for the operational steps.
 ### Collaborative Notes
 
 Notes are fully functional: use the rich-text editor (powered by TipTap) on the candidate detail page to add timestamped notes. All notes are persisted via `POST /api/candidates/[id]/notes` (Zod-validated) and render in reverse chronological order.
@@ -363,6 +364,21 @@ The first time you open **Rank candidates** for a job, the JD is parsed by Groq 
 - Overall Fit is the **average of applicable criteria** — irrelevant ones are skipped, not penalised. This means a job with no language requirement does not punish candidates for lacking a language.
 
 > **Tip:** When too few candidates are eligible, edit the job and relax a must-have to "preferred" — the next ranking will re-include them.
+
+### Per-Job Shortlist
+
+The ranked-candidates page has two tabs: **Ranked candidates** and **Shortlist (N)**. Use the shortlist as your active pick list **for that specific job** — it is independent of the global Watchlist (the star toggle on the Candidates list, which marks a candidate as generally interesting across all jobs).
+
+- **Add to shortlist:** click the star icon next to any ranked candidate. Idempotent — clicking twice does not duplicate.
+- **Snapshot fit:** when you add a candidate, the current Fit score is captured (`fitScoreAtAdd`). The Shortlist tab shows both the **snapshot** and the **current** fit, so you can spot drift if the ranking changed (e.g., after a JD edit).
+- **HR notes:** each shortlist entry has an inline note field for short context ("phone screened", "availability July", etc.).
+- **Remove:** the trash icon removes the candidate from this job's shortlist (does not affect their global Watchlist or any other job's shortlist).
+- **Per-candidate view:** the candidate detail page shows a **Shortlisted For** card listing every job this candidate is currently shortlisted on, so you immediately see if they're already in flight elsewhere.
+
+> **Three concepts, do not confuse them:**
+> 1. **Watchlist** (`candidates.shortlisted`) — global "follow this candidate" star on the Candidates list. Job-agnostic.
+> 2. **Per-job Shortlist** (`job_shortlists`) — your active pick list for one specific job. Covered here.
+> 3. **Application status `SHORTLISTED`** — a lifecycle stage on a job *application* (Submitted → Under Review → … → Shortlisted). Triggered from the Applications view, not from ranking.
 
 ---
 
@@ -634,6 +650,22 @@ The Analytics page provides HR managers with real-time aggregate statistics acro
 
 All data is served from the `GET /api/analytics` endpoint, which runs 7 parallel database queries for maximum speed.
 
+### My Charts (per-user custom widgets)
+
+Below the seven default charts you can build your own using a constrained, no-SQL chart builder. Widgets are **per HR user** — only you see your saved charts.
+
+- Click **➕ Add chart** to open the builder dialog.
+- Pick a **metric** (one of: Candidates, Applications, Jobs, Assessments).
+- Pick a **dimension** — the catalog only offers dimensions that make sense for the chosen metric (e.g. *Status*, *Country*, *Score bucket*, *Department*, *Type*, or temporal buckets *Day / Week / Month*).
+- Pick a **chart type** — only types valid for the dimension family are offered (categorical → bar / horizontal bar / pie; temporal → line / area / bar; no-dimension → stat card).
+- Tune **Top-N** (categorical) or **Lookback days** (temporal) and give the chart a title — a default title is auto-suggested.
+- A **live preview** updates as you adjust the form (debounced ~300 ms).
+- **Save** to add it to your dashboard. **Edit** or **Delete** any saved chart from its card.
+
+> **Why is the builder constrained?** Every spec is validated server-side against a strict Zod schema before any database query runs. Unknown filter keys, mismatched dimension/chart-type combinations, or out-of-range limits are rejected. There is no freeform SQL surface — by design.
+
+Widgets are stored per user in `hr_dashboard_widgets`; the seven default analytics charts above are unaffected.
+
 ---
 
 ## 14. Improvement Tracks
@@ -708,6 +740,8 @@ Export includes:
 | **AI-powered CV parsing** | Groq Llama 3.3 70B (primary) + OpenAI GPT-4o (fallback) extract structured data |
 | **CV scoring engine (Quality)** | Deterministic 4-factor scoring: experience (35%), years (25%), education (20%), location (20%) |
 | **Per-job Fit scoring** | 7-criteria engine — field, experience-in-field, seniority, required skills, preferred skills, languages, education |
+| **Per-job Shortlist** | Per-job pick list (`job_shortlists`) with snapshot fit, HR notes, and Shortlisted-For card on candidate profile — distinct from global Watchlist and from `application_status.SHORTLISTED` |
+| **My Charts (custom analytics widgets)** | Per-user constrained-builder charts on `/dashboard/analytics`: 4 metrics × whitelisted dimensions × 6 chart types, Zod-strict spec, live preview, edit/delete |
 | **Scoring weights & presets** | Configurable 5-dimension scoring with real-time re-ranking, built-in quick presets, custom preset save/delete |
 | **Duplicate detection** | 3-tier matching (email → name+location → name only) |
 | **Job management** | Full CRUD for jobs with search, filter, pagination |
@@ -737,6 +771,7 @@ Export includes:
 | Feature | What Works | What's Missing |
 |---------|------------|----------------|
 | **Candidate tagging** | Database model exists | API endpoints and UI |
+| **Contact Candidate email delivery** | Compose UI, validation, Resend integration, interaction-history logging | Verified Resend sender domain in production (see [CONTACT_EMAIL_OPTION_B_SETUP.md](CONTACT_EMAIL_OPTION_B_SETUP.md)) |
 | **Improvement tracks** | Database models, borderline detection | Daily content, progress logic, reassessment flow, UI |
 | **PDF export** | — | Profile reports, assessment results as PDF |
 

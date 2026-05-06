@@ -275,7 +275,7 @@ export const hrGuideSections: GuideSection[] = [
             "Application history, assessment results with evidence trails, skill verification outcomes.",
             "Recruiter Notes — collaborative rich-text notes (TipTap editor), timestamped, reverse chronological.",
             "Interaction History panel — every notification, status change, email, and campaign linked to the candidate, with HR sender attribution and read tracking.",
-            "Contact Candidate — send an email directly; the message is recorded as a CONTACT_EMAIL_SENT event in the interaction history.",
+            "Contact Candidate — send an email directly; the message is recorded as a CONTACT_EMAIL_SENT event in the interaction history. Outbound delivery requires a verified Resend sender domain in production.",
           ]}
         />
       </>
@@ -318,6 +318,28 @@ export const hrGuideSections: GuideSection[] = [
           must-have criterion is met. Overall Fit is the average of
           applicable criteria — irrelevant ones are skipped, not penalised.
         </Note>
+        <Sub>Per-job Shortlist</Sub>
+        <p>
+          The ranked-candidates page has two tabs: <strong>Ranked candidates</strong>
+          and <strong>Shortlist (N)</strong>. The shortlist is your active
+          pick list <em>for that specific job</em> — separate from the global
+          Watchlist (the star toggle on the Candidates list).
+        </p>
+        <Bullets
+          items={[
+            "Add to shortlist via the star icon next to a ranked candidate (idempotent — clicking twice does not duplicate).",
+            "Snapshot fit: the current Fit score is captured at add time; the Shortlist tab shows snapshot vs current so you can spot drift after JD edits.",
+            "HR notes per shortlist entry for short context (\"phone screened\", \"availability July\").",
+            "Remove via the trash icon — only affects this job's shortlist.",
+            "Candidate detail page shows a Shortlisted For card listing every job they're shortlisted on.",
+          ]}
+        />
+        <Tip>
+          Three concepts, do not confuse them: <strong>Watchlist</strong>
+          (global star), <strong>Per-job Shortlist</strong> (this feature),
+          and <strong>application status SHORTLISTED</strong> (a lifecycle
+          stage on a job application).
+        </Tip>
       </>
     ),
   },
@@ -494,6 +516,28 @@ export const hrGuideSections: GuideSection[] = [
             "Score Distribution histogram — 5 score buckets.",
           ]}
         />
+        <Sub>My Charts (per-user custom widgets)</Sub>
+        <p>
+          Below the seven default charts you can build your own using a
+          constrained no-SQL chart builder. Saved widgets are scoped to your
+          HR account.
+        </p>
+        <Steps
+          items={[
+            "Click ➕ Add chart to open the builder dialog.",
+            "Pick a metric (Candidates, Applications, Jobs, Assessments).",
+            "Pick a dimension — the catalog only offers dimensions valid for that metric.",
+            "Pick a chart type — only types valid for the dimension family are offered.",
+            "Tune Top-N (categorical) or Lookback days (temporal); a live preview updates as you go.",
+            "Save to add it to your dashboard. Edit or Delete from each widget card.",
+          ]}
+        />
+        <Note>
+          Every spec is validated server-side against a strict Zod schema
+          before any database query runs. There is no freeform SQL surface —
+          unknown filters or mismatched dimension/chart-type combinations are
+          rejected.
+        </Note>
       </>
     ),
   },
