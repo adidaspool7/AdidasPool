@@ -193,6 +193,31 @@ CREATE TRIGGER trg_parsing_jobs_updated_at
 
 CREATE INDEX idx_parsing_jobs_status ON parsing_jobs(status);
 
+-- JD parser telemetry: one row per JobRequirementsExtractorService.extract() call.
+-- Used to track success rate, latency, token cost, and provider/model mix for
+-- the JD requirements LLM pipeline. Row-level events; aggregate via SQL.
+CREATE TABLE jd_parsing_telemetry (
+  id                 TEXT PRIMARY KEY,
+  job_id             TEXT REFERENCES jobs(id) ON DELETE CASCADE,
+  attempted_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  provider           TEXT NOT NULL,                  -- 'groq' | 'openai'
+  model              TEXT NOT NULL,
+  success            BOOLEAN NOT NULL,
+  duration_ms        INTEGER,
+  prompt_tokens      INTEGER,
+  completion_tokens  INTEGER,
+  total_tokens       INTEGER,
+  fallback_used      BOOLEAN NOT NULL DEFAULT FALSE, -- true when primary failed and fallback ran
+  schema_version     INTEGER NOT NULL,
+  input_chars        INTEGER,
+  error_kind         TEXT,                            -- 'rate_limit' | 'invalid_json' | 'schema_validation' | 'other' | NULL
+  error_message      TEXT
+);
+
+CREATE INDEX idx_jd_telemetry_attempted_at ON jd_parsing_telemetry(attempted_at DESC);
+CREATE INDEX idx_jd_telemetry_job_id ON jd_parsing_telemetry(job_id);
+CREATE INDEX idx_jd_telemetry_success ON jd_parsing_telemetry(success);
+
 -- Promotional campaigns
 CREATE TABLE promo_campaigns (
   id               TEXT PRIMARY KEY,

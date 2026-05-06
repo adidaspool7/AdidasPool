@@ -31,6 +31,10 @@ import {
   describeLLMError,
 } from "./openai-client";
 import type { LLMConfig } from "./openai-client";
+import {
+  jdParsingTelemetryRepository,
+  type JdParsingErrorKind,
+} from "@server/infrastructure/database/jd-parsing-telemetry.repository";
 
 const SYSTEM_PROMPT = `You are a recruitment analyst. Extract structured hiring requirements from the job description below.
 
@@ -152,13 +156,31 @@ export class JobRequirementsExtractorService {
    * @param jobTitle Optional. When provided, the title is shown to the LLM as
    *                 context so the title-based seniority hint can fire on
    *                 sectionless postings (e.g. "Junior Designer" → JUNIOR).
+   * @param jobId Optional. When provided, the per-call telemetry row is linked
+   *              to the originating job (FK to jobs.id, ON DELETE CASCADE).
    */
-  async extract(jdText: string, jobTitle?: string): Promise<JobRequirements> {
+  async extract(
+    jdText: string,
+    jobTitle?: string,
+    jobId?: string
+  ): Promise<JobRequirements> {
+    const startedAt = Date.now();
     const cleaned = JobRequirementsExtractorService.stripBoilerplate(jdText);
     if (cleaned.length < 50) {
-      throw new Error(
-        `Job description too short to extract (${cleaned.length} chars).`
-      );
+      const msg = `Job description too short to extract (${cleaned.length} chars).`;
+      void jdParsingTelemetryRepository.record({
+        jobId: jobId ?? null,
+        provider: "n/a",
+        model: "n/a",
+        success: false,
+        durationMs: Date.now() - startedAt,
+        fallbackUsed: false,
+        schemaVersion: JOB_REQUIREMENTS_SCHEMA_VERSION,
+        inputChars: cleaned.length,
+        errorKind: "input_too_short",
+        errorMessage: msg,
+      });
+      throw new Error(msg);
     }
 
     // Truncate extremely long JDs — Groq free tier has token limits.
@@ -173,26 +195,72 @@ export class JobRequirementsExtractorService {
 
     const primary = getLLMConfig();
     let config = primary;
-    let raw: string | null;
+    let fallbackUsed = false;
+    let llmResult: { raw: string | null; usage: LLMUsage | null };
 
     try {
-      raw = await this.callLLM(config, input);
+      llmResult = await this.callLLM(config, input);
     } catch (err) {
-      if (!isRateLimitError(err)) throw err;
+      if (!isRateLimitError(err)) {
+        void this.recordFailure({
+          jobId,
+          config,
+          startedAt,
+          fallbackUsed: false,
+          inputChars: body.length,
+          errorKind: "rate_limit_or_other",
+          err,
+        });
+        throw err;
+      }
       const fallback = getFallbackLLMConfig();
       if (!fallback) {
-        throw new Error(
-          `Job requirements extraction failed: ${describeLLMError(err)}`
-        );
+        const msg = `Job requirements extraction failed: ${describeLLMError(err)}`;
+        void this.recordFailure({
+          jobId,
+          config,
+          startedAt,
+          fallbackUsed: false,
+          inputChars: body.length,
+          errorKind: "rate_limit_or_other",
+          err: new Error(msg),
+        });
+        throw new Error(msg);
       }
       console.warn(
         `[JobRequirementsExtractor] Rate-limited on ${primary.provider}; trying ${fallback.provider}.`
       );
       config = fallback;
-      raw = await this.callLLM(config, input);
+      fallbackUsed = true;
+      try {
+        llmResult = await this.callLLM(config, input);
+      } catch (fallbackErr) {
+        void this.recordFailure({
+          jobId,
+          config,
+          startedAt,
+          fallbackUsed: true,
+          inputChars: body.length,
+          errorKind: "rate_limit_or_other",
+          err: fallbackErr,
+        });
+        throw fallbackErr;
+      }
     }
 
+    const { raw, usage } = llmResult;
+
     if (!raw) {
+      void this.recordFailure({
+        jobId,
+        config,
+        startedAt,
+        fallbackUsed,
+        inputChars: body.length,
+        errorKind: "llm_empty",
+        err: new Error("LLM returned empty response."),
+        usage,
+      });
       throw new Error("LLM returned empty response.");
     }
 
@@ -200,9 +268,18 @@ export class JobRequirementsExtractorService {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(
-        `LLM returned invalid JSON (first 200 chars): ${raw.slice(0, 200)}`
-      );
+      const msg = `LLM returned invalid JSON (first 200 chars): ${raw.slice(0, 200)}`;
+      void this.recordFailure({
+        jobId,
+        config,
+        startedAt,
+        fallbackUsed,
+        inputChars: body.length,
+        errorKind: "invalid_json",
+        err: new Error(msg),
+        usage,
+      });
+      throw new Error(msg);
     }
 
     // Fill provenance before schema parse so defaults aren't overwritten
@@ -214,10 +291,36 @@ export class JobRequirementsExtractorService {
 
     const result = JobRequirementsSchema.safeParse(withProvenance);
     if (!result.success) {
-      throw new Error(
-        `LLM output failed schema validation: ${result.error.message}`
-      );
+      const msg = `LLM output failed schema validation: ${result.error.message}`;
+      void this.recordFailure({
+        jobId,
+        config,
+        startedAt,
+        fallbackUsed,
+        inputChars: body.length,
+        errorKind: "schema_validation",
+        err: new Error(msg),
+        usage,
+      });
+      throw new Error(msg);
     }
+
+    void jdParsingTelemetryRepository.record({
+      jobId: jobId ?? null,
+      provider: config.provider,
+      model: config.model,
+      success: true,
+      durationMs: Date.now() - startedAt,
+      promptTokens: usage?.promptTokens ?? null,
+      completionTokens: usage?.completionTokens ?? null,
+      totalTokens: usage?.totalTokens ?? null,
+      fallbackUsed,
+      schemaVersion: JOB_REQUIREMENTS_SCHEMA_VERSION,
+      inputChars: body.length,
+      errorKind: null,
+      errorMessage: null,
+    });
+
     return result.data;
   }
 
@@ -226,10 +329,49 @@ export class JobRequirementsExtractorService {
     return JOB_REQUIREMENTS_SCHEMA_VERSION;
   }
 
+  private recordFailure(args: {
+    jobId?: string;
+    config: LLMConfig;
+    startedAt: number;
+    fallbackUsed: boolean;
+    inputChars: number;
+    errorKind:
+      | "invalid_json"
+      | "schema_validation"
+      | "llm_empty"
+      | "rate_limit_or_other";
+    err: unknown;
+    usage?: LLMUsage | null;
+  }): Promise<void> {
+    const message =
+      args.err instanceof Error ? args.err.message : String(args.err);
+    const kind: JdParsingErrorKind =
+      args.errorKind === "rate_limit_or_other"
+        ? isRateLimitError(args.err)
+          ? "rate_limit"
+          : "other"
+        : args.errorKind;
+    return jdParsingTelemetryRepository.record({
+      jobId: args.jobId ?? null,
+      provider: args.config.provider,
+      model: args.config.model,
+      success: false,
+      durationMs: Date.now() - args.startedAt,
+      promptTokens: args.usage?.promptTokens ?? null,
+      completionTokens: args.usage?.completionTokens ?? null,
+      totalTokens: args.usage?.totalTokens ?? null,
+      fallbackUsed: args.fallbackUsed,
+      schemaVersion: JOB_REQUIREMENTS_SCHEMA_VERSION,
+      inputChars: args.inputChars,
+      errorKind: kind,
+      errorMessage: message.slice(0, 500),
+    });
+  }
+
   private async callLLM(
     config: LLMConfig,
     userContent: string
-  ): Promise<string | null> {
+  ): Promise<{ raw: string | null; usage: LLMUsage | null }> {
     const response = await config.client.chat.completions.create({
       model: config.model,
       messages: [
@@ -240,6 +382,21 @@ export class JobRequirementsExtractorService {
       temperature: 0.1,
       max_tokens: 1500,
     });
-    return response.choices[0]?.message?.content ?? null;
+    const raw = response.choices[0]?.message?.content ?? null;
+    const u = response.usage;
+    const usage: LLMUsage | null = u
+      ? {
+          promptTokens: u.prompt_tokens ?? null,
+          completionTokens: u.completion_tokens ?? null,
+          totalTokens: u.total_tokens ?? null,
+        }
+      : null;
+    return { raw, usage };
   }
+}
+
+interface LLMUsage {
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
 }

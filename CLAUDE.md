@@ -168,6 +168,9 @@ The "universal candidate match score" was deleted. Matching is now always
 - `jobs.parsed_requirements JSONB`, `jobs.parsed_requirements_version INT`
 - `experiences.fields_of_work TEXT[]` + GIN index
 - `job_matches` (cache)
+- `jd_parsing_telemetry` — one row per `JobRequirementsExtractorService.extract()`
+  call (provider, model, success, duration_ms, prompt/completion tokens,
+  fallback_used, error_kind). Fire-and-forget; failures never break parsing.
 - All consolidated into the canonical `00000000000000_schema.sql`.
 
 ### Tests
