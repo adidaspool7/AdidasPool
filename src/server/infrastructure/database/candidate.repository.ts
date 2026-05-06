@@ -6,7 +6,7 @@
  */
 
 import db from "./supabase-client";
-import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
+import { camelizeKeys, snakeifyKeys, generateId, assertNoError, escapeOrTerm } from "./db-utils";
 import type {
   ICandidateRepository,
   CandidateFilters,
@@ -51,10 +51,12 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
 
     // Search filter
     if (filters.search) {
-      const s = filters.search.replace(/'/g, "''");
-      query = query.or(
-        `first_name.ilike.%${s}%,last_name.ilike.%${s}%,email.ilike.%${s}%`
-      );
+      const s = escapeOrTerm(filters.search);
+      if (s) {
+        query = query.or(
+          `first_name.ilike.%${s}%,last_name.ilike.%${s}%,email.ilike.%${s}%`
+        );
+      }
     }
 
     // Status
@@ -66,8 +68,8 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
 
     // Location search
     if (filters.locationSearch) {
-      const l = filters.locationSearch.replace(/'/g, "''");
-      query = query.or(`location.ilike.%${l}%,country.ilike.%${l}%`);
+      const l = escapeOrTerm(filters.locationSearch);
+      if (l) query = query.or(`location.ilike.%${l}%,country.ilike.%${l}%`);
     }
 
     // Source type

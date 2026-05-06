@@ -7,6 +7,9 @@
 
 import db from "./supabase-client";
 import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
+
+/** Whitelist for `target_role` — never interpolate raw user input here. */
+const ALLOWED_TARGET_ROLES = new Set(["CANDIDATE", "HR"]);
 import type {
   INotificationRepository,
   NotificationFilters,
@@ -68,7 +71,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       .eq("read", false);
 
     if (candidateId) query = query.eq("candidate_id", candidateId);
-    if (targetRole)
+    if (targetRole && ALLOWED_TARGET_ROLES.has(targetRole))
       query = query.or(`target_role.eq.${targetRole},target_role.is.null`);
 
     const { count, error } = await query;
@@ -152,7 +155,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       .update({ read: true, read_at: new Date().toISOString() })
       .eq("read", false);
     if (candidateId) query = query.eq("candidate_id", candidateId);
-    if (targetRole)
+    if (targetRole && ALLOWED_TARGET_ROLES.has(targetRole))
       query = query.or(`target_role.eq.${targetRole},target_role.is.null`);
     const { error } = await query;
     assertNoError(error, "notification.markAllAsRead");

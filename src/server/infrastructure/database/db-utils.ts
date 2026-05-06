@@ -98,6 +98,32 @@ export function generateId(): string {
 }
 
 // ----------------------------------------------------------------
+// PostgREST .or() / .ilike() value sanitization
+// ----------------------------------------------------------------
+/**
+ * Sanitizes a user-supplied substring for use inside a PostgREST
+ * `.or()` expression of the form  `col.ilike.%value%,...`.
+ *
+ * PostgREST treats `,` `(` `)` as structural separators in `.or()` lists
+ * and `:` for embedded resource hints; backslashes / double-quotes can
+ * escape further. Leaving them in the value lets a malicious search term
+ * inject extra OR-branches, e.g.
+ *   ?search=foo,email.eq.victim@x.com
+ * would silently widen the result set. We strip those characters and
+ * collapse whitespace.
+ *
+ * SQL-level wildcards (`%`, `_`) are intentionally preserved — the
+ * caller already wraps the value in `%...%`, and stripping them would
+ * not buy any safety: PostgREST always passes ILIKE as parameterized.
+ */
+export function escapeOrTerm(value: string): string {
+  return value
+    .replace(/[,():"\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ----------------------------------------------------------------
 // Supabase error helper — throws on DB error
 // ----------------------------------------------------------------
 export function assertNoError(

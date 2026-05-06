@@ -6,7 +6,7 @@
  */
 
 import db from "./supabase-client";
-import { camelizeKeys, snakeifyKeys, generateId, assertNoError } from "./db-utils";
+import { camelizeKeys, snakeifyKeys, generateId, assertNoError, escapeOrTerm } from "./db-utils";
 import type { IJobRepository } from "@server/domain/ports/repositories";
 
 export class SupabaseJobRepository implements IJobRepository {
@@ -37,7 +37,8 @@ export class SupabaseJobRepository implements IJobRepository {
     if (options?.search) {
       const terms = options.search.trim().split(/\s+/).filter(Boolean);
       for (const term of terms) {
-        const t = term.replace(/'/g, "''");
+        const t = escapeOrTerm(term);
+        if (!t) continue;
         query = query.or(
           `title.ilike.%${t}%,department.ilike.%${t}%,location.ilike.%${t}%`
         );
@@ -59,9 +60,10 @@ export class SupabaseJobRepository implements IJobRepository {
         // OR of substring matches — mirrors single-value semantics so
         // "Retail" still matches "Retail (Store)" etc.
         const expr = cleaned
-          .map((d) => `department.ilike.%${d.replace(/[,()]/g, " ").trim()}%`)
+          .map((d) => `department.ilike.%${escapeOrTerm(d)}%`)
+          .filter((b) => b.length > "department.ilike.%%".length)
           .join(",");
-        query = query.or(expr);
+        if (expr) query = query.or(expr);
       }
     }
     if (options?.country) {
