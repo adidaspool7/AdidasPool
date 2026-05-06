@@ -5,19 +5,19 @@
  *
  * Uses the service role key — bypasses RLS.
  * Never expose this client to the browser.
+ *
+ * NOTE: `SupabaseClient<any>` is used deliberately at this SDK boundary so
+ * `.from()` accepts arbitrary table names and row shapes without generated
+ * database types. Repositories on top of this singleton then re-narrow with
+ * the row interfaces in `@server/domain/ports/repositories.ts`.
  */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Typed as SupabaseClient<any> so all .from() calls accept arbitrary table
-// names and row shapes without generated database types.
 const globalForSupabase = globalThis as unknown as {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: SupabaseClient<any> | undefined;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabaseAdmin: SupabaseClient<any> =
   globalForSupabase.supabaseAdmin ??
   createClient<any>(

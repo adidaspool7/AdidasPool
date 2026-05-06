@@ -6,14 +6,17 @@
  *
  * Implements IStorageService using Supabase Storage.
  * Bucket "talent-pool" is created automatically on first use if it does not exist.
+ *
+ * NOTE: createClient<any> is used at this SDK boundary because Supabase's
+ * generic argument requires generated database types we don't ship.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createClient } from "@supabase/supabase-js";
 import type { IStorageService } from "@server/domain/ports/services";
 
 const BUCKET = "talent-pool";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getAdminClient(): ReturnType<typeof createClient<any>> {
   return createClient<any>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +35,6 @@ function getAdminClient(): ReturnType<typeof createClient<any>> {
 let bucketVerified = false;
 
 async function ensureBucket(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: ReturnType<typeof createClient<any>>
 ): Promise<void> {
   if (bucketVerified) return;
