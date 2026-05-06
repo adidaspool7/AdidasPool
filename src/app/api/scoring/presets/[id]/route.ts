@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoringPresetRepository } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/scoring/presets/[id]");
 
 export async function DELETE(
   _request: NextRequest,
@@ -10,7 +13,7 @@ export async function DELETE(
     await scoringPresetRepository.delete(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Error deleting preset:", error);
+    log.error("Error deleting preset:", error);
     return NextResponse.json({ error: "Failed to delete preset" }, { status: 500 });
   }
 }

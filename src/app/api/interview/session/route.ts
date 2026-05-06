@@ -8,6 +8,9 @@ import {
   createInterviewRuntimeToken,
   hashInterviewToken,
 } from "@server/infrastructure/security/interview-token";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/session");
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (insertError) {
-      console.error("Error creating interview session:", insertError);
+      log.error("Error creating interview session:", insertError);
       return NextResponse.json(
         { error: "Failed to create interview session" },
         { status: 500 }
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
       candidateName: `${candidate.firstName} ${candidate.lastName}`,
     });
   } catch (error) {
-    console.error("Error creating interview runtime session:", error);
+    log.error("Error creating interview runtime session:", error);
     return NextResponse.json(
       { error: "Failed to create interview runtime session" },
       { status: 500 }

@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { shortlistUseCases } from "@server/application";
 import { requireHr } from "@/lib/auth/require-hr";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/[id]/shortlist/[candidateId]");
 
 export async function DELETE(
   _request: NextRequest,
@@ -22,7 +25,7 @@ export async function DELETE(
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Error removing from shortlist:", error);
+    log.error("Error removing from shortlist:", error);
     return NextResponse.json(
       { error: "Failed to remove from shortlist" },
       { status: 500 }
@@ -60,7 +63,7 @@ export async function PATCH(
     }
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error updating shortlist note:", error);
+    log.error("Error updating shortlist note:", error);
     return NextResponse.json(
       { error: "Failed to update shortlist note" },
       { status: 500 }

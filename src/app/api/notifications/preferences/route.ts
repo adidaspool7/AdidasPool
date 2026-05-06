@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/notifications/preferences");
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +30,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Error fetching preferences:", error);
+    log.error("Error fetching preferences:", error);
     return NextResponse.json({ error: "Failed to fetch preferences" }, { status: 500 });
   }
 }
@@ -44,7 +47,7 @@ export async function PUT(request: NextRequest) {
     const updated = await notificationUseCases.updatePreferences(candidateId, prefs);
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error updating preferences:", error);
+    log.error("Error updating preferences:", error);
     return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
   }
 }

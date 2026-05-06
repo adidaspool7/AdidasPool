@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { exportUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/export/candidates");
 
 /**
  * GET /api/export/candidates
@@ -18,7 +21,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error exporting candidates:", error);
+    log.error("Error exporting candidates:", error);
     return NextResponse.json(
       { error: "Failed to export" },
       { status: 500 }

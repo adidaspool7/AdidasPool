@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoringPresetRepository } from "@server/application";
 import { z } from "zod";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/scoring/presets");
 
 const CreatePresetSchema = z.object({
   name: z.string().min(1).max(60),
@@ -22,7 +25,7 @@ export async function GET() {
     const presets = await scoringPresetRepository.findAll();
     return NextResponse.json(presets);
   } catch (error) {
-    console.error("Error fetching presets:", error);
+    log.error("Error fetching presets:", error);
     return NextResponse.json({ error: "Failed to fetch presets" }, { status: 500 });
   }
 }
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("Error creating preset:", error);
+    log.error("Error creating preset:", error);
     return NextResponse.json({ error: "Failed to create preset" }, { status: 500 });
   }
 }

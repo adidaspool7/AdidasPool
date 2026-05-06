@@ -7,6 +7,9 @@ import {
   hashInterviewToken,
   verifyInterviewRuntimeTokenForUser,
 } from "@server/infrastructure/security/interview-token";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/realtime");
 
 type InterviewSessionPayload = {
   id: string;
@@ -188,7 +191,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error starting realtime interview:", error);
+    log.error("Error starting realtime interview:", error);
     const message =
       error instanceof Error ? error.message : "Failed to start realtime interview";
     return NextResponse.json({ error: message }, { status: 500 });

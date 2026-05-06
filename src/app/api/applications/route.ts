@@ -10,6 +10,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { applicationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/applications");
 
 const ApplySchema = z.object({
   jobId: z.string().uuid(),
@@ -33,7 +36,7 @@ export async function POST(request: NextRequest) {
       status: result.alreadyApplied ? 200 : 201,
     });
   } catch (error) {
-    console.error("Error creating application:", error);
+    log.error("Error creating application:", error);
     return NextResponse.json(
       { error: "Failed to create application" },
       { status: 500 }
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest) {
       await applicationUseCases.listByCandidateId(candidateId);
     return NextResponse.json(applications);
   } catch (error) {
-    console.error("Error fetching applications:", error);
+    log.error("Error fetching applications:", error);
     return NextResponse.json(
       { error: "Failed to fetch applications" },
       { status: 500 }

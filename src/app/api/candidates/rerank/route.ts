@@ -3,6 +3,9 @@ import { candidateUseCases, scoringWeightsRepository } from "@server/application
 import { recomputeOverallScore } from "@server/domain/services/scoring.service";
 import { CandidateFilterSchema } from "@server/application/dtos";
 import { z } from "zod";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/rerank");
 
 const RerankSchema = z.object({
   weights: z.object({
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("Error re-ranking candidates:", error);
+    log.error("Error re-ranking candidates:", error);
     return NextResponse.json(
       { error: "Failed to re-rank candidates" },
       { status: 500 }

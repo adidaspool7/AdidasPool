@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases, NotFoundError } from "@server/application";
 import { UpdateJobSchema } from "@server/application/dtos";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/[id]");
 
 /**
  * GET /api/jobs/[id]
@@ -19,7 +22,7 @@ export async function GET(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching job:", error);
+    log.error("Error fetching job:", error);
     return NextResponse.json(
       { error: "Failed to fetch job" },
       { status: 500 }
@@ -52,7 +55,7 @@ export async function PATCH(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error updating job:", error);
+    log.error("Error updating job:", error);
     return NextResponse.json(
       { error: "Failed to update job" },
       { status: 500 }
@@ -77,7 +80,7 @@ export async function DELETE(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error deleting job:", error);
+    log.error("Error deleting job:", error);
     return NextResponse.json(
       { error: "Failed to delete job" },
       { status: 500 }

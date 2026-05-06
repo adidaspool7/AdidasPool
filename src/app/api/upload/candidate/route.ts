@@ -8,6 +8,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { uploadUseCases, notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/candidate");
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
         metadata: { isReupload, source: "candidate-self-upload" },
       });
     } catch (err) {
-      console.error("Failed to create HR_CV_UPLOADED notification:", err);
+      log.error("Failed to create HR_CV_UPLOADED notification:", err);
     }
 
     return NextResponse.json(result, { status: 200 });
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
-    console.error("[POST /api/upload/candidate] Error:", message);
+    log.error("[POST /api/upload/candidate] Error:", message);
     return NextResponse.json(
       { error: `Upload failed: ${message}` },
       { status: 500 }

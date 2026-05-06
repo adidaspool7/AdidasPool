@@ -7,6 +7,9 @@ import {
   verifyInterviewRuntimeTokenForUser,
 } from "@server/infrastructure/security/interview-token";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/realtime/terminate");
 
 function getInterviewBackendUrl(): string {
   const url = process.env.INTERVIEW_BACKEND_URL;
@@ -195,7 +198,7 @@ export async function POST(request: NextRequest) {
         };
       }
     } catch (candidateError) {
-      console.error("Error fetching candidate for evaluation:", candidateError);
+      log.error("Error fetching candidate for evaluation:", candidateError);
     }
 
     const sessionMode = (interview as { interviewMode?: string }).interviewMode === "LANGUAGE"
@@ -211,7 +214,7 @@ export async function POST(request: NextRequest) {
           mode: sessionMode,
         });
       } catch (evalError) {
-        console.error("Evaluator call failed:", evalError);
+        log.error("Evaluator call failed:", evalError);
         evaluation = DEFAULT_EVALUATION;
       }
     }
@@ -265,7 +268,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (err) {
-      console.error("Failed to create HR_ASSESSMENT_COMPLETED notification:", err);
+      log.error("Failed to create HR_ASSESSMENT_COMPLETED notification:", err);
     }
 
     return NextResponse.json({
@@ -277,7 +280,7 @@ export async function POST(request: NextRequest) {
       rationale: evaluation.rationale,
     });
   } catch (error) {
-    console.error("Error terminating interview:", error);
+    log.error("Error terminating interview:", error);
     const message =
       error instanceof Error ? error.message : "Failed to terminate interview";
     return NextResponse.json({ error: message }, { status: 500 });

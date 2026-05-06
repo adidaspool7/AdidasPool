@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { shortlistUseCases, NotFoundError } from "@server/application";
 import { requireHr } from "@/lib/auth/require-hr";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/[id]/shortlist");
 
 export async function GET(
   _request: NextRequest,
@@ -19,7 +22,7 @@ export async function GET(
     const entries = await shortlistUseCases.listByJob(id);
     return NextResponse.json({ entries, count: entries.length });
   } catch (error) {
-    console.error("Error listing shortlist:", error);
+    log.error("Error listing shortlist:", error);
     return NextResponse.json(
       { error: "Failed to list shortlist" },
       { status: 500 }
@@ -61,7 +64,7 @@ export async function POST(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error adding to shortlist:", error);
+    log.error("Error adding to shortlist:", error);
     return NextResponse.json(
       { error: "Failed to add to shortlist" },
       { status: 500 }

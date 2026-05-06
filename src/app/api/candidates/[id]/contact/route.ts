@@ -3,6 +3,9 @@ import { z } from "zod";
 import { candidateUseCases, notificationUseCases, NotFoundError } from "@server/application";
 import { emailService } from "@server/container";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/contact");
 
 const ContactSchema = z.object({
   subject: z.string().min(1, "Subject is required").max(200),
@@ -57,7 +60,7 @@ export async function POST(
     );
 
     if (!result.success) {
-      console.error("Contact email failed:", result.error);
+      log.error("Contact email failed:", result.error);
       return NextResponse.json(
         { error: result.error ?? "Failed to send email" },
         { status: 502 }
@@ -77,7 +80,7 @@ export async function POST(
       });
     } catch (err) {
       // Non-fatal: email was delivered, just log the failure
-      console.error("Failed to log CONTACT_EMAIL_SENT notification:", err);
+      log.error("Failed to log CONTACT_EMAIL_SENT notification:", err);
     }
 
     return NextResponse.json({ success: true });
@@ -85,7 +88,7 @@ export async function POST(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error sending contact email:", error);
+    log.error("Error sending contact email:", error);
     return NextResponse.json(
       { error: "Failed to send email" },
       { status: 500 }

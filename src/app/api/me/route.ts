@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { profileUseCases, NotFoundError } from "@server/application";
 import { UpdateProfileSchema } from "@server/application/dtos";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/me");
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,7 @@ export async function GET() {
     const candidate = await profileUseCases.getCurrentProfile();
     return NextResponse.json(candidate);
   } catch (error) {
-    console.error("Error getting current user:", error);
+    log.error("Error getting current user:", error);
     return NextResponse.json(
       { error: "Failed to get current user" },
       { status: 500 }
@@ -40,7 +43,7 @@ export async function PATCH(request: NextRequest) {
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error updating profile:", error);
+    log.error("Error updating profile:", error);
     return NextResponse.json(
       { error: "Failed to update profile" },
       { status: 500 }
@@ -63,7 +66,7 @@ export async function DELETE(request: NextRequest) {
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error deleting profile data:", error);
+    log.error("Error deleting profile data:", error);
     return NextResponse.json(
       { error: "Failed to delete profile data" },
       { status: 500 }

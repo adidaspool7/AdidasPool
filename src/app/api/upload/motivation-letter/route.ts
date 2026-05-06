@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/motivation-letter");
 
 /**
  * POST /api/upload/motivation-letter
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === "ValidationError") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("Motivation letter upload error:", error);
+    log.error("Motivation letter upload error:", error);
     return NextResponse.json(
       { error: "Failed to upload file" },
       { status: 500 }

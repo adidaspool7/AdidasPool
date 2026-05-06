@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storageService } from "@server/container";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/image");
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: proxyUrl });
   } catch (error) {
-    console.error("Error uploading image:", error);
+    log.error("Error uploading image:", error);
     return NextResponse.json(
       { error: "Failed to upload image" },
       { status: 500 }

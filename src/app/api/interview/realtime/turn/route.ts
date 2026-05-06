@@ -7,6 +7,9 @@ import {
   verifyInterviewRuntimeTokenForUser,
 } from "@server/infrastructure/security/interview-token";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/realtime/turn");
 
 function getInterviewBackendUrl(): string {
   const url = process.env.INTERVIEW_BACKEND_URL;
@@ -300,7 +303,7 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (err) {
-        console.error("Failed to create HR_ASSESSMENT_COMPLETED notification:", err);
+        log.error("Failed to create HR_ASSESSMENT_COMPLETED notification:", err);
       }
     }
 
@@ -312,7 +315,7 @@ export async function POST(request: NextRequest) {
         body.mode === "voice" && !turnResult.audio_base64 ? "text-only" : null,
     });
   } catch (error) {
-    console.error("Error handling realtime interview turn:", error);
+    log.error("Error handling realtime interview turn:", error);
     const message =
       error instanceof Error ? error.message : "Failed to process interview turn";
     return NextResponse.json({ error: message }, { status: 500 });

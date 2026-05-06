@@ -29,6 +29,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
 import { resolveCaller, type AuthenticatedCaller } from "@/lib/auth/resolve-caller";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/notifications");
 
 /**
  * Returns true iff the caller is allowed to mutate (read/archive/delete)
@@ -138,7 +141,7 @@ export async function GET(request: NextRequest) {
     const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
     return NextResponse.json({ notifications, unreadCount });
   } catch (error) {
-    console.error("Error fetching notifications:", error);
+    log.error("Error fetching notifications:", error);
     return NextResponse.json(
       { error: "Failed to fetch notifications" },
       { status: 500 }
@@ -218,7 +221,7 @@ export async function PATCH(request: NextRequest) {
     const updated = await notificationUseCases.markAsRead(id);
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error updating notification:", error);
+    log.error("Error updating notification:", error);
     return NextResponse.json(
       { error: "Failed to update notification" },
       { status: 500 }
@@ -247,7 +250,7 @@ export async function DELETE(request: NextRequest) {
     await notificationUseCases.deleteNotification(id);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting notification:", error);
+    log.error("Error deleting notification:", error);
     return NextResponse.json(
       { error: "Failed to delete notification" },
       { status: 500 }

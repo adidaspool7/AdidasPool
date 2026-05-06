@@ -7,6 +7,9 @@ import {
   hashInterviewToken,
   verifyInterviewRuntimeTokenForUser,
 } from "@server/infrastructure/security/interview-token";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/proctoring");
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +77,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      console.error("Error inserting proctoring event:", insertError);
+      log.error("Error inserting proctoring event:", insertError);
       return NextResponse.json(
         { error: "Failed to store proctoring event" },
         { status: 500 }
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Error ingesting proctoring event:", error);
+    log.error("Error ingesting proctoring event:", error);
     return NextResponse.json(
       { error: "Failed to ingest proctoring event" },
       { status: 500 }

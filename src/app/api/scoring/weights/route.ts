@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { scoringWeightsRepository } from "@server/application";
 import { z } from "zod";
 import { CRITERION_KEYS } from "@server/domain/services/job-fit.service";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/scoring/weights");
 
 const CriterionWeightsSchema = z
   .object(
@@ -53,7 +56,7 @@ export async function GET() {
     const weights = await scoringWeightsRepository.get();
     return NextResponse.json(weights);
   } catch (error) {
-    console.error("Error fetching scoring weights:", error);
+    log.error("Error fetching scoring weights:", error);
     return NextResponse.json(
       { error: "Failed to fetch scoring weights" },
       { status: 500 }
@@ -78,7 +81,7 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("Error updating scoring weights:", error);
+    log.error("Error updating scoring weights:", error);
     return NextResponse.json(
       { error: "Failed to update scoring weights" },
       { status: 500 }
@@ -121,7 +124,7 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("Error patching scoring weights:", error);
+    log.error("Error patching scoring weights:", error);
     return NextResponse.json(
       {
         error: "Failed to patch scoring weights",

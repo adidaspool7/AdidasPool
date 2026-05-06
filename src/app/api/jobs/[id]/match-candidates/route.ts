@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases, NotFoundError, JobClosedError } from "@server/application";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/[id]/match-candidates");
 
 // Always recompute on every request \u2014 the response depends on the
 // current `scoring_weights` row and on candidate data that can change
@@ -53,7 +56,7 @@ export async function GET(
         { status: 410 }
       );
     }
-    console.error("Error matching candidates to job:", error);
+    log.error("Error matching candidates to job:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to match candidates" },
       { status: 500 }

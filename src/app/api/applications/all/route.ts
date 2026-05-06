@@ -9,13 +9,16 @@
 
 import { NextResponse } from "next/server";
 import { applicationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/applications/all");
 
 export async function GET() {
   try {
     const applications = await applicationUseCases.listAll();
     return NextResponse.json(applications);
   } catch (error) {
-    console.error("Error fetching all applications:", error);
+    log.error("Error fetching all applications:", error);
     return NextResponse.json(
       { error: "Failed to fetch applications" },
       { status: 500 }

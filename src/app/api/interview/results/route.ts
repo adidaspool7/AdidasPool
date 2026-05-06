@@ -7,6 +7,9 @@ import { NextResponse } from "next/server";
 import db from "@server/infrastructure/database/supabase-client";
 import { camelizeKeys } from "@server/infrastructure/database/db-utils";
 import { profileUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/interview/results");
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +41,7 @@ export async function GET() {
       .limit(10);
 
     if (error) {
-      console.error("Error fetching interview results:", error);
+      log.error("Error fetching interview results:", error);
       return NextResponse.json({ results: [] });
     }
 
@@ -48,7 +51,7 @@ export async function GET() {
 
     return NextResponse.json({ results });
   } catch (error) {
-    console.error("Error fetching interview results:", error);
+    log.error("Error fetching interview results:", error);
     return NextResponse.json(
       { error: "Failed to fetch interview results" },
       { status: 500 }

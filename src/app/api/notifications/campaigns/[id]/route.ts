@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/notifications/campaigns/[id]");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,7 +26,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }
     return NextResponse.json({ ...campaign, readStats });
   } catch (error) {
-    console.error("Error fetching campaign:", error);
+    log.error("Error fetching campaign:", error);
     return NextResponse.json({ error: "Failed to fetch campaign" }, { status: 500 });
   }
 }
@@ -35,7 +38,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const campaign = await notificationUseCases.updateCampaign(id, body);
     return NextResponse.json(campaign);
   } catch (error: any) {
-    console.error("Error updating campaign:", error);
+    log.error("Error updating campaign:", error);
     const message = error?.message || "Failed to update campaign";
     const status = message.includes("not found") ? 404 : message.includes("Cannot change") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -48,7 +51,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await notificationUseCases.deleteCampaign(id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting campaign:", error);
+    log.error("Error deleting campaign:", error);
     const message = error?.message || "Failed to delete campaign";
     const status = message.includes("not found") ? 404 : message.includes("Only Draft") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

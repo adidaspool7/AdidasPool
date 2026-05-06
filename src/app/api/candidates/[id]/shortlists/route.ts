@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shortlistUseCases } from "@server/application";
 import { requireHr } from "@/lib/auth/require-hr";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/shortlists");
 
 export async function GET(
   _request: NextRequest,
@@ -18,7 +21,7 @@ export async function GET(
     const entries = await shortlistUseCases.listByCandidate(id);
     return NextResponse.json({ entries, count: entries.length });
   } catch (error) {
-    console.error("Error listing candidate shortlists:", error);
+    log.error("Error listing candidate shortlists:", error);
     return NextResponse.json(
       { error: "Failed to list shortlists" },
       { status: 500 }

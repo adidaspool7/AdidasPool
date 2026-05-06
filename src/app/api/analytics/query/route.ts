@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireHr } from "@/lib/auth/require-hr";
 import { dashboardWidgetUseCases } from "@server/application";
 import { WidgetSpecValidationError } from "@server/application/use-cases/dashboard-widget.use-cases";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/analytics/query");
 
 export async function POST(req: NextRequest) {
   const auth = await requireHr();
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("[analytics/query] failed", err);
+    log.error("[analytics/query] failed", err);
     return NextResponse.json({ error: "Query failed" }, { status: 500 });
   }
 }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/countries");
 
 /**
  * GET /api/jobs/countries
@@ -27,7 +30,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ countries });
   } catch (error) {
-    console.error("Error fetching job countries:", error);
+    log.error("Error fetching job countries:", error);
     return NextResponse.json(
       { error: "Failed to fetch countries" },
       { status: 500 }

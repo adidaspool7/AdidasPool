@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assessmentUseCases } from "@server/application";
 import { CreateAssessmentSchema } from "@server/application/dtos";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/assessments");
 
 /**
  * GET /api/assessments
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(assessments);
   } catch (error) {
-    console.error("Error fetching assessments:", error);
+    log.error("Error fetching assessments:", error);
     return NextResponse.json(
       { error: "Failed to fetch assessments" },
       { status: 500 }
@@ -47,7 +50,7 @@ export async function POST(request: NextRequest) {
     const assessment = await assessmentUseCases.createAssessment(result.data);
     return NextResponse.json(assessment, { status: 201 });
   } catch (error) {
-    console.error("Error creating assessment:", error);
+    log.error("Error creating assessment:", error);
     return NextResponse.json(
       { error: "Failed to create assessment" },
       { status: 500 }

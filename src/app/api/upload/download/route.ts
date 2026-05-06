@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storageService } from "@server/container";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/download");
 
 /**
  * GET /api/upload/download?url=...
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Download] Error proxying file:", error);
+    log.error("[Download] Error proxying file:", error);
     return NextResponse.json(
       { error: "Failed to fetch file" },
       { status: 500 }

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { jobUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/picker");
 
 /**
  * GET /api/jobs/picker
@@ -16,7 +19,7 @@ export async function GET() {
     const jobs = await jobUseCases.listJobsForPicker();
     return NextResponse.json({ jobs });
   } catch (error) {
-    console.error("Error fetching jobs for picker:", error);
+    log.error("Error fetching jobs for picker:", error);
     return NextResponse.json(
       { error: "Failed to fetch jobs" },
       { status: 500 }

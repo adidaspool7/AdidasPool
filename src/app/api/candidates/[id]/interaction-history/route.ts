@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases, NotFoundError } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/interaction-history");
 
 /**
  * GET /api/candidates/[id]/interaction-history
@@ -21,7 +24,7 @@ export async function GET(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching interaction history:", error);
+    log.error("Error fetching interaction history:", error);
     return NextResponse.json(
       { error: "Failed to fetch interaction history" },
       { status: 500 }

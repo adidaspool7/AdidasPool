@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { uploadUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/bulk");
 
 /**
  * POST /api/upload/bulk
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
       try {
         await uploadUseCases.processBulkUpload(jobId, fileEntries);
       } catch (error) {
-        console.error("[BulkUpload] Background processing error:", error);
+        log.error("[BulkUpload] Background processing error:", error);
       }
     });
 
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
       { status: 202 }
     );
   } catch (error) {
-    console.error("[BulkUpload] Error:", error);
+    log.error("[BulkUpload] Error:", error);
     const message =
       error instanceof Error ? error.message : "Failed to process bulk upload";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -58,7 +61,7 @@ export async function GET() {
     const jobs = await uploadUseCases.getRecentParsingJobs(50);
     return NextResponse.json({ jobs });
   } catch (error) {
-    console.error("[BulkUpload] Error fetching jobs:", error);
+    log.error("[BulkUpload] Error fetching jobs:", error);
     return NextResponse.json(
       { error: "Failed to fetch parsing jobs" },
       { status: 500 }
@@ -85,7 +88,7 @@ export async function PATCH(request: NextRequest) {
     const result = await uploadUseCases.cancelJob(jobId);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[BulkUpload] Cancel error:", error);
+    log.error("[BulkUpload] Cancel error:", error);
     const message =
       error instanceof Error ? error.message : "Failed to cancel job";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -111,7 +114,7 @@ export async function DELETE(request: NextRequest) {
     const result = await uploadUseCases.deleteParsingJob(jobId);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[BulkUpload] Delete error:", error);
+    log.error("[BulkUpload] Delete error:", error);
     const message =
       error instanceof Error ? error.message : "Failed to delete job";
     return NextResponse.json({ error: message }, { status: 400 });

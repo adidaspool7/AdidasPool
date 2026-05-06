@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { applicationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/applications/[id]");
 
 const VALID_STATUSES = new Set([
   "SUBMITTED", "RECEIVED", "IN_REVIEW", "ASSESSMENT_READY",
@@ -46,7 +49,7 @@ export async function PATCH(
       { status: 400 }
     );
   } catch (error) {
-    console.error("Error updating application:", error);
+    log.error("Error updating application:", error);
     return NextResponse.json(
       { error: "Failed to update application" },
       { status: 500 }

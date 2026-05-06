@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireHr } from "@/lib/auth/require-hr";
 import { dashboardWidgetUseCases } from "@server/application";
 import { WidgetSpecValidationError } from "@server/application/use-cases/dashboard-widget.use-cases";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/analytics/widgets/[id]");
 
 export async function PATCH(
   req: NextRequest,
@@ -29,7 +32,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    console.error("[analytics/widgets PATCH] failed", err);
+    log.error("[analytics/widgets PATCH] failed", err);
     return NextResponse.json({ error: "Failed to update widget" }, { status: 500 });
   }
 }

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { candidateRepository } from "@server/container";
 import { calculateCvScore } from "@server/domain/services/scoring.service";
 import db from "@server/infrastructure/database/supabase-client";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/rescore");
 
 /**
  * POST /api/candidates/rescore
@@ -51,7 +54,7 @@ export async function POST() {
 
     return NextResponse.json({ updated: rows.length });
   } catch (error) {
-    console.error("[Rescore]", error);
+    log.error("[Rescore]", error);
     return NextResponse.json(
       { error: "Failed to rescore candidates" },
       { status: 500 }

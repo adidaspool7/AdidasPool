@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { candidateUseCases } from "@server/application";
 import { CandidateFilterSchema } from "@server/application/dtos";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates");
 
 /**
  * GET /api/candidates
@@ -54,7 +57,7 @@ export async function GET(request: NextRequest) {
       pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching candidates:", error);
+    log.error("Error fetching candidates:", error);
     return NextResponse.json(
       { error: "Failed to fetch candidates" },
       { status: 500 }

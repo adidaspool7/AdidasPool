@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload");
 
 /**
  * POST /api/upload
@@ -15,7 +18,7 @@ export async function POST(request: NextRequest) {
     const result = await uploadUseCases.uploadCvFiles(files);
     return NextResponse.json(result, { status: 202 });
   } catch (error) {
-    console.error("Error handling upload:", error);
+    log.error("Error handling upload:", error);
     return NextResponse.json(
       { error: "Failed to process upload" },
       { status: 500 }

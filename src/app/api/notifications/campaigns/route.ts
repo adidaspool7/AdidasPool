@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/notifications/campaigns");
 
 export async function GET() {
   try {
@@ -23,7 +26,7 @@ export async function GET() {
     );
     return NextResponse.json(enriched);
   } catch (error) {
-    console.error("Error fetching campaigns:", error);
+    log.error("Error fetching campaigns:", error);
     return NextResponse.json({ error: "Failed to fetch campaigns" }, { status: 500 });
   }
 }
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(campaign, { status: 201 });
   } catch (error) {
-    console.error("Error creating campaign:", error);
+    log.error("Error creating campaign:", error);
     return NextResponse.json({ error: "Failed to create campaign" }, { status: 500 });
   }
 }

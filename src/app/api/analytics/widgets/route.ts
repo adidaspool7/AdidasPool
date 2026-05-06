@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireHr } from "@/lib/auth/require-hr";
 import { dashboardWidgetUseCases } from "@server/application";
 import { WidgetSpecValidationError } from "@server/application/use-cases/dashboard-widget.use-cases";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/analytics/widgets");
 
 export async function GET() {
   const auth = await requireHr();
@@ -34,7 +37,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("[analytics/widgets POST] failed", err);
+    log.error("[analytics/widgets POST] failed", err);
     return NextResponse.json({ error: "Failed to create widget" }, { status: 500 });
   }
 }

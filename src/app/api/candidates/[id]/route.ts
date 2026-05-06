@@ -3,6 +3,9 @@ import { candidateUseCases, NotFoundError } from "@server/application";
 import { UpdateCandidateSchema, CandidateRelationsUpdateSchema } from "@server/application/dtos";
 import type { CandidateRelationsInput } from "@server/domain/ports/repositories";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]");
 
 /**
  * GET /api/candidates/[id]
@@ -22,7 +25,7 @@ export async function GET(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching candidate:", error);
+    log.error("Error fetching candidate:", error);
     return NextResponse.json(
       { error: "Failed to fetch candidate" },
       { status: 500 }
@@ -96,7 +99,7 @@ export async function PATCH(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error updating candidate:", error);
+    log.error("Error updating candidate:", error);
     return NextResponse.json(
       { error: "Failed to update candidate" },
       { status: 500 }
@@ -126,7 +129,7 @@ export async function DELETE(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error deleting candidate:", error);
+    log.error("Error deleting candidate:", error);
     return NextResponse.json(
       { error: "Failed to delete candidate" },
       { status: 500 }

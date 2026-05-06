@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/notifications/campaigns/preview");
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ audienceCount: count });
   } catch (error) {
-    console.error("Error previewing audience:", error);
+    log.error("Error previewing audience:", error);
     return NextResponse.json({ error: "Failed to preview audience" }, { status: 500 });
   }
 }

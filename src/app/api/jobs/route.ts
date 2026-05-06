@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases } from "@server/application";
 import { CreateJobSchema } from "@server/application/dtos";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs");
 
 /**
  * GET /api/jobs
@@ -33,7 +36,7 @@ export async function GET(request: NextRequest) {
     const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department, country });
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    log.error("Error fetching jobs:", error);
     return NextResponse.json(
       { error: "Failed to fetch jobs" },
       { status: 500 }
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
     const job = await jobUseCases.createJob(result.data);
     return NextResponse.json(job, { status: 201 });
   } catch (error) {
-    console.error("Error creating job:", error);
+    log.error("Error creating job:", error);
     return NextResponse.json(
       { error: "Failed to create job" },
       { status: 500 }

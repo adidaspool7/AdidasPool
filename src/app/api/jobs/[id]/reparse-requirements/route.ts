@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobUseCases, NotFoundError } from "@server/application";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/[id]/reparse-requirements");
 
 /**
  * POST /api/jobs/[id]/reparse-requirements
@@ -31,7 +34,7 @@ export async function POST(
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error re-parsing job requirements:", error);
+    log.error("Error re-parsing job requirements:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to re-parse" },
       { status: 500 }

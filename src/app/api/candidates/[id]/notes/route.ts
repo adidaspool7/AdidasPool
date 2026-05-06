@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { candidateUseCases, ValidationError } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/notes");
 
 const NoteSchema = z.object({
   author: z.string().trim().min(1).max(200),
@@ -34,7 +37,7 @@ export async function POST(
     if (error instanceof ValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("Error creating note:", error);
+    log.error("Error creating note:", error);
     return NextResponse.json(
       { error: "Failed to create note" },
       { status: 500 }

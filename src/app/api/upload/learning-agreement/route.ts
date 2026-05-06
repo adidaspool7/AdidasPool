@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadUseCases, applicationUseCases } from "@server/application";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/upload/learning-agreement");
 
 /**
  * POST /api/upload/learning-agreement
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === "ValidationError") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("Learning agreement upload error:", error);
+    log.error("Learning agreement upload error:", error);
     return NextResponse.json(
       { error: "Failed to upload learning agreement" },
       { status: 500 }

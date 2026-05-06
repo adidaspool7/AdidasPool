@@ -15,6 +15,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import db from "@server/infrastructure/database/supabase-client";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/skills/[skillId]/verification");
 
 const BodySchema = z.object({
   verificationStatus: z.enum(["PENDING", "PASSED", "FAILED", "UNVERIFIED"]),
@@ -70,7 +73,7 @@ export async function PATCH(
       .eq("candidate_id", candidateId);
 
     if (updateError) {
-      console.error("Error updating skill verification:", updateError);
+      log.error("Error updating skill verification:", updateError);
       return NextResponse.json(
         { error: "Failed to update skill verification status" },
         { status: 500 }
@@ -85,7 +88,7 @@ export async function PATCH(
       verifiedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error in skill verification override:", error);
+    log.error("Error in skill verification override:", error);
     return NextResponse.json(
       { error: "Failed to update skill verification" },
       { status: 500 }

@@ -17,6 +17,9 @@ import { after } from "next/server";
 import { jobUseCases } from "@server/application";
 import db from "@server/infrastructure/database/supabase-client";
 import { generateId, camelizeKeys } from "@server/infrastructure/database/db-utils";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/jobs/sync");
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes max for scraping
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create sync job record");
     }
 
-    console.log(`[JobSync] Starting background sync (id: ${syncId}, maxPages: ${maxPages})`);
+    log.info(`[JobSync] Starting background sync (id: ${syncId}, maxPages: ${maxPages})`);
 
     // Process in background after response is sent
     after(async () => {
@@ -83,11 +86,11 @@ export async function POST(request: NextRequest) {
           result: JSON.parse(JSON.stringify(result)),
           completed_at: new Date().toISOString(),
         }).eq("id", syncId);
-        console.log(
+        log.info(
           `[JobSync] Sync complete: ${result.created} created, ${result.updated} updated (${result.durationMs}ms)`
         );
       } catch (error) {
-        console.error("[JobSync] Background sync failed:", error);
+        log.error("[JobSync] Background sync failed:", error);
         await db.from("sync_jobs").update({
           status: "failed",
           result: { error: error instanceof Error ? error.message : "Unknown error" },
@@ -101,7 +104,7 @@ export async function POST(request: NextRequest) {
       { status: 202 }
     );
   } catch (error) {
-    console.error("[JobSync] Sync failed:", error);
+    log.error("[JobSync] Sync failed:", error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
