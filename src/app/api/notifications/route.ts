@@ -1,27 +1,63 @@
 /**
- * GET /api/notifications  — scoped listing (candidate or HR)
- * PATCH /api/notifications — mark as read / mark all as read
+ * GET /api/notifications     — scoped listing (auth-derived role/candidateId)
+ * PATCH /api/notifications   — mark as read / mark all as read / archive
+ * DELETE /api/notifications  — delete a single notification by id
  *
  * ONION LAYER: Presentation (thin controller)
  * Delegates to: NotificationUseCases
  *
- * Query params:
- *   role=candidate|hr  (required for scoping)
- *   candidateId=...    (required when role=candidate)
- *   unread=true        (optional — filter unread only)
- *   type=JOB_POSTED    (optional — filter by type)
- *   limit=50           (optional)
- *   offset=0           (optional)
+ * AUTH MODEL (post-audit C1, 2026-05):
+ *   - Caller resolved server-side via Supabase session cookie.
+ *   - Client query params `role` / `candidateId` / `targetRole` are IGNORED
+ *     for authorization — they are no longer trusted. Any mutation requires
+ *     the caller to own the target row:
+ *       * HR can only mutate notifications targeted to HR (target_role = 'HR'
+ *         or null).
+ *       * Candidates can only mutate notifications belonging to their
+ *         candidateId AND targeted to candidates (target_role = 'CANDIDATE'
+ *         or null).
+ *
+ * Query params (GET):
+ *   countOnly=true      (optional — fast path for sidebar badge)
+ *   unread=true         (optional — filter unread only)
+ *   archived=true|false (optional — filter archived state)
+ *   type=JOB_POSTED     (optional — filter by type)
+ *   limit=50            (optional)
+ *   offset=0            (optional)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { notificationUseCases } from "@server/application";
+import { resolveCaller, type AuthenticatedCaller } from "@/lib/auth/resolve-caller";
+
+/**
+ * Returns true iff the caller is allowed to mutate (read/archive/delete)
+ * the given notification row. A row with target_role=null is considered
+ * a system notification visible to whoever owns the candidate_id.
+ */
+function callerOwnsNotification(
+  caller: AuthenticatedCaller,
+  notification: { candidateId?: string | null; targetRole?: string | null }
+): boolean {
+  const targetRole = notification.targetRole ?? null;
+
+  if (caller.kind === "hr") {
+    return targetRole === "HR" || targetRole === null;
+  }
+
+  // Candidate: must match candidateId AND target must be candidate-scoped.
+  if (!caller.candidateId) return false;
+  if (notification.candidateId !== caller.candidateId) return false;
+  return targetRole === "CANDIDATE" || targetRole === null;
+}
 
 export async function GET(request: NextRequest) {
+  const auth = await resolveCaller();
+  if (auth.response) return auth.response;
+  const caller = auth.caller;
+
   try {
     const { searchParams } = request.nextUrl;
-    const role = searchParams.get("role");
-    const candidateId = searchParams.get("candidateId");
     const countOnly = searchParams.get("countOnly") === "true";
     const unread = searchParams.get("unread") === "true";
     const archived = searchParams.get("archived");
@@ -33,34 +69,41 @@ export async function GET(request: NextRequest) {
 
     // Fast path: only return unread count (for sidebar badge)
     if (countOnly) {
-      if (role === "candidate" && candidateId) {
-        const unreadCount = await notificationUseCases.countUnread(candidateId, "CANDIDATE");
+      if (caller.kind === "candidate") {
+        if (!caller.candidateId) return NextResponse.json({ unreadCount: 0 });
+        const unreadCount = await notificationUseCases.countUnread(
+          caller.candidateId,
+          "CANDIDATE"
+        );
         return NextResponse.json({ unreadCount });
       }
-      if (role === "hr") {
-        const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
-        return NextResponse.json({ unreadCount });
-      }
-      return NextResponse.json({ unreadCount: 0 });
+      const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
+      return NextResponse.json({ unreadCount });
     }
 
     const filters: Record<string, unknown> = { unread: unread || undefined, type, limit, offset };
     if (archived !== null) filters.archived = archived === "true";
 
-    if (role === "candidate") {
-      if (!candidateId) {
-        return NextResponse.json(
-          { error: "candidateId is required when role=candidate" },
-          { status: 400 }
-        );
+    if (caller.kind === "candidate") {
+      if (!caller.candidateId) {
+        return NextResponse.json({ notifications: [], unreadCount: 0 });
       }
-      const notifications = await notificationUseCases.listForCandidate(candidateId, filters);
-      const unreadCount = await notificationUseCases.countUnread(candidateId, "CANDIDATE");
+      const notifications = await notificationUseCases.listForCandidate(
+        caller.candidateId,
+        filters
+      );
+      const unreadCount = await notificationUseCases.countUnread(
+        caller.candidateId,
+        "CANDIDATE"
+      );
       // Enrich promotional notifications with isPinned from their campaign
-      const campaignIds = [...new Set(notifications.filter((n: any) => n.campaignId).map((n: any) => n.campaignId))];
+      const campaignIds = [
+        ...new Set(
+          notifications.filter((n: any) => n.campaignId).map((n: any) => n.campaignId)
+        ),
+      ];
       const pinnedSet = new Set<string>();
       const archivedSet = new Set<string>();
-      // Parallel fetch instead of sequential await loop (prototype-friendly N+1 fix)
       const campaigns = await Promise.all(
         campaignIds.map((cid) => notificationUseCases.getCampaign(cid as string))
       );
@@ -69,13 +112,13 @@ export async function GET(request: NextRequest) {
         if (campaign?.isPinned) pinnedSet.add(cid as string);
         if (campaign?.status === "ARCHIVED") archivedSet.add(cid as string);
       });
-      // Filter out notifications from archived campaigns
-      const visible = notifications.filter((n: any) => !n.campaignId || !archivedSet.has(n.campaignId));
+      const visible = notifications.filter(
+        (n: any) => !n.campaignId || !archivedSet.has(n.campaignId)
+      );
       const enriched = visible.map((n: any) => ({
         ...n,
         isPinned: n.campaignId ? pinnedSet.has(n.campaignId) : false,
       }));
-      // Sort: pinned first, then by createdAt desc
       enriched.sort((a: any, b: any) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
@@ -84,15 +127,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ notifications: enriched, unreadCount });
     }
 
-    if (role === "hr") {
-      const notifications = await notificationUseCases.listForHR(filters);
-      const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
-      return NextResponse.json({ notifications, unreadCount });
-    }
-
-    // Fallback: return all (legacy)
-    const notifications = await notificationUseCases.listAll();
-    return NextResponse.json(notifications);
+    // HR
+    const notifications = await notificationUseCases.listForHR(filters);
+    const unreadCount = await notificationUseCases.countUnread(undefined, "HR");
+    return NextResponse.json({ notifications, unreadCount });
   } catch (error) {
     console.error("Error fetching notifications:", error);
     return NextResponse.json(
@@ -103,34 +141,74 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await resolveCaller();
+  if (auth.response) return auth.response;
+  const caller = auth.caller;
+
   try {
     const body = await request.json();
-    const { id, markAllRead, candidateId, targetRole, archive, archiveIds } = body;
+    const { id, markAllRead, archive, archiveIds } = body as {
+      id?: string;
+      markAllRead?: boolean;
+      archive?: boolean;
+      archiveIds?: unknown;
+    };
 
     // Archive a single notification
     if (archive && id) {
+      const existing = await notificationUseCases.getById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (!callerOwnsNotification(caller, existing)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       const updated = await notificationUseCases.archiveNotification(id);
       return NextResponse.json(updated);
     }
 
-    // Archive multiple notifications
-    if (archiveIds && Array.isArray(archiveIds)) {
-      const count = await notificationUseCases.archiveMany(archiveIds);
+    // Archive multiple notifications — verify each is owned by the caller.
+    if (Array.isArray(archiveIds)) {
+      const ids = archiveIds.filter((x): x is string => typeof x === "string");
+      if (ids.length === 0) {
+        return NextResponse.json({ success: true, archived: 0 });
+      }
+      const owned: string[] = [];
+      for (const nid of ids) {
+        const existing = await notificationUseCases.getById(nid);
+        if (existing && callerOwnsNotification(caller, existing)) {
+          owned.push(nid);
+        }
+      }
+      if (owned.length === 0) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const count = await notificationUseCases.archiveMany(owned);
       return NextResponse.json({ success: true, archived: count });
     }
 
     if (markAllRead) {
-      await notificationUseCases.markAllAsRead(candidateId, targetRole);
+      // Caller-derived only — body candidateId/targetRole no longer trusted.
+      if (caller.kind === "candidate") {
+        if (!caller.candidateId) return NextResponse.json({ success: true });
+        await notificationUseCases.markAllAsRead(caller.candidateId, "CANDIDATE");
+      } else {
+        await notificationUseCases.markAllAsRead(undefined, "HR");
+      }
       return NextResponse.json({ success: true });
     }
 
     if (!id) {
-      return NextResponse.json(
-        { error: "id is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    const existing = await notificationUseCases.getById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!callerOwnsNotification(caller, existing)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const updated = await notificationUseCases.markAsRead(id);
     return NextResponse.json(updated);
   } catch (error) {
@@ -143,11 +221,22 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await resolveCaller();
+  if (auth.response) return auth.response;
+  const caller = auth.caller;
+
   try {
     const { searchParams } = request.nextUrl;
     const id = searchParams.get("id");
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+    const existing = await notificationUseCases.getById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!callerOwnsNotification(caller, existing)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     await notificationUseCases.deleteNotification(id);
     return NextResponse.json({ success: true });

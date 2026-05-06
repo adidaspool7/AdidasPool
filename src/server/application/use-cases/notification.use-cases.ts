@@ -37,6 +37,11 @@ export class NotificationUseCases {
     return this.notificationRepo.countUnread(candidateId, targetRole);
   }
 
+  /** Single notification by id, used for ownership/auth checks before mutations. */
+  async getById(id: string) {
+    return this.notificationRepo.findById(id);
+  }
+
   // Legacy — kept for backward compat
   async listAll() {
     return this.notificationRepo.findAll();

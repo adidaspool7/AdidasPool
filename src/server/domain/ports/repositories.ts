@@ -265,6 +265,8 @@ export interface INotificationRepository {
   countUnread(candidateId?: string, targetRole?: string): Promise<number>;
   /** Returns full interaction history for a candidate, all types + archived, newest first. */
   findInteractionHistory(candidateId: string): Promise<any[]>;
+  /** Single notification by id (used for ownership checks before mutations). */
+  findById(id: string): Promise<any | null>;
 
   findAll(): Promise<any[]>;
   findUnread(): Promise<any[]>;

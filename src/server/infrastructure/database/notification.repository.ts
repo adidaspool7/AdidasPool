@@ -202,6 +202,18 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     assertNoError(error, "notification.delete");
   }
 
+  /** Single notification by id; null on not-found. Used for ownership checks. */
+  async findById(id: string) {
+    const { data, error } = await db
+      .from("notifications")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) return null;
+    if (!data) return null;
+    return camelizeKeys<any>(data as Record<string, unknown>);
+  }
+
   // ── Preferences ─────────────────────────────────────────
 
   async getPreferences(candidateId: string) {

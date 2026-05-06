@@ -70,6 +70,16 @@ export class CandidateUseCases {
   }
 
   /**
+   * Look up the candidate row owned by an authenticated Supabase user.
+   * Returns null if no candidate is linked to that user_id (e.g. before
+   * the user has uploaded a CV / claimed an HR-uploaded profile).
+   * Used by API routes to derive the caller's candidateId for auth.
+   */
+  async findByUserId(userId: string) {
+    return this.candidateRepo.findByUserId(userId);
+  }
+
+  /**
    * Update candidate data (manual edits by recruiter).
    * @param createdBy  HR user email to attribute the notification to (optional).
    */
