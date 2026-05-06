@@ -49,11 +49,12 @@ All use case instances are created in `src/server/container.ts`. Route handlers 
 - Always run `snakeifyKeys()` on data going into Supabase `.insert()` or `.update()`
 
 ### 2.2 JSONB Fields — Do Not Camelize Internally
-These fields are stored as opaque JSON and must NOT have their internal keys recursively camelized. The `camelizeKeys()` utility already handles this — do not modify the `JSONB_KEYS` set without a reason:
+These fields are stored as opaque JSON and must NOT have their internal keys recursively camelized. The `camelizeKeys()` utility already handles this. When you add a new JSONB column, add its camelCase key to the `JSONB_KEYS` set in `src/server/infrastructure/database/db-utils.ts`. Current set:
 
 ```
 parsedData, evaluationRationale, errorLog, result, breakdown,
-rawAiResponse, details, parsingConfidence
+rawAiResponse, details, parsingConfidence, parsedRequirements,
+metadata, spec
 ```
 
 ### 2.3 IDs

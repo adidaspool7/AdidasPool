@@ -2,9 +2,17 @@
 
 > Tracks all planned work. Status legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ❌ Blocked
 > Keep this file updated after every session. Do not delete completed items — move them to the bottom "Completed" section.
-> Last audited: 2026-04-30 — synced with notification system updates and interview-token fix.
+> Last audited: 2026-05-06 — synced with per-job shortlist, HR custom analytics widgets, and Option B contact-email plan.
 
 ---
+
+## Recent Work (2026-04-30 → 2026-05-06)
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| R.7 | Per-Job Shortlist (`job_shortlists`) — HR pick list per job, snapshot fit | ✅ | Use cases + 4 endpoints + tabs UI on `/jobs/[id]/match-candidates`; tests in `tests/job-shortlist-use-cases.test.ts` |
+| R.8 | HR Custom Analytics Widgets ("My charts") | ✅ | `hr_dashboard_widgets` table, Zod-strict catalog (4 metrics × dimensions × 6 chart types), 4 API routes, builder dialog with live preview, 16 catalog tests — commit `2f3dc33` |
+| R.9 | Contact Candidate email — Option B setup plan | ⬜ | Code path is ready; awaiting Resend verified domain. See [CONTACT_EMAIL_OPTION_B_SETUP.md](CONTACT_EMAIL_OPTION_B_SETUP.md) |
 
 ## Recent Work (2026-04-26 → 2026-04-30)
 
@@ -142,6 +150,7 @@
 | M.3 | Configure Google OAuth consent screen in Google Cloud Console | ⬜ |
 | M.4 | Add `https://adidas-pool.vercel.app` to Supabase Auth URL allowlist | ✅ |
 | M.5 | Confirm HTTPS + browser permissions for camera/mic in production | ⬜ |
+| M.8 | Prepare Contact Candidate email delivery (Option B) — see [CONTACT_EMAIL_OPTION_B_SETUP.md](CONTACT_EMAIL_OPTION_B_SETUP.md) | ⬜ |
 
 ---
 
