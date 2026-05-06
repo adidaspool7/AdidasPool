@@ -23,6 +23,159 @@ export interface PaginatedResult<T> {
   };
 }
 
+/**
+ * Camelized DB row interfaces.
+ *
+ * Rows come from the Supabase JS client + `camelizeKeys()`. Each interface
+ * declares the columns the application layer actually consumes today (and
+ * widens to `[key: string]: unknown` for everything else, since the
+ * underlying SELECT often pulls `*` plus joins). New columns SHOULD be
+ * declared here when their first typed consumer is added — that keeps the
+ * audit-M1/M6 pressure on `any` from creeping back.
+ *
+ * Optional fields use `?` (may be missing on a partial SELECT). Fields are
+ * loosely typed (`string | null` etc.) because the runtime shape of
+ * camelized rows is intentionally loose.
+ */
+export interface CandidateRow {
+  id: string;
+  userId?: string | null;
+  email?: string | null;
+  firstName?: string;
+  lastName?: string;
+  status?: string;
+  shortlisted?: boolean;
+  needsReview?: boolean | null;
+  activatedAt?: string | null;
+  overallCvScore?: number | null;
+  country?: string | null;
+  location?: string | null;
+  primaryBusinessArea?: string | null;
+  sourceType?: string | null;
+  rawCvUrl?: string | null;
+  motivationLetterUrl?: string | null;
+  learningAgreementUrl?: string | null;
+  parsedData?: unknown;
+  experiences?: unknown[];
+  education?: unknown[];
+  languages?: unknown[];
+  skills?: unknown[];
+  notes?: unknown[];
+  tags?: unknown[];
+  applications?: unknown[];
+  assessments?: unknown[];
+  interviews?: unknown[];
+  jobMatches?: unknown[];
+  improvementTracks?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface JobRow {
+  id: string;
+  title?: string;
+  department?: string | null;
+  location?: string | null;
+  country?: string | null;
+  sourceUrl?: string | null;
+  description?: string | null;
+  status?: string | null;
+  type?: string | null;
+  internshipStatus?: string | null;
+  externalId?: string | null;
+  postedAt?: string | null;
+  parsedRequirements?: unknown;
+  parsedRequirementsVersion?: number | null;
+  requiredSkills?: unknown;
+  requiredLanguage?: string | null;
+  requiredLanguageLevel?: string | null;
+  requiredEducationLevel?: string | null;
+  minYearsExperience?: number | null;
+  [key: string]: unknown;
+}
+
+export interface NotificationRow {
+  id: string;
+  type?: string;
+  message?: string;
+  candidateId?: string | null;
+  targetRole?: string | null;
+  jobId?: string | null;
+  applicationId?: string | null;
+  campaignId?: string | null;
+  read?: boolean;
+  readAt?: string | null;
+  archived?: boolean;
+  createdAt?: string;
+  createdBy?: string | null;
+  metadata?: unknown;
+  [key: string]: unknown;
+}
+
+export interface JobApplicationRow {
+  id: string;
+  jobId?: string;
+  candidateId?: string;
+  status?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+export interface AssessmentRow {
+  id: string;
+  candidateId?: string;
+  status?: string;
+  type?: string;
+  token?: string | null;
+  [key: string]: unknown;
+}
+
+export interface ParsingJobRow {
+  id: string;
+  status?: string;
+  totalFiles?: number;
+  parsedFiles?: number;
+  failedFiles?: number;
+  uploadedBy?: string | null;
+  fileName?: string | null;
+  errorLog?: unknown;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+export interface CampaignRow {
+  id: string;
+  title?: string;
+  body?: string;
+  status?: string;
+  isPinned?: boolean;
+  targetAll?: boolean;
+  targetInternshipsOnly?: boolean;
+  targetCountries?: string[];
+  targetFields?: string[];
+  targetEmails?: string[];
+  [key: string]: unknown;
+}
+
+export interface NotificationPreferencesRow {
+  id?: string;
+  candidateId?: string;
+  jobNotifications?: boolean;
+  internshipNotifications?: boolean;
+  onlyMyCountry?: boolean;
+  fieldFilters?: string[];
+  promotionalNotifications?: boolean;
+  [key: string]: unknown;
+}
+
+export interface JobMatchRow {
+  id?: string;
+  jobId: string;
+  candidateId: string;
+  matchScore: number;
+  breakdown?: unknown;
+  [key: string]: unknown;
+}
+
 export interface CandidateFilters {
   search?: string;
   status?: string;
@@ -48,41 +201,41 @@ export interface CandidateFilters {
 // ============================================
 
 export interface ICandidateRepository {
-  findMany(filters: CandidateFilters): Promise<PaginatedResult<any>>;
-  findById(id: string): Promise<any | null>;
-  findByIdWithSelect(id: string, select: Record<string, unknown>): Promise<any | null>;
-  findByUserId(userId: string): Promise<any | null>;
-  findByEmail(email: string): Promise<any | null>;
+  findMany(filters: CandidateFilters): Promise<PaginatedResult<CandidateRow>>;
+  findById(id: string): Promise<CandidateRow | null>;
+  findByIdWithSelect(id: string, select: Record<string, unknown>): Promise<CandidateRow | null>;
+  findByUserId(userId: string): Promise<CandidateRow | null>;
+  findByEmail(email: string): Promise<CandidateRow | null>;
 
-  findFirstByCreation(select?: Record<string, unknown>): Promise<any | null>;
+  findFirstByCreation(select?: Record<string, unknown>): Promise<CandidateRow | null>;
 
   createDefault(
     data: Record<string, unknown>,
     select?: Record<string, unknown>
-  ): Promise<any>;
+  ): Promise<CandidateRow>;
 
-  update(id: string, data: Record<string, unknown>): Promise<any>;
+  update(id: string, data: Record<string, unknown>): Promise<CandidateRow>;
 
   updateWithSelect(
     id: string,
     data: Record<string, unknown>,
     select: Record<string, unknown>
-  ): Promise<any>;
+  ): Promise<CandidateRow>;
 
-  addNote(candidateId: string, author: string, content: string): Promise<any>;
+  addNote(candidateId: string, author: string, content: string): Promise<{ id: string; [key: string]: unknown }>;
   updateStatus(candidateId: string, status: string): Promise<void>;
-  findForMatching(opts?: { fieldsOfWork?: string[] }): Promise<any[]>;
-  findByIdForMatching(candidateId: string): Promise<any | null>;
-  findForNotifications(): Promise<any[]>;
+  findForMatching(opts?: { fieldsOfWork?: string[] }): Promise<CandidateRow[]>;
+  findByIdForMatching(candidateId: string): Promise<CandidateRow | null>;
+  findForNotifications(): Promise<CandidateRow[]>;
   findInternshipCandidateIds(): Promise<Set<string>>;
-  findForExport(): Promise<any[]>;
-  findForRescore(): Promise<any[]>;
+  findForExport(): Promise<CandidateRow[]>;
+  findForRescore(): Promise<CandidateRow[]>;
 
   /** Create a new candidate with all related records in a single transaction */
   createWithRelations(
     data: Record<string, unknown>,
     relations: CandidateRelationsInput
-  ): Promise<any>;
+  ): Promise<CandidateRow>;
 
   /** Delete and re-create all related records for a candidate (used when re-parsing a CV) */
   replaceRelatedRecords(
@@ -144,15 +297,15 @@ export interface IJobRepository {
     internshipStatus?: string;
     department?: string | string[];
     country?: string | string[];
-  }): Promise<PaginatedResult<any>>;
-  findById(id: string): Promise<any | null>;
-  findByExternalId(externalId: string): Promise<any | null>;
-  create(data: Record<string, unknown>): Promise<any>;
-  update(id: string, data: Record<string, unknown>): Promise<any>;
+  }): Promise<PaginatedResult<JobRow>>;
+  findById(id: string): Promise<JobRow | null>;
+  findByExternalId(externalId: string): Promise<JobRow | null>;
+  create(data: Record<string, unknown>): Promise<JobRow>;
+  update(id: string, data: Record<string, unknown>): Promise<JobRow>;
   upsertByExternalId(
     externalId: string,
     data: Record<string, unknown>
-  ): Promise<{ job: any; created: boolean }>;
+  ): Promise<{ job: JobRow; created: boolean }>;
   bulkUpsertByExternalId(
     jobs: {
       externalId: string;
@@ -204,8 +357,8 @@ export interface IJobRepository {
     jobId: string,
     candidateId: string,
     matchScore: number,
-    breakdown: any
-  ): Promise<any>;
+    breakdown: unknown
+  ): Promise<JobMatchRow>;
   delete(id: string): Promise<void>;
 }
 
@@ -214,9 +367,9 @@ export interface IJobRepository {
 // ============================================
 
 export interface IAssessmentRepository {
-  findMany(filters: { status?: string; candidateId?: string }): Promise<any[]>;
-  create(data: Record<string, unknown>): Promise<any>;
-  findByToken(token: string): Promise<any | null>;
+  findMany(filters: { status?: string; candidateId?: string }): Promise<AssessmentRow[]>;
+  create(data: Record<string, unknown>): Promise<AssessmentRow>;
+  findByToken(token: string): Promise<AssessmentRow | null>;
 }
 
 // ============================================
@@ -224,12 +377,12 @@ export interface IAssessmentRepository {
 // ============================================
 
 export interface IJobApplicationRepository {
-  findByCandidateId(candidateId: string): Promise<any[]>;
-  findByJobAndCandidate(jobId: string, candidateId: string): Promise<any | null>;
-  findAll(): Promise<any[]>;
-  create(data: { jobId: string; candidateId: string }): Promise<any>;
-  updateStatus(id: string, status: string): Promise<any>;
-  update(id: string, data: Record<string, unknown>): Promise<any>;
+  findByCandidateId(candidateId: string): Promise<JobApplicationRow[]>;
+  findByJobAndCandidate(jobId: string, candidateId: string): Promise<JobApplicationRow | null>;
+  findAll(): Promise<JobApplicationRow[]>;
+  create(data: { jobId: string; candidateId: string }): Promise<JobApplicationRow>;
+  updateStatus(id: string, status: string): Promise<JobApplicationRow>;
+  update(id: string, data: Record<string, unknown>): Promise<JobApplicationRow>;
   delete(id: string): Promise<void>;
 }
 
@@ -260,38 +413,38 @@ export interface CreateNotificationData {
 }
 
 export interface INotificationRepository {
-  findForCandidate(candidateId: string, filters?: NotificationFilters): Promise<any[]>;
-  findForHR(filters?: NotificationFilters): Promise<any[]>;
+  findForCandidate(candidateId: string, filters?: NotificationFilters): Promise<NotificationRow[]>;
+  findForHR(filters?: NotificationFilters): Promise<NotificationRow[]>;
   countUnread(candidateId?: string, targetRole?: string): Promise<number>;
   /** Returns full interaction history for a candidate, all types + archived, newest first. */
-  findInteractionHistory(candidateId: string): Promise<any[]>;
+  findInteractionHistory(candidateId: string): Promise<NotificationRow[]>;
   /** Single notification by id (used for ownership checks before mutations). */
-  findById(id: string): Promise<any | null>;
+  findById(id: string): Promise<NotificationRow | null>;
 
-  findAll(): Promise<any[]>;
-  findUnread(): Promise<any[]>;
+  findAll(): Promise<NotificationRow[]>;
+  findUnread(): Promise<NotificationRow[]>;
 
-  create(data: CreateNotificationData): Promise<any>;
+  create(data: CreateNotificationData): Promise<NotificationRow>;
   createMany(data: CreateNotificationData[]): Promise<number>;
-  markAsRead(id: string): Promise<any>;
+  markAsRead(id: string): Promise<NotificationRow>;
   markAllAsRead(candidateId?: string, targetRole?: string): Promise<void>;
-  archiveNotification(id: string): Promise<any>;
+  archiveNotification(id: string): Promise<NotificationRow>;
   archiveMany(ids: string[]): Promise<number>;
   deleteNotification(id: string): Promise<void>;
 
-  getPreferences(candidateId: string): Promise<any | null>;
+  getPreferences(candidateId: string): Promise<NotificationPreferencesRow | null>;
   upsertPreferences(candidateId: string, prefs: {
     jobNotifications?: boolean;
     internshipNotifications?: boolean;
     onlyMyCountry?: boolean;
     fieldFilters?: string[];
     promotionalNotifications?: boolean;
-  }): Promise<any>;
+  }): Promise<NotificationPreferencesRow>;
 
-  createCampaign(data: any): Promise<any>;
-  findCampaigns(): Promise<any[]>;
-  findCampaignById(id: string): Promise<any | null>;
-  updateCampaign(id: string, data: any): Promise<any>;
+  createCampaign(data: Record<string, unknown>): Promise<CampaignRow>;
+  findCampaigns(): Promise<CampaignRow[]>;
+  findCampaignById(id: string): Promise<CampaignRow | null>;
+  updateCampaign(id: string, data: Record<string, unknown>): Promise<CampaignRow>;
   deleteCampaign(id: string): Promise<void>;
   getCampaignReadStats(campaignId: string): Promise<{ total: number; read: number }>;
 }
@@ -312,9 +465,9 @@ export interface IParsingJobRepository {
     totalFiles: number;
     uploadedBy?: string;
     fileName?: string;
-  }): Promise<any>;
-  findById(id: string): Promise<any | null>;
-  findRecent(limit?: number): Promise<any[]>;
+  }): Promise<ParsingJobRow>;
+  findById(id: string): Promise<ParsingJobRow | null>;
+  findRecent(limit?: number): Promise<ParsingJobRow[]>;
   updateStatus(id: string, status: string): Promise<void>;
   incrementParsed(id: string): Promise<void>;
   incrementFailed(id: string): Promise<void>;

@@ -136,7 +136,7 @@ export class JobUseCases {
             if (isInternship && !prefs.internshipNotifications) continue;
             if (!isInternship && !prefs.jobNotifications) continue;
             if (prefs.onlyMyCountry && c.country && job.country && c.country !== job.country) continue;
-            if (prefs.fieldFilters?.length > 0 && job.department) {
+            if (prefs.fieldFilters && prefs.fieldFilters.length > 0 && job.department) {
               const match = prefs.fieldFilters.some(
                 (f: string) => f.toLowerCase() === (job.department as string).toLowerCase()
               );
@@ -197,7 +197,7 @@ export class JobUseCases {
             if (!prefs) { targetIds.push(c.id); continue; }
             if (!prefs.internshipNotifications) continue;
             if (prefs.onlyMyCountry && c.country && job.country && c.country !== job.country) continue;
-            if (prefs.fieldFilters?.length > 0 && job.department) {
+            if (prefs.fieldFilters && prefs.fieldFilters.length > 0 && job.department) {
               const match = prefs.fieldFilters.some(
                 (f: string) => f.toLowerCase() === (job.department as string).toLowerCase()
               );

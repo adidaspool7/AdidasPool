@@ -200,7 +200,7 @@ export class NotificationUseCases {
         TERMINATED: ["ARCHIVED"],
         ARCHIVED: [],
       };
-      if (!allowed[campaign.status]?.includes(data.status)) {
+      if (!allowed[campaign.status ?? ""]?.includes(data.status)) {
         throw new Error(`Cannot change status from ${campaign.status} to ${data.status}`);
       }
     }
@@ -257,11 +257,11 @@ export class NotificationUseCases {
         // Internship candidates filter
         if (internshipCandidateIds && !internshipCandidateIds.has(c.id)) continue;
         // Country filter
-        if (campaign.targetCountries?.length > 0 && c.country) {
+        if (campaign.targetCountries && campaign.targetCountries.length > 0 && c.country) {
           if (!campaign.targetCountries.includes(c.country)) continue;
         }
         // Field of study filter
-        if (campaign.targetFields?.length > 0) {
+        if (campaign.targetFields && campaign.targetFields.length > 0) {
           const candidateField = (c as any).fieldOfStudy || (c as any).department || "";
           if (candidateField) {
             const match = campaign.targetFields.some(
@@ -273,7 +273,7 @@ export class NotificationUseCases {
       }
 
       // Individual email targeting: if targetEmails has entries, only include matching emails
-      if (campaign.targetEmails?.length > 0) {
+      if (campaign.targetEmails && campaign.targetEmails.length > 0) {
         const email = (c as any).email?.toLowerCase();
         if (!email || !campaign.targetEmails.some((e: string) => e.toLowerCase() === email)) continue;
       }
@@ -288,7 +288,7 @@ export class NotificationUseCases {
       const batch = targetIds.slice(i, i + BATCH_SIZE);
       const rows: CreateNotificationData[] = batch.map((candidateId) => ({
         type: "PROMOTIONAL",
-        message: campaign.body,
+        message: String(campaign.body ?? ""),
         targetRole: "CANDIDATE",
         candidateId,
         campaignId: campaign.id,

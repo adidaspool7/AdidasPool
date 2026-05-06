@@ -151,8 +151,8 @@ export class ProfileUseCases {
       full?.rawCvUrl,
       full?.motivationLetterUrl,
       full?.learningAgreementUrl,
-      ...(full?.applications ?? []).map(
-        (application: { learningAgreementUrl?: string | null }) =>
+      ...((full?.applications ?? []) as Array<{ learningAgreementUrl?: string | null }>).map(
+        (application) =>
           application.learningAgreementUrl ?? null
       ),
     ].filter(

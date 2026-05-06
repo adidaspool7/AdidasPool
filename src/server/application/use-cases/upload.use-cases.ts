@@ -252,7 +252,7 @@ export class UploadUseCases {
 
     // Determine final status
     const finalJob = await this.parsingJobRepo.findById(jobId);
-    const allFailed = finalJob?.parsedFiles === 0 && finalJob?.failedFiles > 0;
+    const allFailed = finalJob?.parsedFiles === 0 && (finalJob?.failedFiles ?? 0) > 0;
     await this.parsingJobRepo.updateStatus(
       jobId,
       allFailed ? "FAILED" : "COMPLETED"
