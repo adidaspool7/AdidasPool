@@ -3,6 +3,12 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 type InterviewTokenPayload = {
   interviewId: string;
   candidateId: string;
+  /**
+   * Authenticated Supabase user id (auth.users.id) bound to the token at
+   * issuance. The token is only valid when presented by the same user —
+   * this prevents replay/leakage across users (audit H5).
+   */
+  userId: string;
   exp: number;
 };
 
@@ -58,11 +64,27 @@ export function verifyInterviewRuntimeToken(token: string): InterviewTokenPayloa
   }
 
   const payload = JSON.parse(unb64url(body)) as InterviewTokenPayload;
-  if (!payload.interviewId || !payload.candidateId || !payload.exp) {
+  if (!payload.interviewId || !payload.candidateId || !payload.userId || !payload.exp) {
     throw new Error("Invalid interview runtime token payload");
   }
   if (payload.exp < Math.floor(Date.now() / 1000)) {
     throw new Error("Interview runtime token expired");
+  }
+  return payload;
+}
+
+/**
+ * Verify a token AND assert that it was issued to the given Supabase user.
+ * Throws if the token is invalid/expired or if the user binding doesn't match.
+ * Use this in every route that accepts an interview runtime bearer token.
+ */
+export function verifyInterviewRuntimeTokenForUser(
+  token: string,
+  expectedUserId: string
+): InterviewTokenPayload {
+  const payload = verifyInterviewRuntimeToken(token);
+  if (payload.userId !== expectedUserId) {
+    throw new Error("Interview runtime token does not match authenticated user");
   }
   return payload;
 }

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { StartInterviewRuntimeSchema } from "@server/application/dtos";
 import db from "@server/infrastructure/database/supabase-client";
 import { camelizeKeys } from "@server/infrastructure/database/db-utils";
+import { createClient } from "@/lib/supabase/server";
 import {
   createInterviewRuntimeToken,
   hashInterviewToken,
@@ -10,6 +11,14 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
+    // Audit H5: bind the runtime token to the authenticated user so a
+    // leaked token cannot be replayed from another browser/session.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const parsed = StartInterviewRuntimeSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(
@@ -20,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const { data: candidateRow, error: candidateError } = await db
       .from("candidates")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, user_id")
       .eq("id", parsed.data.candidateId)
       .single();
 
@@ -30,10 +39,16 @@ export async function POST(request: NextRequest) {
 
     const candidate = camelizeKeys<any>(candidateRow as Record<string, unknown>);
 
+    // Only the candidate themselves may launch their interview runtime.
+    if (candidate.userId && candidate.userId !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const interviewId = randomUUID();
     const { token, expiresAt } = createInterviewRuntimeToken({
       interviewId,
       candidateId: candidate.id,
+      userId: user.id,
     });
 
     const { error: insertError } = await db.from("interview_sessions").insert({

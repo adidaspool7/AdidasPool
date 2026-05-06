@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@server/infrastructure/database/supabase-client";
 import { camelizeKeys, generateId } from "@server/infrastructure/database/db-utils";
 import { StartInterviewRealtimeSchema } from "@server/application/dtos";
+import { createClient } from "@/lib/supabase/server";
 import {
   hashInterviewToken,
-  verifyInterviewRuntimeToken,
+  verifyInterviewRuntimeTokenForUser,
 } from "@server/infrastructure/security/interview-token";
 
 type InterviewSessionPayload = {
@@ -71,7 +72,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing bearer token" }, { status: 401 });
     }
 
-    const tokenPayload = verifyInterviewRuntimeToken(token);
+    // Audit H5: token is bound to the authenticated user that issued it.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const tokenPayload = verifyInterviewRuntimeTokenForUser(token, user.id);
 
     const { data: sessionRow, error: sessionError } = await db
       .from("interview_sessions")
