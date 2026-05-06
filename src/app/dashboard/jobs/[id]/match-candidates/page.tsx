@@ -6,9 +6,9 @@ import Link from "next/link";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@client/components/ui/card";
 import { Badge } from "@client/components/ui/badge";
 import { Button } from "@client/components/ui/button";
@@ -23,23 +23,16 @@ import {
   ArrowLeft,
   Briefcase,
   CheckCircle2,
-  XCircle,
-  Loader2,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   ExternalLink,
-  SlidersHorizontal,
+  Loader2,
   MoreHorizontal,
+  RefreshCw,
   Star,
   Trash2,
+  XCircle,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@client/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +40,13 @@ import {
   DropdownMenuTrigger,
 } from "@client/components/ui/dropdown-menu";
 import { cn } from "@client/lib/utils";
+import {
+  BALANCED_PRESET,
+  type CriterionKey,
+  mergeWeights,
+} from "@client/lib/job-fit-weights";
+import { ParsedRequirementsCard } from "@client/components/match-candidates/parsed-requirements-card";
+import { MatchSettingsCard } from "@client/components/match-candidates/match-settings-card";
 
 // ============================================
 // TYPES (mirror server response)
@@ -119,82 +119,6 @@ interface ShortlistRow {
 // ============================================
 // HELPERS
 // ============================================
-
-// Per-criterion weights — must mirror server `CRITERION_KEYS` in
-// src/server/domain/services/job-fit.service.ts.
-const CRITERION_KEYS = [
-  "field",
-  "experience",
-  "seniority",
-  "requiredSkills",
-  "preferredSkills",
-  "languages",
-  "education",
-] as const;
-type CriterionKey = (typeof CRITERION_KEYS)[number];
-
-const CRITERION_LABELS: Record<CriterionKey, string> = {
-  field: "Field of Work",
-  experience: "Experience (years)",
-  seniority: "Seniority",
-  requiredSkills: "Required Skills",
-  preferredSkills: "Preferred Skills",
-  languages: "Languages",
-  education: "Education",
-};
-
-const BALANCED_PRESET: Record<CriterionKey, number> = {
-  field: 2,
-  experience: 2,
-  seniority: 1,
-  requiredSkills: 3,
-  preferredSkills: 1,
-  languages: 1,
-  education: 1,
-};
-
-const SKILLS_FIRST_PRESET: Record<CriterionKey, number> = {
-  field: 2,
-  experience: 1,
-  seniority: 1,
-  requiredSkills: 3,
-  preferredSkills: 2,
-  languages: 1,
-  education: 1,
-};
-
-const EXPERIENCE_FIRST_PRESET: Record<CriterionKey, number> = {
-  field: 3,
-  experience: 3,
-  seniority: 2,
-  requiredSkills: 1,
-  preferredSkills: 1,
-  languages: 1,
-  education: 1,
-};
-
-const PRESETS: { label: string; weights: Record<CriterionKey, number> }[] = [
-  { label: "Balanced", weights: BALANCED_PRESET },
-  { label: "Skills-first", weights: SKILLS_FIRST_PRESET },
-  { label: "Experience-first", weights: EXPERIENCE_FIRST_PRESET },
-];
-
-function mergeWeights(raw: Record<string, number> | undefined): Record<CriterionKey, number> {
-  const out: Record<CriterionKey, number> = { ...BALANCED_PRESET };
-  if (raw) {
-    for (const k of CRITERION_KEYS) {
-      const v = raw[k];
-      if (typeof v === "number" && Number.isFinite(v)) {
-        out[k] = Math.max(0, Math.min(3, v));
-      }
-    }
-  }
-  return out;
-}
-
-function weightsEqual(a: Record<CriterionKey, number>, b: Record<CriterionKey, number>): boolean {
-  return CRITERION_KEYS.every((k) => a[k] === b[k]);
-}
 
 function fitBadge(score: number) {
   if (score >= 80) return "bg-emerald-100 text-emerald-800";
@@ -552,251 +476,24 @@ export default function MatchCandidatesPage({
 
       {/* Parsed JD requirements (placed above Match Settings so HR can
           eyeball "what's the matcher scoring against?" before tuning) */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Parsed Job Requirements</CardTitle>
-              <CardDescription>What the matcher is scoring against.</CardDescription>
-            </div>
-            {data.job.sourceUrl && (
-              <a
-                href={data.job.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary hover:underline inline-flex items-center gap-1 shrink-0"
-              >
-                View on adidas Careers <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="text-sm grid gap-3 md:grid-cols-2">
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Fields of Work</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.fieldsOfWork ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.fieldsOfWork!.map((f) => (
-                  <Badge key={f} variant="secondary">{f}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Seniority / Experience</div>
-            <div>
-              {data.requirements.seniorityLevel ?? "Any"} ·{" "}
-              {data.requirements.minYearsInField != null
-                ? `${data.requirements.minYearsInField}+ yrs in field`
-                : "no minimum"}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Required Skills</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.requiredSkills ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.requiredSkills!.map((s) => (
-                  <Badge key={s} className="bg-blue-100 text-blue-800">{s}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Preferred Skills</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.preferredSkills ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.preferredSkills!.map((s) => (
-                  <Badge key={s} variant="outline">{s}</Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Languages</div>
-            <div className="flex flex-wrap gap-1">
-              {(data.requirements.requiredLanguages ?? []).length === 0 ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                data.requirements.requiredLanguages!.map((l) => (
-                  <Badge key={l.language} variant="secondary">
-                    {l.language}{l.cefr ? ` ${l.cefr}` : ""}
-                  </Badge>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Education</div>
-            <div>{data.requirements.requiredEducationLevel ?? "—"}</div>
-          </div>
-        </CardContent>
-      </Card>
+      <ParsedRequirementsCard job={data.job} requirements={data.requirements} />
 
       {/* Match Settings (HR-tunable, global). Placed below Parsed
           Requirements so HR sees "what we're matching against" first,
           then the levers to reshape the ranking, immediately above the
           ranked candidate list. */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setMatchSettingsOpen((v) => !v)}
-              className="flex items-center gap-2 text-left hover:opacity-80"
-              aria-expanded={matchSettingsOpen}
-            >
-              {matchSettingsOpen ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
-              <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-              <CardTitle className="text-base">Match Settings</CardTitle>
-            </button>
-            {matchSettingsOpen && (
-              <div className="flex items-center gap-2 ml-auto">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
-                      What is this?
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-96 text-xs">
-                    <p className="mb-2">
-                      HR-tunable weights for the 7 fit criteria. The fit score
-                      is a <strong>weighted average</strong> of the applicable
-                      criteria using these weights.
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                      <li>Set a weight to <strong>0</strong> to fully ignore that dimension.</li>
-                      <li>Eligibility ignores zero-weight criteria.</li>
-                    </ul>
-                  </PopoverContent>
-                </Popover>
-                <div className="flex items-center gap-1">
-                  {PRESETS.map((p) => {
-                    const active = weightsEqual(criterionWeightsDraft, p.weights);
-                    return (
-                      <Button
-                        key={p.label}
-                        variant={active ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setCriterionWeightsDraft({ ...p.weights })}
-                        disabled={savingConfig}
-                      >
-                        {p.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        {matchSettingsOpen && (
-        <CardContent className="pt-2 pb-4 px-4">
-          {/* Per-criterion weight sliders */}
-          <div className="grid gap-3 md:grid-cols-2">
-            {CRITERION_KEYS.map((k) => {
-              const v = criterionWeightsDraft[k];
-              const isOff = v === 0;
-              return (
-                <div key={k} className="flex items-center gap-3 text-sm">
-                  <span className={cn("w-44 shrink-0", isOff && "text-muted-foreground line-through")}>
-                    {CRITERION_LABELS[k]}
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={v}
-                    onChange={(e) =>
-                      setCriterionWeightsDraft((prev) => ({
-                        ...prev,
-                        [k]: Number(e.target.value),
-                      }))
-                    }
-                    className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
-                    disabled={savingConfig}
-                  />
-                  <span
-                    className={cn(
-                      "w-16 text-right text-xs",
-                      isOff ? "text-muted-foreground italic" : "text-blue-600"
-                    )}
-                    aria-label={isOff ? "off" : `weight ${v} of 3`}
-                    title={isOff ? "Ignored" : `Weight ${v} of 3`}
-                  >
-                    {isOff ? "off" : "★".repeat(v) + "☆".repeat(3 - v)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <Separator className="my-4" />
-
-          {/* Required-skill coverage threshold + Apply */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium">Required-skill coverage</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground">
-                    ?
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 text-xs">
-                  Minimum fraction of the Job Description&apos;s required skills
-                  a candidate must cover for the eligibility.
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={Math.round(thresholdDraft * 100)}
-                onChange={(e) => setThresholdDraft(Number(e.target.value) / 100)}
-                className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
-                disabled={savingConfig}
-              />
-              <span className="text-sm font-semibold tabular-nums w-12 text-right">
-                {Math.round(thresholdDraft * 100)}%
-              </span>
-            </div>
-            <Button
-              size="sm"
-              className="h-7 text-xs"
-              onClick={saveConfig}
-              disabled={
-                savingConfig ||
-                (Math.abs(thresholdDraft - threshold) < 0.005 &&
-                  weightsEqual(criterionWeightsDraft, criterionWeights))
-              }
-            >
-              {savingConfig ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…
-                </>
-              ) : (
-                "Apply"
-              )}
-            </Button>
-          </div>
-        </CardContent>
-        )}
-      </Card>
+      <MatchSettingsCard
+        open={matchSettingsOpen}
+        onOpenChange={setMatchSettingsOpen}
+        threshold={threshold}
+        thresholdDraft={thresholdDraft}
+        onThresholdDraftChange={setThresholdDraft}
+        weights={criterionWeights}
+        weightsDraft={criterionWeightsDraft}
+        onWeightsDraftChange={setCriterionWeightsDraft}
+        saving={savingConfig}
+        onApply={saveConfig}
+      />
 
       {/* Tabs: Ranked candidates / Shortlist */}
       <Tabs
