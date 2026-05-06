@@ -14,6 +14,9 @@
  */
 
 import OpenAI from "openai";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("LLM");
 
 export type LLMProvider = "groq" | "openai";
 
@@ -68,7 +71,7 @@ function resolveLLMConfig(): LLMConfig {
 export function getLLMConfig(): LLMConfig {
   if (!globalForLLM.llmConfig) {
     globalForLLM.llmConfig = resolveLLMConfig();
-    console.log(`[LLM] Primary provider: ${globalForLLM.llmConfig.provider} (model: ${globalForLLM.llmConfig.model})`);
+    log.info(`Primary provider: ${globalForLLM.llmConfig.provider} (model: ${globalForLLM.llmConfig.model})`);
   }
   return globalForLLM.llmConfig;
 }
@@ -86,7 +89,7 @@ export function getFallbackLLMConfig(): LLMConfig | null {
     const openai = buildOpenAIConfig();
     if (openai) {
       globalForLLM.fallbackConfig = openai;
-      console.log(`[LLM] Fallback provider ready: ${openai.provider} (model: ${openai.model})`);
+      log.info(`Fallback provider ready: ${openai.provider} (model: ${openai.model})`);
     }
   }
   return globalForLLM.fallbackConfig ?? null;

@@ -30,6 +30,9 @@ import {
 } from "./openai-client";
 import type { LLMConfig } from "./openai-client";
 import { FIELDS_OF_WORK } from "@server/domain/value-objects/fields-of-work";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("CV Parser");
 
 const CV_EXTRACTION_PROMPT = `You are a CV/resume parser. Extract structured information from the following CV text.
 
@@ -269,23 +272,23 @@ Rules:
     } catch (error) {
       if (!isRateLimitError(error)) throw error;
 
-      console.warn(
-        `[CV Parser] Rate limit hit on ${config.provider}. Attempting fallback/retry...`
+      log.warn(
+        `Rate limit hit on ${config.provider}. Attempting fallback/retry...`
       );
 
       // Strategy 1: Try fallback provider (Groq → OpenAI)
       const fallback = getFallbackLLMConfig();
       if (fallback && !this.usingFallback) {
         this.usingFallback = true;
-        console.log(
-          `[CV Parser] Switching to fallback provider: ${fallback.provider} (${fallback.model})`
+        log.info(
+          `Switching to fallback provider: ${fallback.provider} (${fallback.model})`
         );
         try {
           return await this.doLLMCall(fallback, systemPrompt, userContent, options);
         } catch (fallbackError) {
           // Log the actual fallback error for diagnosis
-          console.warn(
-            `[CV Parser] Fallback provider error: ${describeLLMError(fallbackError)}`
+          log.warn(
+            `Fallback provider error: ${describeLLMError(fallbackError)}`
           );
           // If it's a quota/billing error, don't retry — it's permanent
           if (isQuotaExhaustedError(fallbackError)) {
@@ -295,7 +298,7 @@ Rules:
           }
           if (!isRateLimitError(fallbackError)) throw fallbackError;
           // Both providers rate-limited — fall through to retry with backoff
-          console.warn(`[CV Parser] Fallback provider also rate-limited.`);
+          log.warn(`Fallback provider also rate-limited.`);
         }
       }
 
@@ -306,8 +309,8 @@ Rules:
           extractRetryAfterMs(error),
           30_000 // Cap at 30s per retry to avoid extremely long waits
         );
-        console.log(
-          `[CV Parser] Retry ${attempt}/${MAX_RETRIES} on ${retryConfig.provider} after ${(delayMs / 1000).toFixed(1)}s...`
+        log.info(
+          `Retry ${attempt}/${MAX_RETRIES} on ${retryConfig.provider} after ${(delayMs / 1000).toFixed(1)}s...`
         );
         await this.sleep(delayMs * attempt); // exponential: delay * attempt
 

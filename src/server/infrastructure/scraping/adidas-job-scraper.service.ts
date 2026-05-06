@@ -16,6 +16,9 @@ import type {
   IJobScraperService,
   ScrapedJob,
 } from "@server/domain/ports/services";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("JobScraper");
 
 const BASE_URL = "https://jobs.adidas-group.com";
 const SEARCH_URL = `${BASE_URL}/search/`;
@@ -221,14 +224,14 @@ export class AdidasJobScraperService implements IJobScraperService {
 
     // --- Pass 2: if we're still short, re-scrape with ascending sort ---
     if (allJobs.length < totalResults && maxPages === 0) {
-      console.log(
-        `[JobScraper] Pass 1 got ${allJobs.length}/${totalResults}. Running verification pass (asc sort)...`
+      log.info(
+        `Pass 1 got ${allJobs.length}/${totalResults}. Running verification pass (asc sort)...`
       );
       await this.scrapeWithSort("asc", 0, allJobs, seenIds);
     }
 
-    console.log(
-      `[JobScraper] Scraping complete. ${allJobs.length} unique jobs found (server reported ${totalResults}).`
+    log.info(
+      `Scraping complete. ${allJobs.length} unique jobs found (server reported ${totalResults}).`
     );
     return allJobs;
   }
@@ -269,8 +272,8 @@ export class AdidasJobScraperService implements IJobScraperService {
     const pagesToScrape =
       maxPages > 0 ? Math.min(maxPages, totalPages) : totalPages;
 
-    console.log(
-      `[JobScraper] [${sortDirection}] Found ${totalResults} jobs, ~${pagesToScrape} pages (step ${PAGE_STEP}, overlap ${RESULTS_PER_PAGE - PAGE_STEP}).`
+    log.info(
+      `[${sortDirection}] Found ${totalResults} jobs, ~${pagesToScrape} pages (step ${PAGE_STEP}, overlap ${RESULTS_PER_PAGE - PAGE_STEP}).`
     );
 
     let currentStep = 1;
@@ -282,28 +285,28 @@ export class AdidasJobScraperService implements IJobScraperService {
         const pageResult = await this.fetchPage(startRow, sortDirection);
         if (pageResult.jobs.length === 0) {
           consecutiveEmptyPages++;
-          console.warn(
-            `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape} returned 0 jobs (empty streak: ${consecutiveEmptyPages})`
+          log.warn(
+            `[${sortDirection}] Page ${currentStep + 1}/${pagesToScrape} returned 0 jobs (empty streak: ${consecutiveEmptyPages})`
           );
           // Three empty pages in a row strongly suggests we've walked
           // off the end of the result set or hit a server-side block.
           // Stop early rather than hammering for nothing.
           if (consecutiveEmptyPages >= 3) {
-            console.warn(
-              `[JobScraper] [${sortDirection}] Stopping early after 3 empty pages.`
+            log.warn(
+              `[${sortDirection}] Stopping early after 3 empty pages.`
             );
             break;
           }
         } else {
           consecutiveEmptyPages = 0;
           this.addUniqueJobs(allJobs, seenIds, pageResult.jobs);
-          console.log(
-            `[JobScraper] [${sortDirection}] Page ${currentStep + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total unique: ${allJobs.length})`
+          log.info(
+            `[${sortDirection}] Page ${currentStep + 1}/${pagesToScrape}: ${pageResult.jobs.length} jobs (total unique: ${allJobs.length})`
           );
         }
       } catch (err) {
-        console.error(
-          `[JobScraper] [${sortDirection}] Error fetching page ${currentStep + 1}:`,
+        log.error(
+          `[${sortDirection}] Error fetching page ${currentStep + 1}:`,
           err
         );
       }
@@ -481,13 +484,13 @@ export class AdidasJobScraperService implements IJobScraperService {
         },
       });
     } catch (err) {
-      console.warn(`[JobScraper] fetchJobDescription network error for ${url}:`, err);
+      log.warn(`fetchJobDescription network error for ${url}:`, err);
       return { status: "ERROR", body: null };
     }
 
     if (!response.ok) {
-      console.warn(
-        `[JobScraper] fetchJobDescription HTTP ${response.status} for ${url}`
+      log.warn(
+        `fetchJobDescription HTTP ${response.status} for ${url}`
       );
       return { status: "ERROR", body: null };
     }
