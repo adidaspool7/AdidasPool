@@ -41,7 +41,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .select("status");
     assertNoError(error, "analytics.getCandidatesByStatus");
 
-    const countMap = groupCount(data ?? [], (r: any) => r.status as string);
+    const countMap = groupCount(data ?? [] as { status: string }[], (r) => r.status);
     return STATUS_ORDER.map((status) => ({
       status,
       count: countMap.get(status) ?? 0,
@@ -55,7 +55,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .not("country", "is", null);
     assertNoError(error, "analytics.getCandidatesByCountry");
 
-    const countMap = groupCount(data ?? [], (r: any) => r.country as string);
+    const countMap = groupCount(data ?? [] as { country: string }[], (r) => r.country);
     return Array.from(countMap.entries())
       .map(([country, count]) => ({ country, count }))
       .sort((a, b) => b.count - a.count)
@@ -66,7 +66,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
     const { data, error } = await db.from("skills").select("name");
     assertNoError(error, "analytics.getTopSkills");
 
-    const countMap = groupCount(data ?? [], (r: any) => r.name as string);
+    const countMap = groupCount(data ?? [] as { name: string }[], (r) => r.name);
     return Array.from(countMap.entries())
       .map(([skill, count]) => ({ skill, count }))
       .sort((a, b) => b.count - a.count)
@@ -79,7 +79,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .select("language");
     assertNoError(error, "analytics.getTopLanguages");
 
-    const countMap = groupCount(data ?? [], (r: any) => r.language as string);
+    const countMap = groupCount(data ?? [] as { language: string }[], (r) => r.language);
     return Array.from(countMap.entries())
       .map(([language, count]) => ({ language, count }))
       .sort((a, b) => b.count - a.count)
@@ -92,7 +92,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .select("job_id");
     assertNoError(error, "analytics.getApplicationsPerJob");
 
-    const countMap = groupCount(data ?? [], (r: any) => r.job_id as string);
+    const countMap = groupCount(data ?? [] as { job_id: string }[], (r) => r.job_id);
     const sorted = Array.from(countMap.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit);
@@ -106,7 +106,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .in("id", jobIds);
 
     const jobMap = new Map(
-      (jobs ?? []).map((j: any) => [j.id as string, j.title as string])
+      ((jobs ?? []) as { id: string; title: string }[]).map((j) => [j.id, j.title])
     );
 
     return sorted.map(([jobId, count]) => ({
@@ -150,8 +150,8 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
     assertNoError(error, "analytics.getRecentApplicationTrend");
 
     const dailyMap = new Map<string, number>();
-    for (const row of data ?? []) {
-      const day = new Date((row as any).created_at as string)
+    for (const row of (data ?? []) as { created_at: string }[]) {
+      const day = new Date(row.created_at)
         .toISOString()
         .slice(0, 10);
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + 1);
@@ -169,7 +169,7 @@ export class SupabaseAnalyticsRepository implements IAnalyticsRepository {
       .not("overall_cv_score", "is", null);
     assertNoError(error, "analytics.getScoreDistribution");
 
-    const scores = (data ?? []).map((r: any) => r.overall_cv_score as number);
+    const scores = ((data ?? []) as { overall_cv_score: number }[]).map((r) => r.overall_cv_score);
 
     return SCORE_BUCKETS.map((b) => ({
       range: b.range,

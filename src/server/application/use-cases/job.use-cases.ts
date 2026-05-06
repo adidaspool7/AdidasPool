@@ -421,7 +421,7 @@ export class JobUseCases {
    * description body) so that Job Matching still works without ever calling
    * the LLM. Returns null when there isn't enough manual signal to be useful.
    */
-  private buildManualRequirements(job: any): JobRequirements | null {
+  private buildManualRequirements(job: Record<string, unknown>): JobRequirements | null {
     const dept: string | null =
       typeof job.department === "string" ? job.department : null;
     const skills: string[] = Array.isArray(job.requiredSkills)
@@ -818,12 +818,12 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     experienceByField,
     totalYearsExperience: Math.round(totalYears * 10) / 10,
     educationLevel,
-    languages: languages.map((l: any) => ({
+    languages: (languages as Array<{ language?: unknown; assessedLevel?: unknown; selfDeclaredLevel?: unknown }>).map((l) => ({
       language: String(l.language ?? ""),
       cefr: (l.assessedLevel as string | null) ?? (l.selfDeclaredLevel as string | null),
     })),
-    skillNames: skills
-      .map((s: any) => String(s.name ?? ""))
+    skillNames: (skills as Array<{ name?: unknown }>)
+      .map((s) => String(s.name ?? ""))
       .filter((s: string) => s.length > 0),
     // Experience job titles count as additional skill evidence — a "Team
     // Lead" title is strong support for "team management", "Marketing
@@ -831,8 +831,8 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     // excluded (too noisy / not skill-bearing). Descriptions are also
     // excluded in this pass — they often contain filler that would
     // produce false-positive matches.
-    evidenceTexts: experiences
-      .map((exp: any) => String(exp.title ?? ""))
+    evidenceTexts: (experiences as Array<{ title?: unknown }>)
+      .map((exp) => String(exp.title ?? ""))
       .filter((s: string) => s.length > 0),
     rawExperiences,
   };

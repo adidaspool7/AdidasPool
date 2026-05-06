@@ -97,29 +97,35 @@ export async function GET(request: NextRequest) {
         "CANDIDATE"
       );
       // Enrich promotional notifications with isPinned from their campaign
+      type NotificationRow = {
+        campaignId?: string | null;
+        createdAt: string;
+        [key: string]: unknown;
+      };
+      const list = notifications as NotificationRow[];
       const campaignIds = [
         ...new Set(
-          notifications.filter((n: any) => n.campaignId).map((n: any) => n.campaignId)
+          list.filter((n) => n.campaignId).map((n) => n.campaignId as string)
         ),
       ];
       const pinnedSet = new Set<string>();
       const archivedSet = new Set<string>();
       const campaigns = await Promise.all(
-        campaignIds.map((cid) => notificationUseCases.getCampaign(cid as string))
+        campaignIds.map((cid) => notificationUseCases.getCampaign(cid))
       );
       campaignIds.forEach((cid, i) => {
         const campaign = campaigns[i];
-        if (campaign?.isPinned) pinnedSet.add(cid as string);
-        if (campaign?.status === "ARCHIVED") archivedSet.add(cid as string);
+        if (campaign?.isPinned) pinnedSet.add(cid);
+        if (campaign?.status === "ARCHIVED") archivedSet.add(cid);
       });
-      const visible = notifications.filter(
-        (n: any) => !n.campaignId || !archivedSet.has(n.campaignId)
+      const visible = list.filter(
+        (n) => !n.campaignId || !archivedSet.has(n.campaignId)
       );
-      const enriched = visible.map((n: any) => ({
+      const enriched = visible.map((n) => ({
         ...n,
         isPinned: n.campaignId ? pinnedSet.has(n.campaignId) : false,
       }));
-      enriched.sort((a: any, b: any) => {
+      enriched.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
