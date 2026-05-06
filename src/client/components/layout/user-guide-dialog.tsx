@@ -12,6 +12,7 @@ import {
 import { cn } from "@client/lib/utils";
 import type { UserRole } from "@client/components/providers/role-provider";
 import { hrGuideSections } from "./user-guide-content-hr";
+import { candidateGuideSections } from "./user-guide-content-candidate";
 
 interface GuideSection {
   id: string;
@@ -139,15 +140,3 @@ export function UserGuideDialog({ role }: { role: UserRole }) {
     </Dialog>
   );
 }
-
-const candidateGuideSections: GuideSection[] = [
-  {
-    id: "coming-soon",
-    title: "Coming soon",
-    body: (
-      <p className="text-muted-foreground">
-        The candidate guide is being prepared and will be available shortly.
-      </p>
-    ),
-  },
-];

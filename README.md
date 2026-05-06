@@ -233,7 +233,8 @@ npm test
 | [AppReport/08_Testing_Strategy.md](AppReport/08_Testing_Strategy.md) | Test inventory + coverage |
 | [AppReport/09_Security_Infrastructure.md](AppReport/09_Security_Infrastructure.md) | Auth, RLS, env vars, security posture |
 | [AppReport/10_UI_UX_Design.md](AppReport/10_UI_UX_Design.md) | UI/UX design system |
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | End-user guide (candidate + HR) |
+| [docs/USER_GUIDE_HR.md](docs/USER_GUIDE_HR.md) | End-user guide — HR managers |
+| [docs/USER_GUIDE_CANDIDATE.md](docs/USER_GUIDE_CANDIDATE.md) | End-user guide — candidates |
 | [docs/talent_intelligence_...spec.md](docs/talent_intelligence_language_verification_platform_spec.md) | Original project specification |
 | [claude-docs/CLAUDE_PROJECT_TRACKER.md](claude-docs/CLAUDE_PROJECT_TRACKER.md) | Development progress tracker (Sessions 1–21) |
 

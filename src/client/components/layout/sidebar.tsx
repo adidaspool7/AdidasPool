@@ -131,7 +131,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
         </div>
         <div>
           <h1 className="text-sm font-semibold">Talent Intelligence</h1>
-          <p className="text-xs text-muted-foreground">Platform</p>
+          <p className="text-xs text-muted-foreground">Platform v0.2</p>
         </div>
       </div>
 
@@ -215,9 +215,6 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
           <LogOut className="h-4 w-4" />
           Sign out
         </button>
-        <p className="text-xs text-muted-foreground px-3">
-          Talent Intelligence v0.1
-        </p>
       </div>
     </>
   );

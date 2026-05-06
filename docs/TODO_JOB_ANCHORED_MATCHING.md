@@ -107,7 +107,7 @@ Deferred into Phase 3 where it fits naturally with the new matcher wiring:
 - [ ] `AppReport/05_Database_Design.md` — add `jobs.parsed_requirements` + `experiences.fields_of_work`.
 - [ ] `AppReport/06_Features_Implementation.md` — split "Candidate Evaluation" vs "Job Matching" sections with the new semantics. Also note the Candidates page Assessments column (2026-04-27).
 - [ ] `AppReport/07_API_Documentation.md` — document `/api/jobs/[id]/match-candidates`.
-- [ ] `docs/USER_GUIDE.md` — rewrite HR workflow to "open a job → see ranked candidates" flow.
+- [ ] `docs/USER_GUIDE_HR.md` — rewrite HR workflow to "open a job → see ranked candidates" flow.
 
 ## Definition of done (whole initiative)
 
