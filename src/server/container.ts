@@ -3,8 +3,8 @@
  *
  * ONION LAYER: Composition Root (outermost — wires everything together)
  *
- * All Prisma repositories have been replaced with Supabase equivalents.
- * The domain ports (interfaces) are unchanged — only the implementations changed.
+ * All persistence is via Supabase repositories. The domain ports define
+ * the contracts; only the infrastructure implementations are swappable.
  */
 
 // Infrastructure implementations

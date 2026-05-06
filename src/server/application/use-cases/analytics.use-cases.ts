@@ -5,7 +5,6 @@
  * DEPENDENCIES: Domain ports (inward only)
  *
  * Orchestrates analytics data retrieval.
- * Replaces direct Prisma usage in the analytics API route.
  */
 
 import type { IAnalyticsRepository } from "@server/domain/ports/repositories";

@@ -2,7 +2,6 @@
  * Supabase Parsing Job Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaParsingJobRepository
  */
 
 import db from "./supabase-client";

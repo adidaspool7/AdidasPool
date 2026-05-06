@@ -2,7 +2,6 @@
  * Supabase Assessment Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaAssessmentRepository
  */
 
 import db from "./supabase-client";

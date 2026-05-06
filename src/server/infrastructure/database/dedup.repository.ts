@@ -2,7 +2,6 @@
  * Supabase Deduplication Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaDeduplicationRepository
  */
 
 import db from "./supabase-client";

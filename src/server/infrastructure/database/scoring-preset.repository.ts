@@ -2,7 +2,6 @@
  * Supabase Scoring Preset Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaScoringPresetRepository
  */
 
 import db from "./supabase-client";

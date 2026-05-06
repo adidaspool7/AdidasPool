@@ -2,7 +2,6 @@
  * Supabase Scoring Weights Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaScoringWeightsRepository
  */
 
 import db from "./supabase-client";

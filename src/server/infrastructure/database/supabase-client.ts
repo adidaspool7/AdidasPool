@@ -5,7 +5,6 @@
  *
  * Uses the service role key — bypasses RLS.
  * Never expose this client to the browser.
- * Replaces the Prisma client singleton.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

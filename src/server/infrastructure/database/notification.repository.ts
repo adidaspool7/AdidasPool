@@ -2,7 +2,6 @@
  * Supabase Notification Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaNotificationRepository
  */
 
 import db from "./supabase-client";

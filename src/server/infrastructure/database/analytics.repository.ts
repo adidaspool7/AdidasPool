@@ -2,7 +2,6 @@
  * Supabase Analytics Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaAnalyticsRepository
  *
  * Note: Supabase JS doesn't support GROUP BY directly. Aggregations
  * are performed in-memory after fetching the relevant columns.

@@ -2,7 +2,6 @@
  * Supabase Candidate Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaCandidateRepository
  */
 
 import db from "./supabase-client";

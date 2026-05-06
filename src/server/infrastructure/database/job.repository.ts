@@ -2,7 +2,6 @@
  * Supabase Job Repository
  *
  * ONION LAYER: Infrastructure
- * REPLACES: PrismaJobRepository
  */
 
 import db from "./supabase-client";
