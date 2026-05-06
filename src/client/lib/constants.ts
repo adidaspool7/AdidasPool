@@ -1,34 +1,13 @@
 /**
- * Consolidated list of fields of work / departments extracted from
- * 1 019 synced adidas job openings.
+ * Fields of work / departments.
  *
- * Overlapping entries have been merged:
- *   - "Retail" + "Retail (Store)" → "Retail"
- *   - "Finance" + "Accounting & Finance" → "Finance"
- *   - "Supply Chain & Sourcing" + "Supply Chain Management" → "Supply Chain & Sourcing"
- *
- * Sorted alphabetically.
+ * Canonical source of truth lives in the domain layer
+ * (`@server/domain/value-objects/fields-of-work`). Re-exported here so
+ * existing client code keeps importing from `@client/lib/constants`
+ * without violating the layering rule (server modules now import from
+ * the domain module directly).
  */
-export const FIELDS_OF_WORK = [
-  "Brand Management & Communications",
-  "Corporate Services",
-  "Data",
-  "Design",
-  "Digital",
-  "Finance",
-  "General Management & Business Development",
-  "Legal & Regulatory",
-  "Merchandising & Planning",
-  "People & Culture",
-  "Product Development & Operations",
-  "Real Estate & Facilities",
-  "Retail",
-  "Sales",
-  "Supply Chain & Sourcing",
-  "Technology",
-] as const;
-
-export type FieldOfWork = (typeof FIELDS_OF_WORK)[number];
+export { FIELDS_OF_WORK, type FieldOfWork } from "@server/domain/value-objects/fields-of-work";
 
 /**
  * ISO 3166-1 alpha-2 code -> full English country name.

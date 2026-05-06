@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { FIELDS_OF_WORK } from "@/client/lib/constants";
+import { FIELDS_OF_WORK } from "@server/domain/value-objects/fields-of-work";
 
 /**
  * Current schema version. Bump when the shape changes incompatibly OR when

@@ -29,7 +29,7 @@ import {
   extractRetryAfterMs,
 } from "./openai-client";
 import type { LLMConfig } from "./openai-client";
-import { FIELDS_OF_WORK } from "@client/lib/constants";
+import { FIELDS_OF_WORK } from "@server/domain/value-objects/fields-of-work";
 
 const CV_EXTRACTION_PROMPT = `You are a CV/resume parser. Extract structured information from the following CV text.
 

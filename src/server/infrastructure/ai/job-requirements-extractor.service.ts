@@ -23,7 +23,7 @@ import {
   JOB_REQUIREMENTS_SCHEMA_VERSION,
   type JobRequirements,
 } from "@server/domain/services/job-requirements.schema";
-import { FIELDS_OF_WORK } from "@/client/lib/constants";
+import { FIELDS_OF_WORK } from "@server/domain/value-objects/fields-of-work";
 import {
   getLLMConfig,
   getFallbackLLMConfig,
