@@ -32,6 +32,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@client/components/ui/sheet";
+import { UserGuideDialog } from "./user-guide-dialog";
 
 // ============================================
 // NAVIGATION DEFINITIONS PER ROLE
@@ -206,6 +207,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
 
       {/* Footer */}
       <div className="border-t p-4 space-y-2">
+        <UserGuideDialog role={role} />
         <button
           onClick={clearRole}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
