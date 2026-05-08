@@ -1166,14 +1166,7 @@ export default function CandidatesPage() {
                                   >
                                     {decisionLabel}
                                   </span>
-                                ) : (
-                                  <span
-                                    title="No hiring decision yet"
-                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground/60"
-                                  >
-                                    No decision
-                                  </span>
-                                )}
+                                ) : null}
                               </div>
                             );
                           })()}
