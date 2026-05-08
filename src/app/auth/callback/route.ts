@@ -106,7 +106,27 @@ export async function GET(request: Request) {
     const appRole = user.app_metadata?.role;
 
     if (appRole === "candidate" || appRole === "hr") {
-      // Role already set — keep it
+      // Role already set — but reject if the user tried to sign in under the
+      // OPPOSITE role. An account is bound to one role for life: an HR user
+      // clicking "Login as Candidate" (or vice versa) must NOT be silently
+      // logged in under their stored role.
+      if (role && role !== appRole) {
+        await supabase.auth.signOut();
+
+        const errorUrl = new URL(`${origin}/auth/error`);
+        errorUrl.searchParams.set("reason", "role_mismatch");
+        errorUrl.searchParams.set("registered", appRole);
+        errorUrl.searchParams.set("attempted", role);
+
+        const mismatchResponse = NextResponse.redirect(errorUrl);
+        // Forward sign-out cookies (clears the session)
+        responseCookies.forEach(({ name, value, options }) => {
+          mismatchResponse.cookies.set(name, value, options);
+        });
+        mismatchResponse.cookies.set("pending_role", "", { path: "/", maxAge: 0 });
+        return mismatchResponse;
+      }
+      // Otherwise: same role (or no role hint sent) — keep the stored role.
     } else {
       // Determine the role: URL param → legacy user_metadata → fallback
       const newRole =
