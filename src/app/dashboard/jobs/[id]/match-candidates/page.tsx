@@ -39,7 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@client/components/ui/dropdown-menu";
-import { cn } from "@client/lib/utils";
+import { cn, formatLocation } from "@client/lib/utils";
 import {
   BALANCED_PRESET,
   type CriterionKey,
@@ -779,7 +779,7 @@ function ShortlistTab({
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{fullName || "Unnamed candidate"}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {[r.candidate.location, r.candidate.country].filter(Boolean).join(" · ") || "—"}
+                      {formatLocation(r.candidate.location, r.candidate.country, " · ") || "—"}
                       {r.addedBy && (
                         <>
                           {" "}· Added by{" "}

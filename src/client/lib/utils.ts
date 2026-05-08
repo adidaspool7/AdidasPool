@@ -36,3 +36,33 @@ export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + "...";
 }
+
+/**
+ * Format a candidate's location + country without duplicating the country.
+ *
+ * CV parsing often persists the country both at the tail of `location`
+ * (e.g. "Porto, Portugal") and again in the dedicated `country` field
+ * ("Portugal"), which produced ugly strings like "Porto, Portugal, Portugal".
+ *
+ * @param separator Defaults to `", "`. Pass `" · "` for compact rows.
+ */
+export function formatLocation(
+  location: string | null | undefined,
+  country: string | null | undefined,
+  separator: string = ", "
+): string {
+  const loc = (location ?? "").trim();
+  const ctry = (country ?? "").trim();
+  if (!loc) return ctry;
+  if (!ctry) return loc;
+  const locLower = loc.toLowerCase();
+  const ctryLower = ctry.toLowerCase();
+  if (
+    locLower === ctryLower ||
+    locLower.endsWith(`, ${ctryLower}`) ||
+    locLower.endsWith(` ${ctryLower}`)
+  ) {
+    return loc;
+  }
+  return `${loc}${separator}${ctry}`;
+}

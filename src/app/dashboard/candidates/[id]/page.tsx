@@ -14,6 +14,7 @@ import { Button } from "@client/components/ui/button";
 import { Separator } from "@client/components/ui/separator";
 import { Skeleton } from "@client/components/ui/skeleton";
 import { Progress } from "@client/components/ui/progress";
+import { formatLocation } from "@client/lib/utils";
 import {
   Tabs,
   TabsContent,
@@ -718,7 +719,7 @@ export default function CandidateDetailPage({
                 {(c.location || c.country) && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />{" "}
-                    {[c.location, c.country].filter(Boolean).join(", ")}
+                    {formatLocation(c.location, c.country)}
                   </span>
                 )}
                 {c.linkedinUrl && (

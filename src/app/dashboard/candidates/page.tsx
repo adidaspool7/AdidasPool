@@ -70,6 +70,7 @@ import {
   Send,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
+import { formatLocation } from "@client/lib/utils";
 import { useRole } from "@client/components/providers/role-provider";
 import { Textarea } from "@client/components/ui/textarea";
 import { Label } from "@client/components/ui/label";
@@ -1116,7 +1117,7 @@ export default function CandidatesPage() {
                           )}
                           {(c.location || c.country) && (
                             <p className="text-[11px] text-muted-foreground">
-                              {[c.location, c.country].filter(Boolean).join(", ")}
+                              {formatLocation(c.location, c.country)}
                             </p>
                           )}
                           {/* Funnel chips — compact pipeline stage at a glance */}
