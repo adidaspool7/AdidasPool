@@ -1,0 +1,56 @@
+\chapter{Conclusions}
+\label{cap:conclusions}
+
+% TARGET LENGTH: ~4 pages.
+
+\section{Summary of Contributions}
+\label{sec:concl-summary}
+
+% Recap the four contributions stated in Chapter 1; tie each one to
+% concrete deliverables (architecture, codebase, tests, documentation).
+
+\section{Goals Achieved}
+\label{sec:concl-goals}
+
+% Walk through the seven objectives from Section 1.3 with a one-line
+% verdict per objective and a pointer to the chapter where it was
+% delivered.
+
+\section{Lessons Learned}
+\label{sec:concl-lessons}
+
+\subsection{Product Owner Lessons in a Two-Person Team}
+% Discuss the tension of being PO and main implementer. How backlog
+% ordering was kept client-driven. How sprint reviews became the main
+% mechanism for the teammate to push back on PO decisions. The risk of
+% scope creep when the same person holds both roles.
+
+\subsection{Architectural Lessons}
+% The onion rule paid off the moment the AI Interviewer had to be
+% extracted into a separate process. The cost of "no ORM" (manual
+% camelize/snakeify) was real but bounded; type safety filled the gap.
+
+\subsection{AI Lessons}
+% Structured-output prompting beats free-form for any field that has to
+% land in a database. Schema versioning of LLM outputs is a must.
+% Fallback providers are a reliability tool, not a luxury.
+
+\section{Limitations}
+\label{sec:concl-limitations}
+
+% Sample-size limits of the validation survey; coverage gaps in some
+% use-case modules; reliance on browser-native STT/TTS; manual
+% right-to-erasure flow.
+
+\section{Future Work}
+\label{sec:concl-future}
+
+% Backlog from docs/audit-6-5-2026.md items #2--#14; right-to-erasure
+% automation; expansion of the analytics widget catalogue; offline
+% transcription via Whisper for browsers without Web Speech API;
+% multi-tenant separation (organisation-level data isolation).
+
+\section{Closing Remarks}
+\label{sec:concl-closing}
+
+% Brief, sober closing paragraph.

@@ -1,0 +1,241 @@
+\chapter{Introduction}
+\label{cap:introduction}
+
+This report documents the design, implementation and validation of the
+\emph{Talent Intelligence and Language Verification Platform}, a web
+application built during the BlendEd program in partnership with adidas
+Global Business Services (GBS) Porto, in the context of the LEI-PROJ
+(PESTI) project unit of the Bachelor's Degree in Computer Engineering at
+the Instituto Superior de Engenharia do Porto.
+
+The platform addresses an everyday tension faced by recruitment teams that
+operate under European data protection law. On one hand, hiring volumes are
+high and recruiters spend a substantial share of their time triaging
+\textit{Curricula Vitae}, screening for language proficiency and tracking
+status changes across spreadsheets and email threads. On the other hand,
+the General Data Protection Regulation (\gls{gdpr}) constrains how long
+candidate data may be retained after a process closes, which forces
+periodic deletions and turns institutional memory into a liability rather
+than an asset. The work presented here proposes a structured talent pool
+backed by automated CV parsing, job-anchored matching, and a Large Language
+Model (\gls{llm}) based assessment module that together help HR teams
+extract value from candidate data within the time window the law allows,
+and re-engage promising candidates in a compliant way.
+
+%----------------------------------------------------------------------------------------
+
+\section{Context}
+\label{sec:context}
+
+The BlendEd program is a partnership between Portuguese higher education
+institutions and adidas GBS Porto in which student teams design and
+implement software solutions for problems sourced from the company's day-to-day
+operations. The team behind this project (two members) was assigned to the
+HR / Talent Acquisition area at adidas GBS Porto with a deliberately broad
+brief: to identify recurring frictions in the recruitment workflow and to
+propose a tool that improves them.
+
+Discovery sessions with the client surfaced a pattern that runs across most
+of their processes. Candidate data is rich and heterogeneous (CVs in
+multiple formats, scattered emails, spreadsheets per campaign, ad-hoc
+language self-assessments) but it is not stored in a way that supports
+analysis or reuse. The same information has to be re-extracted from CVs
+every time a new opening is published, recruiters cannot easily tell
+whether a candidate has applied before, and there is no consistent way to
+verify language proficiency before a first interview. The six-month
+retention rule imposed by \gls{gdpr} amplifies all of these problems: the
+moment a process closes, the institutional memory it generated starts a
+countdown.
+
+This project is therefore positioned at the intersection of three concerns
+that recruitment software rarely addresses simultaneously: HR productivity
+(reducing manual CV analysis time and giving recruiters analytics-ready
+views), candidate experience (proactive communication and feedback paths
+for candidates not selected) and regulatory compliance (a deletion-aware
+data model and a contact-history audit trail).
+
+%----------------------------------------------------------------------------------------
+
+\section{Problem Statement}
+\label{sec:problem}
+
+The HR teams interviewed during the discovery phase reported nine concrete
+pain points, summarised in
+Table~\ref{tab:pain-points-overview}. These were validated through repeated
+client meetings and an instrumented survey with one question per pain
+point.
+
+\begin{table}[h]
+\centering
+\caption[Pain points identified during client discovery]{Pain points
+identified during client discovery, as documented in
+\textit{TalentPool-client\_pain\_points.md} (29\textsuperscript{th} April 2026).}
+\label{tab:pain-points-overview}
+\begin{tabular}{p{0.05\linewidth}p{0.85\linewidth}}
+\toprule
+\textbf{\#} & \textbf{Pain point} \\
+\midrule
+1 & No structured way to organise candidate information; spreadsheets are still common \\
+2 & Difficult to know whether a candidate has applied before, made worse by the GDPR six-month rule \\
+3 & No first-pass screening for language or other skills before the first interview \\
+4 & No structured channel to contact candidates (status changes, opportunities, campaigns) \\
+5 & Significant time spent extracting basic information from each CV manually \\
+6 & No quick, organised view of the recruitment pipeline \\
+7 & No data-driven way to decide where to focus future recruitment efforts \\
+8 & Existing tools do not feel like they reduce repetitive work \\
+9 & No structured process to keep promising-but-rejected candidates engaged \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The problem this project addresses can therefore be stated as follows:
+
+\begin{quote}
+\textit{How can a small HR team manage a structured pool of candidates --- including
+CV-derived facts, language proficiency, application history and outbound
+communications --- in a way that is efficient under high volume, compliant
+with GDPR retention obligations, and useful both for individual hiring
+decisions and for strategic planning?}
+\end{quote}
+
+%----------------------------------------------------------------------------------------
+
+\section{Objectives}
+\label{sec:objectives}
+
+The project pursues seven objectives, derived directly from the pain points
+above and refined during sprint planning with the client:
+
+\begin{enumerate}
+	\item \textbf{Centralise candidate data.} Replace ad-hoc spreadsheets
+	with a relational, GDPR-aware talent pool storing CV-derived facts,
+	application history, languages, skills, notes and assessment results.
+
+	\item \textbf{Automate CV ingestion.} Parse uploaded CVs with a
+	\gls{llm} pipeline (Groq Llama~3.3 70B as primary, OpenAI GPT-4o as
+	fallback) that extracts structured experience, education, languages,
+	skills and a per-experience field-of-work tag.
+
+	\item \textbf{Provide job-anchored matching.} Score candidates against
+	specific job descriptions using a rule-based fit algorithm
+	(\textit{computeJobFit}) that combines field of work, seniority,
+	required and preferred skills, languages and education, and that
+	exposes per-criterion explanations.
+
+	\item \textbf{Verify language proficiency.} Offer an AI-driven
+	conversational interview that returns a Common European Framework of
+	Reference (\gls{cefr}) level along with grammar, vocabulary and
+	fluency sub-scores, plus a separate technical-skill interview mode.
+
+	\item \textbf{Empower HR communication.} Build a notification and
+	campaign system with full interaction history per candidate, including
+	manually composed emails, status changes and promotional outreach.
+
+	\item \textbf{Make the pipeline measurable.} Provide both built-in
+	dashboards and a custom widget builder so HR can observe pipeline
+	health and slice the data along whitelisted dimensions.
+
+	\item \textbf{Respect compliance and security.} Enforce an
+	authentication-and-authorisation model that gates HR-only operations
+	server-side, and adopt a deletion-aware data model that aligns with
+	the six-month GDPR retention rule.
+\end{enumerate}
+
+%----------------------------------------------------------------------------------------
+
+\section{Approach}
+\label{sec:approach}
+
+The project followed an incremental, Scrum-based delivery cycle over the
+academic year, with the author acting as Product Owner and the second team
+member, Stratos Demertzoglou, owning the AI Interviewer sidecar (a Python
+\textit{FastAPI} service) end to end. All other modules --- frontend,
+Next.js API routes, database schema, CV parsing pipeline, matching engine,
+notifications, analytics and CI/CD --- were designed and implemented by
+the author.
+
+The technological choices were guided by the brief: a small two-person
+team, a tight academic deadline, and the need for production-grade
+deployment. The platform is implemented as a Next.js 16 application
+written in TypeScript, deployed on Vercel, and backed by a Supabase
+PostgreSQL database with Supabase Auth (Google OAuth). The codebase
+follows an onion / clean architecture (\gls{onion}) in which the Domain
+layer has zero external dependencies and Use Cases never import from
+infrastructure --- a discipline that proved decisive when the AI
+Interviewer module had to be slotted in as a separate process. Validation
+combines automated unit and integration testing with Vitest, manual
+acceptance testing with the client, and a structured feedback survey
+mapped one-to-one onto the nine pain points.
+
+The contributions claimed by this work are:
+
+\begin{itemize}
+	\item A reference architecture for an AI-assisted recruitment platform
+	that respects GDPR retention rules without sacrificing analytical
+	value.
+	\item A reproducible job-anchored fit algorithm that is auditable
+	per-criterion (as opposed to opaque embedding-based ranking),
+	implemented as a pure function with full unit-test coverage.
+	\item A dual-mode AI interviewer (technical skill validation and
+	CEFR-grade language assessment) integrated into a Next.js application
+	through a hardened HMAC-signed token contract.
+	\item A documented project-management experience report from a
+	two-person team using Scrum, with the author serving as Product Owner.
+\end{itemize}
+
+%----------------------------------------------------------------------------------------
+
+\section{Team Composition and Personal Contribution}
+\label{sec:team}
+
+The project was developed by a team of two:
+
+\begin{description}
+	\item[Fernando Regalado Lobo Ribeiro (author):] Product Owner;
+	full-stack engineer; responsible for client discovery, requirements,
+	architecture, database design, the entire Next.js application
+	(frontend, API routes, use cases, repositories, AI parsing pipeline,
+	matching engine, notifications, analytics, security, CI/CD,
+	deployment), automated testing and the writing of this report.
+
+	\item[Stratos Demertzoglou:] AI engineer; responsible for the AI
+	Interviewer FastAPI service: the conversational orchestration loop,
+	the CEFR evaluator, the system prompts for both technical and
+	language modes, and the integration contract consumed by the
+	Next.js side.
+\end{description}
+
+The split was negotiated explicitly during sprint zero, codified in the
+product backlog as a module boundary, and re-confirmed at every sprint
+review. Because the author was simultaneously Product Owner and the main
+implementer, the role had to be exercised carefully: backlog ordering had
+to remain client-driven and not author-driven, and integration risk
+between the two modules was mitigated through a documented HTTP contract
+and a shared session-token scheme described in
+Chapter~\ref{cap:design}.
+
+%----------------------------------------------------------------------------------------
+
+\section{Document Structure}
+\label{sec:structure}
+
+The remainder of this report is organised as follows.
+Chapter~\ref{cap:state-of-the-art} reviews the state of the art in
+recruitment software, AI-assisted CV parsing, conversational language
+assessment and the regulatory landscape that shapes them.
+Chapter~\ref{cap:analysis} analyses the problem in depth, formalises the
+requirements and describes the project-management approach and the team
+dynamics.
+Chapter~\ref{cap:design} presents the solution design: the architecture,
+domain model, database schema, matching algorithm and the AI Interviewer
+contract.
+Chapter~\ref{cap:implementation} walks through the implementation,
+covering the technology stack, the most relevant features and the
+trade-offs encountered along the way.
+Chapter~\ref{cap:validation} reports verification and validation results,
+including automated test coverage, security review and the client-facing
+survey.
+Chapter~\ref{cap:conclusions} closes the report with conclusions, an
+honest assessment of limitations and a roadmap for future work.
+The bibliography and a set of appendices --- detailed database schema,
+full API reference, and the survey instrument --- complete the document.

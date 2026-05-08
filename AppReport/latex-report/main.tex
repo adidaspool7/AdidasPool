@@ -1,0 +1,91 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Talent Intelligence & Language Verification Platform
+% LEI-PROJ (PESTI) project report
+% Author: Fernando Regalado Lobo Ribeiro (1060064)
+% Academic year: 2025/2026
+%
+% Built on the PESTI/ISEP report class (April 2024 / March 2025).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[
+	11pt,
+	english,        % language switch (en labels everywhere)
+	singlespacing,
+	parskip,
+	nohyperreflinkcolor,
+]{PESTI-style}
+
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=newest}
+
+% --- Citation style (Harvard-like, recommended by the template) -------------
+\usepackage[style=authoryear-comp,backend=biber]{biblatex}
+\addbibresource{mainbibliography.bib}
+
+\makeglossaries
+
+%----------------------------------------------------------------------------------------
+%	REPORT INFORMATION
+%----------------------------------------------------------------------------------------
+
+\thesistitle{Talent Intelligence and Language Verification Platform}
+
+\thesisinstitution{adidas GBS Porto --- BlendEd Program}
+
+\thesisacademicyear{2025/2026}
+
+\studentname{Fernando Regalado Lobo Ribeiro}
+
+\studentnumber{1060064}
+
+\supervisor{Nuno Escudeiro}
+
+% No external supervisor for this project.
+%\externalsupervisor{}
+
+\examdate{June 2026}
+
+\keywords{Talent Pool, Recruitment, AI, Large Language Models, GDPR, Language Assessment, CEFR}
+
+\hypersetup{pdftitle=\ttitle}
+\hypersetup{pdfauthor=\authorname}
+\hypersetup{pdfkeywords=\keywordnames}
+
+%----------------------------------------------------------------------------------------
+%	DOCUMENT
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+% Front matter (cover, statement, abstract, ToC, glossary, ...)
+\input{frontmatter/frontmatter}
+
+%----------------------------------------------------------------------------------------
+%	BODY
+%----------------------------------------------------------------------------------------
+
+\input{chapters/ch1/chapter1} % Introduction
+\input{chapters/ch2/chapter2} % State of the Art
+\input{chapters/ch3/chapter3} % Analysis & Methodology
+\input{chapters/ch4/chapter4} % Solution Design
+\input{chapters/ch5/chapter5} % Implementation
+\input{chapters/ch6/chapter6} % Verification & Validation
+\input{chapters/ch7/chapter7} % Conclusions
+
+%----------------------------------------------------------------------------------------
+%	BIBLIOGRAPHY
+%----------------------------------------------------------------------------------------
+
+\printbibliography[heading=bibintoc]
+
+%----------------------------------------------------------------------------------------
+%	APPENDICES
+%----------------------------------------------------------------------------------------
+
+\appendix
+\input{appendices/appendixA} % Detailed database schema
+\input{appendices/appendixB} % API reference
+\input{appendices/appendixC} % Survey & client meeting evidence
+
+\end{document}

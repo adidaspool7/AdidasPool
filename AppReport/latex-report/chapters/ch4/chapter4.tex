@@ -1,0 +1,88 @@
+\chapter{Solution Design}
+\label{cap:design}
+
+% TARGET LENGTH: ~12 pages.
+% Sources: AppReport/04_Architecture_Design.md, 05_Database_Design.md,
+% 09_Security_Infrastructure.md.
+
+\section{Architectural Overview}
+\label{sec:design-overview}
+
+% C4 Level 1 (system context) and Level 2 (containers). Two containers:
+% Next.js application + Supabase managed services + FastAPI sidecar.
+
+\section{Onion / Clean Architecture}
+\label{sec:design-onion}
+
+% Layer diagram: Domain (no deps) -> Application (use cases) ->
+% Infrastructure (repos, AI services, storage) -> Presentation (API
+% routes, React components). Dependency rule. Examples.
+
+\section{Domain Model}
+\label{sec:design-domain}
+
+% Core entities: Candidate, Experience, Education, Language, Skill,
+% Job, JobApplication, JobMatch, JobShortlist, AssessmentTemplate,
+% AssessmentResult, InterviewSession, ImprovementTrack, Notification,
+% PromoCampaign, ParsingJob.
+
+\section{Database Design}
+\label{sec:design-database}
+
+% ERD. Naming convention (snake_case in DB, camelCase in JS via
+% camelizeKeys / snakeifyKeys). JSONB usage and the JSONB_KEYS opt-out.
+% IDs: TEXT PRIMARY KEY + crypto.randomUUID(). updated_at trigger.
+% Why RLS is disabled and how access control is enforced.
+
+\section{Job-Anchored Matching Algorithm}
+\label{sec:design-matching}
+
+% Two scores: Quality (CV intrinsic) vs Fit (per-job).
+% computeJobFit() criteria: field of work, experience-in-field,
+% seniority, required/preferred skills, languages, education.
+% Aggregation: average of applicable criteria; isEligible = AND of
+% applicable.met. Persistence in job_matches as a cache.
+
+\section{AI Pipelines}
+\label{sec:design-ai}
+
+\subsection{CV Parsing Pipeline}
+% Storage upload -> text extraction -> Groq Llama 3.3 70B prompt with
+% structured-output schema -> Zod validation -> persistence.
+% Fallback to OpenAI GPT-4o on Groq failure. Telemetry table.
+
+\subsection{Job Description Extractor}
+% JobRequirementsExtractorService with versioned schema
+% (JOB_REQUIREMENTS_SCHEMA_VERSION). Lazy parsing on first HR open of
+% "Rank candidates" page.
+
+\subsection{AI Interviewer (FastAPI Sidecar)}
+% Architecture diagram: popup browser window <-> Next.js API routes
+% <-> Python FastAPI. HMAC-SHA256 session token (10-min TTL).
+% Dual mode: TECHNICAL vs LANGUAGE.
+% Evaluator output schema (cefr_level, grammar, vocabulary, fluency).
+
+\section{Security and Compliance}
+\label{sec:design-security}
+
+\subsection{Authentication and Authorisation}
+% Supabase Google OAuth. app_metadata.role server-set on first sign-in.
+% Middleware gating: 401 unauth, 403 non-HR on HR_ONLY_API_PREFIXES.
+
+\subsection{GDPR Alignment}
+% Six-month retention; deletion-aware design. Interaction history audit
+% trail. Right of access via candidate dashboard.
+
+\section{Frontend Design}
+\label{sec:design-frontend}
+
+% shadcn/ui + Tailwind. Information architecture for the HR dashboard
+% vs candidate dashboard. Component library decisions.
+
+\section{Design Decision Log}
+\label{sec:design-decisions}
+
+% Compact table of decisions: choice, alternatives considered, rationale,
+% trade-off accepted. Examples: Supabase over Neon+Prisma; Groq primary
+% over OpenAI; FastAPI sidecar over in-process JS for AI Interviewer;
+% rule-based job fit over embedding similarity.

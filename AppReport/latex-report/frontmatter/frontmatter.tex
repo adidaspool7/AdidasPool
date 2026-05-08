@@ -1,0 +1,156 @@
+% Glossary entries (single-source-of-truth file)
+\input{frontmatter/glossary}
+
+\frontmatter % roman page numbering until the body starts
+
+\pagestyle{plain}
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+\maketitlepage
+
+%----------------------------------------------------------------------------------------
+%	STATEMENT OF INTEGRITY
+%----------------------------------------------------------------------------------------
+\integritystatement
+
+%----------------------------------------------------------------------------------------
+%	DEDICATION (optional)
+%----------------------------------------------------------------------------------------
+\begin{dedicatory}
+To my family, who quietly carried the weight of every late evening this report cost.
+\end{dedicatory}
+
+%----------------------------------------------------------------------------------------
+%	ABSTRACT (English)
+%----------------------------------------------------------------------------------------
+\begin{abstract}
+
+Recruitment teams operating under European data protection law face a recurring
+contradiction: the General Data Protection Regulation forces the deletion of
+candidate data after six months, yet recruiters still need to recognise
+returning candidates, re-engage promising profiles, and screen large CV
+batches under tight deadlines. This report describes the design and
+implementation of a Talent Intelligence and Language Verification Platform
+developed during the BlendEd program in partnership with adidas GBS Porto, a
+web application that combines a structured talent pool, automated CV parsing,
+job-anchored candidate matching, and an AI-driven language and skill
+assessment module.
+
+The work documented here covers the full lifecycle of the project: client
+discovery and pain-point analysis, requirements engineering, architectural
+design following onion / clean principles, database modelling on Supabase
+PostgreSQL, integration of two Large Language Models (Groq Llama~3.3 70B as
+primary and OpenAI GPT-4o as fallback) for CV parsing, job-description
+extraction and conversational interviewing, and the deployment of a
+production-grade Next.js application on Vercel. The platform was delivered by
+a two-person team using Scrum, with the author acting as Product Owner and
+implementing every module except the AI Interviewer FastAPI sidecar
+(developed by the second team member). Validation combines automated testing
+(259 unit tests at the time of writing), a Supabase security advisor sweep,
+and a structured client-feedback survey informed by nine documented pain
+points.
+
+The resulting platform replaces ad-hoc spreadsheets with a structured,
+analytics-ready talent pool, reduces manual CV-screening time, and introduces
+a reproducible CEFR-based language verification flow. The project also
+yielded a reusable architectural reference for AI-assisted recruitment tools
+that respect GDPR retention constraints.
+
+\textbf{Keywords (Theme):} Recruitment, Talent Pool, Human Resources Tooling,
+GDPR, Language Assessment.
+
+\textbf{Keywords (Technologies):} Next.js, TypeScript, Supabase, Large
+Language Models, Retrieval-Augmented Prompting, FastAPI.
+
+\end{abstract}
+
+%----------------------------------------------------------------------------------------
+%	ABSTRACT (Other language --- Portuguese)
+%----------------------------------------------------------------------------------------
+\begin{abstractotherlanguage}
+
+As equipas de recrutamento que operam ao abrigo do Regulamento Geral de
+Proteção de Dados enfrentam uma contradição recorrente: o RGPD obriga à
+eliminação dos dados dos candidatos seis meses após o fim do processo, mas
+os recrutadores continuam a precisar de reconhecer candidatos que se
+recandidatam, de reengajar perfis promissores e de filtrar grandes lotes de
+\textit{Curricula Vitae} sob prazos apertados. Este relatório descreve a
+conceção e implementação de uma Plataforma de Talent Intelligence e
+Verificação de Línguas, desenvolvida no âmbito do programa BlendEd em
+parceria com a adidas GBS Porto, uma aplicação web que combina uma base de
+talentos estruturada, análise automática de \textit{Curricula Vitae},
+\textit{matching} ancorado a vagas concretas e um módulo de avaliação de
+línguas e competências assistido por inteligência artificial.
+
+O trabalho documenta todo o ciclo do projeto: levantamento de problemas
+junto do cliente, engenharia de requisitos, desenho arquitetural segundo
+princípios \textit{onion} / \textit{clean}, modelação da base de dados em
+Supabase PostgreSQL, integração de dois Modelos de Linguagem de Grande
+Escala (Groq Llama~3.3 70B como primário e OpenAI GPT-4o como
+\textit{fallback}) para análise de CV, extração de requisitos das
+descrições de funções e entrevistas conversacionais, e a entrega em
+produção de uma aplicação Next.js na Vercel. A plataforma foi desenvolvida
+por uma equipa de duas pessoas seguindo Scrum, com o autor a desempenhar o
+papel de \textit{Product Owner} e a implementar todos os módulos com
+exceção do \textit{sidecar} FastAPI do Entrevistador Inteligente,
+desenvolvido pelo colega de equipa.
+
+\textbf{Palavras-chave (Tema):} Recrutamento, Talent Pool, Recursos
+Humanos, RGPD, Avaliação de Línguas.
+
+\textbf{Palavras-chave (Tecnologias):} Next.js, TypeScript, Supabase,
+Modelos de Linguagem, FastAPI.
+
+\end{abstractotherlanguage}
+
+%----------------------------------------------------------------------------------------
+%	ACKNOWLEDGEMENTS (optional)
+%----------------------------------------------------------------------------------------
+\begin{acknowledgements}
+
+This project would not have reached the state described in these pages
+without the guidance and patience of several people.
+
+I thank Professor Nuno Escudeiro, my academic supervisor, for the steady
+critical eye and for forcing every architectural choice to defend itself in
+plain language.
+
+I thank the HR team at adidas GBS Porto and the BlendEd program coordinators
+for opening their daily reality to scrutiny --- this report borrows their
+problems, not their data.
+
+I thank Stratos Demertzoglou, my teammate, for owning the AI Interviewer
+sidecar and for the candid sprint-review conversations that kept the project
+honest.
+
+Finally, I thank my family for the quiet, daily logistics that made
+sustained work possible.
+
+\end{acknowledgements}
+
+%----------------------------------------------------------------------------------------
+%	TABLES OF CONTENTS / FIGURES / TABLES
+%----------------------------------------------------------------------------------------
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\renewcommand{\lstlistlistingname}{List of Source Code}
+\lstlistoflistings
+
+%----------------------------------------------------------------------------------------
+%	ABBREVIATIONS (uncomment to enable)
+%----------------------------------------------------------------------------------------
+%\begin{abbreviations}{ll}
+%\textbf{ATS} & \textbf{A}pplicant \textbf{T}racking \textbf{S}ystem\\
+%\textbf{CEFR} & \textbf{C}ommon \textbf{E}uropean \textbf{F}ramework of \textbf{R}eference for languages\\
+%\textbf{GDPR} & \textbf{G}eneral \textbf{D}ata \textbf{P}rotection \textbf{R}egulation\\
+%\textbf{HR} & \textbf{H}uman \textbf{R}esources\\
+%\textbf{LLM} & \textbf{L}arge \textbf{L}anguage \textbf{M}odel\\
+%\textbf{PO} & \textbf{P}roduct \textbf{O}wner\\
+%\textbf{RLS} & \textbf{R}ow-\textbf{L}evel \textbf{S}ecurity\\
+%\textbf{TTS / STT} & \textbf{T}ext-\textbf{T}o-\textbf{S}peech / \textbf{S}peech-\textbf{T}o-\textbf{T}ext\\
+%\end{abbreviations}

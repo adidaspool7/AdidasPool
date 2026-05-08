@@ -1,0 +1,60 @@
+\chapter{Verification and Validation}
+\label{cap:validation}
+
+% TARGET LENGTH: ~8 pages.
+% Sources: AppReport/08_Testing_Strategy.md,
+% docs/audit-6-5-2026.md (security advisor decisions log),
+% client-pain-points (survey results when collected).
+
+\section{Verification Strategy}
+\label{sec:val-verification}
+
+% Three layers: type-checking (tsc --noEmit), unit testing (Vitest),
+% integration smoke testing.
+
+\subsection{Static Analysis and Type Safety}
+% TypeScript strict mode; ESLint; lack of any-leakage in api routes
+% (post-audit cleanup).
+
+\subsection{Unit Tests}
+% 17 test files, 259 tests at submission. Coverage areas: scoring,
+% job-fit, CV validation, upload use cases, interview runtime,
+% job-requirements schema, analytics catalog, shortlist use cases.
+% Coverage report shipped as CI artefact.
+
+\subsection{Manual Acceptance Testing with the Client}
+% Two demo sessions; dataset used; structured walkthrough script.
+
+\section{Validation through Client Survey}
+\label{sec:val-survey}
+
+% Reproduce the survey instrument (one question per pain point),
+% method (sample size, distribution channel, response rate), and
+% headline findings. Include figures: bar charts of responses for the
+% three priority questions (CV time, language screening, borderline
+% engagement). Discuss limitations (small sample, single-organisation).
+
+\section{Security Review}
+\label{sec:val-security}
+
+% Supabase Security Advisor sweep results (final state: 0 warnings,
+% 0 info, 28 acknowledged-intentional errors). Decisions log table
+% (W1 search_path, W2/W3 rls_auto_enable removed with CASCADE,
+% W4 leaked-password protection N/A for OAuth-only auth, I1-I3 RLS
+% disabled by design on three internal tables).
+% JWT rotation event after credential exposure (May 2026).
+
+\section{Performance Considerations}
+\label{sec:val-performance}
+
+% Indices created for hot paths (job_matches, job_shortlists,
+% experiences.fields_of_work GIN). Identified bottlenecks
+% (matchCandidatesToJob fan-out for large pools) and mitigation
+% (batched queries, persisted top-100 cache).
+
+\section{Limitations Found During Validation}
+\label{sec:val-limitations}
+
+% Honest catalogue: STT/TTS browser-only (Chrome/Edge), LLM cost ceiling
+% on free tier, GDPR edge cases not yet automated (right-to-erasure
+% script is manual), analytics widget catalog still narrow.

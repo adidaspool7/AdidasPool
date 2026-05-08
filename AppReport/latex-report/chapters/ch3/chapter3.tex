@@ -1,0 +1,72 @@
+\chapter{Analysis and Methodology}
+\label{cap:analysis}
+
+% TARGET LENGTH: ~10 pages.
+% Sources: AppReport/01_Project_Overview.md, 02_Requirements_Analysis.md,
+% client-pain-points/TalentPool-client_pain_points.md, ata-de-reuniao.
+
+\section{Stakeholders and Personas}
+\label{sec:analysis-stakeholders}
+
+% HR persona ("Carla"): recruiter at adidas GBS, owns ~20 open roles,
+% screens ~200 CVs/week.
+% Candidate persona ("Tiago"): jobseeker, applies via the public portal.
+% Internal stakeholders: client (adidas GBS HR), supervisor (Prof. Nuno
+% Escudeiro), team.
+
+\section{Pain Points and Survey Validation}
+\label{sec:analysis-pains}
+
+% Reproduce table of pain points (see Chapter 1) with deeper discussion.
+% Insert survey questions table from TalentPool-client_pain_points.md.
+% Discuss recommended shortlist (Q5, Q3, Q9, Q2).
+
+\section{Functional Requirements}
+\label{sec:analysis-fr}
+
+% Itemised list (RF1..RFn). Suggested groupings:
+% - RF Talent Pool (CRUD, search, filters, tags, notes)
+% - RF CV Parsing (upload, parse, edit overrides, re-parse)
+% - RF Jobs (CRUD, JD parsing, matching, shortlist)
+% - RF Assessment (interview session, results, improvement track)
+% - RF Notifications & Campaigns
+% - RF Analytics (built-in + custom widgets)
+% - RF Auth & Roles (HR vs Candidate)
+
+\section{Non-Functional Requirements}
+\label{sec:analysis-nfr}
+
+% Performance budgets, security (GDPR alignment, RLS rationale,
+% service-role boundaries), reliability (CI gating), maintainability
+% (onion architecture, type safety), accessibility (WCAG considerations
+% for the candidate portal), portability (browser support for STT/TTS).
+
+\section{Project Management}
+\label{sec:analysis-pm}
+
+\subsection{Scrum Adaptation for a Two-Person Team}
+% Roles: PO (author), Dev (both members). No dedicated Scrum Master ---
+% facilitation rotated. Cadence: 2-week sprints. Ceremonies: planning,
+% review, retro. Tools: GitHub Issues + Project board.
+
+\subsection{Product Backlog and Prioritisation}
+% Discuss MoSCoW prioritisation, dependency mapping between modules.
+% Show backlog snapshot (figure / appendix).
+
+\subsection{Module Boundary with the AI Interviewer}
+% Explain the contract between the Next.js core and the Python FastAPI
+% sidecar. Why this boundary made the team-of-two division of labour
+% workable.
+
+\subsection{Risks, Issues and Decision Log}
+% Top risks mitigated: LLM provider outage (Groq -> OpenAI fallback),
+% GDPR misalignment, scope creep, integration drift between core and
+% sidecar.
+
+\subsection{Sprint-by-Sprint Summary}
+% Compact table: sprint goal, key deliverables, demo notes, retro deltas.
+
+\section{Conclusion of the Analysis}
+\label{sec:analysis-conclusion}
+
+% Bridge to the design chapter.

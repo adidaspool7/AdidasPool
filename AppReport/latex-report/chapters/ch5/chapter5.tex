@@ -1,0 +1,79 @@
+\chapter{Implementation}
+\label{cap:implementation}
+
+% TARGET LENGTH: ~14 pages.
+% Sources: AppReport/03_Technology_Stack.md, 06_Features_Implementation.md,
+% 07_API_Documentation.md (selectively), 10_UI_UX_Design.md.
+
+\section{Technology Stack}
+\label{sec:impl-stack}
+
+% Table form. For each row: layer, choice, version, rationale. Mirror
+% CLAUDE.md but condense to ~12 lines.
+
+\section{Repository Layout}
+\label{sec:impl-layout}
+
+% Tree of src/ with one-line annotation per top-level folder.
+
+\section{Talent Pool Module}
+\label{sec:impl-pool}
+
+% Candidate CRUD, search, filters, tags, notes. Code snippet of one
+% representative use case.
+
+\section{CV Parsing Pipeline}
+\label{sec:impl-cv}
+
+% Walkthrough of upload -> parse -> persist. Show prompt template
+% structure. Discuss failure modes (rate limits, schema drift).
+
+\section{Jobs and Matching}
+\label{sec:impl-jobs}
+
+% Job CRUD, JD parsing, matchCandidatesToJob orchestrator,
+% match-candidates UI. Per-job shortlist (table job_shortlists).
+
+\section{AI Interviewer Integration}
+\label{sec:impl-interviewer}
+
+% From the Next.js side: session creation, token signing, popup window,
+% transcript turn API, evaluation save. Note: the sidecar internals are
+% the contribution of the second team member; this section documents
+% the integration surface.
+
+\section{Notifications and Campaigns}
+\label{sec:impl-notifications}
+
+% Notification types, interaction history panel, campaign scheduling.
+
+\section{Analytics}
+\label{sec:impl-analytics}
+
+% Built-in 7 charts on /dashboard/analytics. Custom widget builder
+% (catalog + WidgetSpecSchema + chart-from-spec).
+
+\section{Authentication, Roles and Middleware}
+\label{sec:impl-auth}
+
+% Supabase OAuth callback, role assignment, middleware.ts gating.
+% requireHr() helper.
+
+\section{Logging and Observability}
+\label{sec:impl-observability}
+
+% createLogger(scope) usage; replacement of raw console.* in API
+% routes; Vercel logs.
+
+\section{CI/CD}
+\label{sec:impl-cicd}
+
+% GitHub Actions: tsc + vitest + coverage artefact. Vercel build
+% pipeline (Turbopack). .npmrc legacy-peer-deps rationale.
+
+\section{Selected Code Excerpts}
+\label{sec:impl-code}
+
+% Use lstlisting for: (a) computeJobFit signature + one criterion,
+% (b) one repo method, (c) the auth middleware, (d) one Vitest test.
+% Keep each excerpt under 25 lines.
