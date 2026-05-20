@@ -140,6 +140,7 @@ export class AmbassadorUseCases {
     university?: string | null;
     yearOfStudy?: string | null;
     previousExperience?: string | null;
+    pitchVideoUrl?: string | null;
   }): Promise<AmbassadorApplicationRow> {
     // Verify program exists and is open
     const program = await this.programRepo.findById(opts.programId);
@@ -173,6 +174,7 @@ export class AmbassadorUseCases {
       university: opts.university ?? null,
       yearOfStudy: opts.yearOfStudy ?? null,
       previousExperience: opts.previousExperience ?? null,
+      pitchVideoUrl: opts.pitchVideoUrl ?? null,
     });
   }
 }

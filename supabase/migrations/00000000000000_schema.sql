@@ -961,6 +961,7 @@ CREATE TABLE IF NOT EXISTS ambassador_applications (
   university          TEXT,
   year_of_study       TEXT,
   previous_experience TEXT,
+  pitch_video_url     TEXT,
   applied_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(program_id, candidate_id)

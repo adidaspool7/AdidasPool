@@ -29,6 +29,7 @@ export async function POST(
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    const videoFile = formData.get("video") as File | null;
     const motivation = (formData.get("motivation") as string | null) || null;
     const university = (formData.get("university") as string | null) || null;
     const yearOfStudy = (formData.get("yearOfStudy") as string | null) || null;
@@ -45,7 +46,17 @@ export async function POST(
     // Step 1: Upload + parse CV → creates/updates candidate
     const uploadResult = await uploadUseCases.uploadCandidateCv(file);
 
-    // Step 2: Submit the ambassador application (also marks sourceType = AMBASSADOR)
+    // Step 2: Upload pitch video (optional)
+    let pitchVideoUrl: string | null = null;
+    if (videoFile && videoFile.size > 0) {
+      const videoUpload = await uploadUseCases.uploadAmbassadorVideo(
+        videoFile,
+        uploadResult.candidateId
+      );
+      pitchVideoUrl = videoUpload.url;
+    }
+
+    // Step 3: Submit the ambassador application (also marks sourceType = AMBASSADOR)
     const application = await ambassadorUseCases.submitApplication({
       programId,
       candidateId: uploadResult.candidateId,
@@ -53,6 +64,7 @@ export async function POST(
       university,
       yearOfStudy,
       previousExperience,
+      pitchVideoUrl,
     });
 
     return NextResponse.json(

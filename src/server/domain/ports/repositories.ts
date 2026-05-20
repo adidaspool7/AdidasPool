@@ -772,6 +772,7 @@ export interface AmbassadorApplicationRow {
   university?: string | null;
   yearOfStudy?: string | null;
   previousExperience?: string | null;
+  pitchVideoUrl?: string | null;
   appliedAt?: string | Date;
   updatedAt?: string | Date;
   candidate?: {
@@ -814,6 +815,7 @@ export interface IAmbassadorApplicationRepository {
     university?: string | null;
     yearOfStudy?: string | null;
     previousExperience?: string | null;
+    pitchVideoUrl?: string | null;
   }): Promise<AmbassadorApplicationRow>;
   updateStatus(id: string, status: string): Promise<AmbassadorApplicationRow>;
   update(id: string, data: Record<string, unknown>): Promise<AmbassadorApplicationRow>;

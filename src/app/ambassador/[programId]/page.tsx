@@ -15,6 +15,12 @@ import {
 } from "@client/components/ui/card";
 import { Badge } from "@client/components/ui/badge";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@client/components/ui/accordion";
+import {
   CalendarDays,
   MapPin,
   Users,
@@ -23,6 +29,7 @@ import {
   AlertCircle,
   Loader2,
   Trophy,
+  Video,
 } from "lucide-react";
 
 interface ProgramInfo {
@@ -51,11 +58,13 @@ export default function AmbassadorApplyPage() {
 
   // Form fields
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [university, setUniversity] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
   const [motivation, setMotivation] = useState("");
   const [previousExperience, setPreviousExperience] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/ambassador/public/${programId}`)
@@ -89,6 +98,7 @@ export default function AmbassadorApplyPage() {
 
     const fd = new FormData();
     fd.append("file", cvFile);
+    if (videoFile) fd.append("video", videoFile);
     if (university) fd.append("university", university);
     if (yearOfStudy) fd.append("yearOfStudy", yearOfStudy);
     if (motivation) fd.append("motivation", motivation);
@@ -384,6 +394,49 @@ export default function AmbassadorApplyPage() {
                 />
               </div>
 
+              {/* Pitch Video */}
+              <div className="space-y-2">
+                <Label htmlFor="video-upload">
+                  Pitch video{" "}
+                  <span className="text-slate-400 font-normal">(optional — 1 min max)</span>
+                </Label>
+                <p className="text-xs text-slate-500">
+                  Record a short 60-second clip introducing yourself and why you&apos;d make a great ambassador. Helps us see your communication style.
+                </p>
+                <div
+                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
+                    videoFile
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-slate-300 hover:border-slate-400"
+                  }`}
+                  onClick={() => videoInputRef.current?.click()}
+                >
+                  {videoFile ? (
+                    <div className="flex items-center justify-center gap-2 text-blue-700">
+                      <Video className="h-5 w-5" />
+                      <span className="font-medium text-sm">{videoFile.name}</span>
+                      <span className="text-xs text-blue-500">
+                        ({(videoFile.size / (1024 * 1024)).toFixed(1)} MB)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 space-y-1">
+                      <Video className="h-8 w-8 mx-auto text-slate-400" />
+                      <p className="text-sm font-medium">Click to upload your pitch video</p>
+                      <p className="text-xs">MP4, WebM or MOV — max 100 MB · 1 min recommended</p>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={videoInputRef}
+                  id="video-upload"
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                  className="hidden"
+                  onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+
               {errorMessage && (
                 <p className="text-sm text-red-600 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -411,6 +464,74 @@ export default function AmbassadorApplyPage() {
                 the email address in your CV.
               </p>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* FAQ */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Frequently asked questions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="q1">
+                <AccordionTrigger className="text-sm font-medium text-left">
+                  How much time will I need to commit?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-600">
+                  We respect your exams and your schedule. The program is flexible, but we recommend
+                  dedicating 3–5 hours per week to stay engaged with your community and tasks.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q2">
+                <AccordionTrigger className="text-sm font-medium text-left">
+                  Where is the program located?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-600">
+                  Our 2026 pilot program is specifically focused on the Porto/Maia ecosystem,
+                  targeting students from universities such as UP, IPP, and others.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q3">
+                <AccordionTrigger className="text-sm font-medium text-left">
+                  Will I receive training?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-600">
+                  Yes. Every ambassador begins with a Bootcamp Day at the Porto Hub, covering brand
+                  history, content creation workshops, and a deep dive into our corporate culture.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q4">
+                <AccordionTrigger className="text-sm font-medium text-left">
+                  What are the benefits of being an adidas Student Ambassador?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-600 space-y-3">
+                  <p>
+                    This program provides a premier platform for students to gain high-value
+                    professional experience without compromising their academic priorities. Designed
+                    with total flexibility and no rigid hours, the program allows participants to
+                    sharpen their skill sets, boost their visibility, and build the core competencies
+                    required to excel in the modern job market.
+                  </p>
+                  <p>
+                    Ambassadors will follow an exclusive learning roadmap, gaining deep insights into
+                    the inner workings of adidas and the global textile industry. Through this
+                    journey, they will connect with seasoned industry experts, expand their
+                    professional circles, and gain valuable exposure within a world-leading brand.
+                    Additionally, specialised workshops focused on advanced communication will
+                    provide the tools necessary to accelerate their long-term career trajectories.
+                  </p>
+                  <p>
+                    To conclude the experience, every participant will receive an official certificate
+                    of completion, serving as a distinguished credential to strengthen their
+                    professional portfolio and résumé.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
       </div>

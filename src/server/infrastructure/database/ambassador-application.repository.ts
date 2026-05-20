@@ -71,6 +71,7 @@ export class SupabaseAmbassadorApplicationRepository
     university?: string | null;
     yearOfStudy?: string | null;
     previousExperience?: string | null;
+    pitchVideoUrl?: string | null;
   }): Promise<AmbassadorApplicationRow> {
     const { data: created, error } = await db
       .from("ambassador_applications")
@@ -82,6 +83,7 @@ export class SupabaseAmbassadorApplicationRepository
         university: data.university ?? null,
         year_of_study: data.yearOfStudy ?? null,
         previous_experience: data.previousExperience ?? null,
+        pitch_video_url: data.pitchVideoUrl ?? null,
       })
       .select(WITH_CANDIDATE)
       .single();
