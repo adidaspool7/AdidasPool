@@ -865,9 +865,43 @@ CREATE TRIGGER trg_notification_prefs_updated_at
 
 
 -- ----------------------------------------------------------------
--- 17. DISABLE RLS (all DB access is server-side via service role)
+-- 17. CANDIDATE SEGMENTS
+-- Manual groups for bulk targeting and filtered views
 -- ----------------------------------------------------------------
 
+CREATE TABLE candidate_segments (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT,
+  created_by  TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_candidate_segments_updated_at
+  BEFORE UPDATE ON candidate_segments
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_segment_members (
+  segment_id   TEXT NOT NULL REFERENCES candidate_segments(id) ON DELETE CASCADE,
+  candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  added_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (segment_id, candidate_id)
+);
+
+CREATE INDEX idx_segment_members_segment   ON candidate_segment_members(segment_id);
+CREATE INDEX idx_segment_members_candidate ON candidate_segment_members(candidate_id);
+
+ALTER TABLE promo_campaigns
+  ADD COLUMN IF NOT EXISTS segment_id TEXT REFERENCES candidate_segments(id) ON DELETE SET NULL;
+
+
+-- ----------------------------------------------------------------
+-- 18. DISABLE RLS (all DB access is server-side via service role)
+-- ----------------------------------------------------------------
+
+ALTER TABLE candidate_segments              DISABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_segment_members       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE candidates                  DISABLE ROW LEVEL SECURITY;
 ALTER TABLE experiences                 DISABLE ROW LEVEL SECURITY;
 ALTER TABLE education                   DISABLE ROW LEVEL SECURITY;

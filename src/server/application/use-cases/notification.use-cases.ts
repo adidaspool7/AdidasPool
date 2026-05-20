@@ -13,6 +13,7 @@
 import type {
   INotificationRepository,
   ICandidateRepository,
+  ISegmentRepository,
   NotificationFilters,
   CreateNotificationData,
 } from "@server/domain/ports/repositories";
@@ -20,7 +21,8 @@ import type {
 export class NotificationUseCases {
   constructor(
     private readonly notificationRepo: INotificationRepository,
-    private readonly candidateRepo?: ICandidateRepository
+    private readonly candidateRepo?: ICandidateRepository,
+    private readonly segmentRepo?: ISegmentRepository
   ) {}
 
   // ── Scoped listing ──────────────────────────────────────
@@ -177,6 +179,7 @@ export class NotificationUseCases {
     targetFields?: string[];
     targetEducation?: string[];
     targetEmails?: string[];
+    segmentId?: string | null;
   }) {
     return this.notificationRepo.createCampaign(data);
   }
@@ -230,6 +233,50 @@ export class NotificationUseCases {
 
     if (!this.candidateRepo) throw new Error("Candidate repository required for sending");
 
+    // Segment targeting: if a segment_id is set, restrict to that segment's members only
+    // and bypass all other targeting filters.
+    if (campaign.segmentId && this.segmentRepo) {
+      const memberIds = await this.segmentRepo.findMemberIds(campaign.segmentId);
+      const memberSet = new Set(memberIds);
+      const candidates = await this.candidateRepo.findForNotifications();
+      const prefsMap = new Map<string, any>();
+      for (const c of candidates) {
+        const p = await this.notificationRepo.getPreferences(c.id);
+        if (p) prefsMap.set(c.id, p);
+      }
+
+      const targetIds: string[] = [];
+      for (const c of candidates) {
+        if (!memberSet.has(c.id)) continue;
+        const prefs = prefsMap.get(c.id);
+        if (prefs && !prefs.promotionalNotifications) continue;
+        targetIds.push(c.id);
+      }
+
+      const BATCH_SIZE = 500;
+      let created = 0;
+      for (let i = 0; i < targetIds.length; i += BATCH_SIZE) {
+        const batch = targetIds.slice(i, i + BATCH_SIZE);
+        const rows: CreateNotificationData[] = batch.map((candidateId) => ({
+          type: "PROMOTIONAL",
+          message: String(campaign.body ?? ""),
+          targetRole: "CANDIDATE",
+          candidateId,
+          campaignId: campaign.id,
+        }));
+        created += await this.notificationRepo.createMany(rows);
+      }
+
+      await this.notificationRepo.updateCampaign(campaignId, {
+        status: "SENT",
+        sentAt: new Date(),
+        sentBy,
+        recipientCount: created,
+      });
+      return { recipientCount: created };
+    }
+
+    // Standard targeting flow (no segment)
     // Get all candidates (including NEW status)
     const candidates = await this.candidateRepo.findForNotifications();
 

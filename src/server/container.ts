@@ -20,6 +20,7 @@ import { SupabaseScoringPresetRepository } from "@server/infrastructure/database
 import { SupabaseAnalyticsRepository } from "@server/infrastructure/database/analytics.repository";
 import { SupabaseShortlistRepository } from "@server/infrastructure/database/shortlist.repository";
 import { SupabaseDashboardWidgetRepository } from "@server/infrastructure/database/dashboard-widget.repository";
+import { SupabaseSegmentRepository } from "@server/infrastructure/database/segment.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
 import { JobRequirementsExtractorService } from "@server/infrastructure/ai/job-requirements-extractor.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
@@ -42,6 +43,7 @@ import type {
   IAnalyticsRepository,
   IShortlistRepository,
   IDashboardWidgetRepository,
+  ISegmentRepository,
 } from "@server/domain/ports/repositories";
 import type {
   ICvParserService,
@@ -90,6 +92,9 @@ export const shortlistRepository: IShortlistRepository =
 
 export const dashboardWidgetRepository: IDashboardWidgetRepository =
   new SupabaseDashboardWidgetRepository();
+
+export const segmentRepository: ISegmentRepository =
+  new SupabaseSegmentRepository();
 
 // ============================================
 // SERVICE INSTANCES

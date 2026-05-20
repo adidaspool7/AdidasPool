@@ -42,6 +42,13 @@ import {
 } from "@client/components/ui/dialog";
 import { Separator } from "@client/components/ui/separator";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@client/components/ui/sheet";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -68,6 +75,10 @@ import {
   Download,
   CheckSquare,
   Send,
+  Users,
+  UserPlus,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 import { formatLocation } from "@client/lib/utils";
@@ -527,6 +538,29 @@ function BusinessAreaDropdown({
   );
 }
 
+// ── Segment types ─────────────────────────────────────────────────
+
+interface CandidateSegment {
+  id: string;
+  name: string;
+  description: string | null;
+  createdBy: string;
+  memberCount: number;
+  createdAt: string;
+}
+
+interface SegmentMember {
+  candidateId: string;
+  addedAt: string;
+  candidate?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    status: string | null;
+  };
+}
+
 // ── Main page ────────────────────────────────────────────────────
 
 export default function CandidatesPage() {
@@ -569,6 +603,20 @@ export default function CandidatesPage() {
   // ── Bulk selection ───────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  // ── Segment (Groups) state ─────────────────────────────────────
+  const [segmentsPanelOpen, setSegmentsPanelOpen] = useState(false);
+  const [segments, setSegments] = useState<CandidateSegment[]>([]);
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
+  const [activeSegment, setActiveSegment] = useState<CandidateSegment | null>(null);
+  const [segmentMembers, setSegmentMembers] = useState<SegmentMember[]>([]);
+  const [segmentMembersLoading, setSegmentMembersLoading] = useState(false);
+  const [createSegmentName, setCreateSegmentName] = useState("");
+  const [createSegmentDesc, setCreateSegmentDesc] = useState("");
+  const [createSegmentBusy, setCreateSegmentBusy] = useState(false);
+  const [segmentFilter, setSegmentFilter] = useState<string>("");
+  // candidateIds that are members of the active segment filter
+  const [segmentFilterMemberIds, setSegmentFilterMemberIds] = useState<Set<string>>(new Set());
 
   const fetchCandidates = useCallback(
     async (page = 1) => {
@@ -615,6 +663,12 @@ export default function CandidatesPage() {
     const debounce = setTimeout(() => fetchCandidates(1), 300);
     return () => clearTimeout(debounce);
   }, [fetchCandidates]);
+
+  // Load segments on mount for "Add to group" dropdown in bulk bar
+  useEffect(() => {
+    fetchSegments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Candidate actions ──────────────────────────────────────────
 
@@ -765,9 +819,13 @@ export default function CandidatesPage() {
     search || statusFilter || businessAreaFilter || locationSearch || (sourceFilter && sourceFilter !== "ALL")
   );
 
-  const displayedCandidates = candidates;
+  // Segment filter applied client-side on top of server-side results
+  const displayedCandidates = segmentFilter
+    ? candidates.filter((c) => segmentFilterMemberIds.has(c.id))
+    : candidates;
 
   // ── Bulk-selection helpers ─────────────────────────────────
+  // displayedCandidates is declared below (after segment filter logic)
   const visibleIds = displayedCandidates.map((c) => c.id);
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
@@ -863,6 +921,113 @@ export default function CandidatesPage() {
     }
   }
 
+  // ── Segment helpers ────────────────────────────────────────────
+
+  async function fetchSegments() {
+    setSegmentsLoading(true);
+    try {
+      const res = await fetch("/api/segments");
+      if (res.ok) setSegments(await res.json());
+    } finally {
+      setSegmentsLoading(false);
+    }
+  }
+
+  async function openSegmentsPanel() {
+    setActiveSegment(null);
+    setSegmentsPanelOpen(true);
+    await fetchSegments();
+  }
+
+  async function openSegment(seg: CandidateSegment) {
+    setActiveSegment(seg);
+    setSegmentMembersLoading(true);
+    try {
+      const res = await fetch(`/api/segments/${seg.id}/members`);
+      if (res.ok) setSegmentMembers(await res.json());
+    } finally {
+      setSegmentMembersLoading(false);
+    }
+  }
+
+  async function createSegment() {
+    const name = createSegmentName.trim();
+    if (!name) return;
+    setCreateSegmentBusy(true);
+    try {
+      const res = await fetch("/api/segments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: createSegmentDesc.trim() || null }),
+      });
+      if (res.ok) {
+        const seg = await res.json();
+        setSegments((prev) => [seg, ...prev]);
+        setCreateSegmentName("");
+        setCreateSegmentDesc("");
+        toast.success(`Group "${seg.name}" created`);
+      }
+    } finally {
+      setCreateSegmentBusy(false);
+    }
+  }
+
+  async function deleteSegment(segId: string, segName: string) {
+    await fetch(`/api/segments/${segId}`, { method: "DELETE" });
+    setSegments((prev) => prev.filter((s) => s.id !== segId));
+    if (activeSegment?.id === segId) setActiveSegment(null);
+    if (segmentFilter === segId) {
+      setSegmentFilter("");
+      setSegmentFilterMemberIds(new Set());
+    }
+    toast.success(`Group "${segName}" deleted`);
+  }
+
+  async function removeMemberFromSegment(segmentId: string, candidateId: string) {
+    await fetch(`/api/segments/${segmentId}/members/${candidateId}`, { method: "DELETE" });
+    setSegmentMembers((prev) => prev.filter((m) => m.candidateId !== candidateId));
+    setSegments((prev) =>
+      prev.map((s) => s.id === segmentId ? { ...s, memberCount: s.memberCount - 1 } : s)
+    );
+  }
+
+  async function addSelectedToSegment(segmentId: string) {
+    if (selected.size === 0) return;
+    const candidateIds = Array.from(selected);
+    setBulkBusy(true);
+    try {
+      const res = await fetch(`/api/segments/${segmentId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateIds }),
+      });
+      if (res.ok) {
+        const { added } = await res.json();
+        setSegments((prev) =>
+          prev.map((s) => s.id === segmentId ? { ...s, memberCount: s.memberCount + added } : s)
+        );
+        clearSelection();
+        toast.success(`Added to group`);
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function applySegmentFilter(segId: string) {
+    if (segId === segmentFilter) {
+      setSegmentFilter("");
+      setSegmentFilterMemberIds(new Set());
+      return;
+    }
+    setSegmentFilter(segId);
+    const res = await fetch(`/api/segments/${segId}/members`);
+    if (res.ok) {
+      const members: SegmentMember[] = await res.json();
+      setSegmentFilterMemberIds(new Set(members.map((m) => m.candidateId)));
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -937,6 +1102,20 @@ export default function CandidatesPage() {
         </Select>
 
         <div className="flex items-center gap-3 ml-auto">
+          <Button
+            variant={segmentFilter ? "default" : "outline"}
+            size="sm"
+            className="h-[38px] gap-1.5"
+            onClick={openSegmentsPanel}
+          >
+            <Users className="h-3.5 w-3.5" />
+            Groups
+            {segmentFilter && (
+              <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                {segments.find((s) => s.id === segmentFilter)?.name ?? "1"}
+              </Badge>
+            )}
+          </Button>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title="Show sign-up accounts that have not uploaded a CV yet.">
             <input
               type="checkbox"
@@ -1002,6 +1181,24 @@ export default function CandidatesPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {segments.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8" disabled={bulkBusy}>
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Add to group
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {segments.map((s) => (
+                    <DropdownMenuItem key={s.id} onClick={() => addSelectedToSegment(s.id)}>
+                      {s.name}
+                      <span className="ml-auto text-xs text-muted-foreground">{s.memberCount}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -1058,7 +1255,7 @@ export default function CandidatesPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : candidates.length === 0 ? (
+              ) : displayedCandidates.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={10}
@@ -1536,6 +1733,164 @@ export default function CandidatesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Groups sidebar ─────────────────────────────────────── */}
+      <Sheet open={segmentsPanelOpen} onOpenChange={setSegmentsPanelOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          {activeSegment ? (
+            <>
+              <SheetHeader className="mb-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 h-auto"
+                    onClick={() => setActiveSegment(null)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <SheetTitle>{activeSegment.name}</SheetTitle>
+                    {activeSegment.description && (
+                      <SheetDescription>{activeSegment.description}</SheetDescription>
+                    )}
+                  </div>
+                </div>
+              </SheetHeader>
+
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-muted-foreground">
+                  {activeSegment.memberCount} member{activeSegment.memberCount !== 1 && "s"}
+                </span>
+                <Button
+                  variant={segmentFilter === activeSegment.id ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => applySegmentFilter(activeSegment.id)}
+                >
+                  {segmentFilter === activeSegment.id ? "Clear filter" : "Filter by this group"}
+                </Button>
+              </div>
+
+              {segmentMembersLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : segmentMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No members yet. Select candidates and use "Add to group".
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {segmentMembers.map((m) => (
+                    <li
+                      key={m.candidateId}
+                      className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted/50 text-sm"
+                    >
+                      <span
+                        className="cursor-pointer hover:underline"
+                        onClick={() => {
+                          setSegmentsPanelOpen(false);
+                          router.push(`/dashboard/candidates/${m.candidateId}`);
+                        }}
+                      >
+                        {m.candidate
+                          ? `${m.candidate.firstName} ${m.candidate.lastName}`
+                          : m.candidateId}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        title="Remove from group"
+                        onClick={() => removeMemberFromSegment(activeSegment.id, m.candidateId)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              <SheetHeader className="mb-4">
+                <SheetTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" /> Candidate Groups
+                </SheetTitle>
+                <SheetDescription>
+                  Manually group candidates for filtered views and campaign targeting.
+                </SheetDescription>
+              </SheetHeader>
+
+              {/* Create form */}
+              <div className="space-y-2 mb-5 p-3 border rounded-lg bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New group</p>
+                <Input
+                  placeholder="Group name"
+                  value={createSegmentName}
+                  onChange={(e) => setCreateSegmentName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && createSegment()}
+                />
+                <Input
+                  placeholder="Description (optional)"
+                  value={createSegmentDesc}
+                  onChange={(e) => setCreateSegmentDesc(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  onClick={createSegment}
+                  disabled={!createSegmentName.trim() || createSegmentBusy}
+                  className="w-full"
+                >
+                  {createSegmentBusy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                  Create group
+                </Button>
+              </div>
+
+              {segmentsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : segments.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No groups yet. Create one above.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {segments.map((seg) => (
+                    <li
+                      key={seg.id}
+                      className={`flex items-center justify-between rounded-lg border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors ${segmentFilter === seg.id ? "border-primary bg-primary/5" : ""}`}
+                      onClick={() => openSegment(seg)}
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{seg.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {seg.memberCount} member{seg.memberCount !== 1 && "s"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                        title="Delete group"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSegment(seg.id, seg.name);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

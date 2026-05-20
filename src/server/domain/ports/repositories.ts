@@ -153,6 +153,7 @@ export interface CampaignRow {
   targetCountries?: string[];
   targetFields?: string[];
   targetEmails?: string[];
+  segmentId?: string | null;
   [key: string]: unknown;
 }
 
@@ -689,5 +690,52 @@ export interface IDashboardWidgetRepository {
   delete(id: string, userId: string): Promise<boolean>;
   /** Returns highest existing position for the user (or -1 if none). */
   maxPositionForUser(userId: string): Promise<number>;
+}
+
+// ============================================
+// CANDIDATE SEGMENT REPOSITORY PORT
+// ============================================
+
+export interface SegmentRow {
+  id: string;
+  name: string;
+  description: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  memberCount?: number;
+}
+
+export interface SegmentMemberRow {
+  segmentId: string;
+  candidateId: string;
+  addedAt: string;
+  candidate?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    overallCvScore: number | null;
+    status: string | null;
+    country: string | null;
+  };
+}
+
+export interface ISegmentRepository {
+  findAll(): Promise<SegmentRow[]>;
+  findById(id: string): Promise<SegmentRow | null>;
+  create(data: { name: string; description: string | null; createdBy: string }): Promise<SegmentRow>;
+  update(id: string, data: { name?: string; description?: string | null }): Promise<SegmentRow | null>;
+  delete(id: string): Promise<boolean>;
+  /** List all members of a segment, enriched with candidate basics. */
+  findMembers(segmentId: string): Promise<SegmentMemberRow[]>;
+  /** IDs of all candidates in the segment. Fast — no join. */
+  findMemberIds(segmentId: string): Promise<string[]>;
+  /** Add candidates. Idempotent — ignores duplicates. */
+  addMembers(segmentId: string, candidateIds: string[]): Promise<number>;
+  /** Remove one candidate from a segment. */
+  removeMember(segmentId: string, candidateId: string): Promise<boolean>;
+  /** Return the segment IDs this candidate belongs to. */
+  findSegmentsForCandidate(candidateId: string): Promise<string[]>;
 }
 

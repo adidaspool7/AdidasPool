@@ -36,6 +36,13 @@ import {
   CommandList,
 } from "@client/components/ui/command";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@client/components/ui/select";
+import {
   Loader2,
   Megaphone,
   Send,
@@ -99,11 +106,18 @@ interface Campaign {
   targetFields: string[];
   targetEducation: string[];
   targetEmails: string[];
+  segmentId?: string | null;
   recipientCount: number | null;
   sentAt: string | null;
   sentBy: string | null;
   createdAt: string;
   readStats: { total: number; read: number } | null;
+}
+
+interface CandidateSegment {
+  id: string;
+  name: string;
+  memberCount: number;
 }
 
 // ============================================
@@ -315,6 +329,15 @@ function CampaignEditorForm({
   const [isPinned, setIsPinned] = useState(campaign?.isPinned ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
+  const [targetSegmentId, setTargetSegmentId] = useState<string>(campaign?.segmentId ?? "");
+  const [availableSegments, setAvailableSegments] = useState<CandidateSegment[]>([]);
+
+  useEffect(() => {
+    fetch("/api/segments")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setAvailableSegments(data))
+      .catch(() => {});
+  }, []);
 
   async function previewAudience() {
     try {
@@ -341,11 +364,12 @@ function CampaignEditorForm({
         title: title.trim(),
         body: body.trim(),
         linkUrl: linkUrl.trim() || undefined,
-        targetAll: targetEmails.length > 0 ? false : targetAll,
-        targetInternshipsOnly: !targetAll && targetInternshipsOnly,
-        targetCountries: targetAll ? [] : targetCountries,
-        targetFields: targetAll ? [] : targetFields,
-        targetEmails,
+        targetAll: targetEmails.length > 0 || targetSegmentId ? false : targetAll,
+        targetInternshipsOnly: !targetAll && !targetSegmentId && targetInternshipsOnly,
+        targetCountries: targetAll || targetSegmentId ? [] : targetCountries,
+        targetFields: targetAll || targetSegmentId ? [] : targetFields,
+        targetEmails: targetSegmentId ? [] : targetEmails,
+        segmentId: targetSegmentId || null,
         scheduledAt: scheduledAt || null,
         isPinned,
       };
@@ -412,11 +436,36 @@ function CampaignEditorForm({
       </div>
       <div className="space-y-2 pt-2 border-t">
         <Label className="text-sm font-medium">Targeting</Label>
-        <div className="flex gap-2">
-          <Button type="button" variant={targetAll ? "default" : "outline"} size="sm" onClick={() => setTargetAll(true)}>All candidates</Button>
-          <Button type="button" variant={!targetAll ? "default" : "outline"} size="sm" onClick={() => setTargetAll(false)}>Targeted</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button type="button" variant={targetAll && !targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(true); setTargetSegmentId(""); }}>All candidates</Button>
+          <Button type="button" variant={!targetAll && !targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(false); setTargetSegmentId(""); }}>Targeted</Button>
+          {availableSegments.length > 0 && (
+            <Button type="button" variant={!!targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetSegmentId(targetSegmentId || availableSegments[0].id); setTargetAll(false); }}>
+              Group
+            </Button>
+          )}
         </div>
-        {!targetAll && (
+        {targetSegmentId && (
+          <div className="space-y-2 pt-2">
+            <Label className="text-xs">Select group</Label>
+            <Select value={targetSegmentId} onValueChange={(v) => setTargetSegmentId(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a group…" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSegments.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} <span className="text-muted-foreground">({s.memberCount})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Campaign will go to all members of this group, ignoring all other targeting filters.
+            </p>
+          </div>
+        )}
+        {!targetAll && !targetSegmentId && (
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between gap-4 rounded-md border p-3">
               <div className="flex items-center gap-2">

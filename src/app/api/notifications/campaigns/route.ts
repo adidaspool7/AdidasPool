@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       targetEducation,
       targetEmails,
       scheduledAt,
+      segmentId,
     } = body;
 
     if (!title || !campaignBody) {
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
       targetFields: targetFields ?? [],
       targetEducation: targetEducation ?? [],
       targetEmails: targetEmails ?? [],
+      segmentId: segmentId ?? null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
     });
 
