@@ -336,6 +336,7 @@ export default function ReceivedApplicationsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeTab, setTypeTab] = useState<"all" | "jobs" | "internships">("all");
 
   useEffect(() => {
     fetchApplications();
@@ -374,10 +375,13 @@ export default function ReceivedApplicationsPage() {
     }
   }
 
-  // Filter to job applications only (exclude internships), exclude withdrawn, then apply search
-  const activeApplications = applications.filter(
-    (app) => app.status !== "WITHDRAWN" && app.job.type !== "INTERNSHIP"
-  );
+  // Filter by type tab and exclude withdrawn
+  const activeApplications = applications.filter((app) => {
+    if (app.status === "WITHDRAWN") return false;
+    if (typeTab === "jobs") return app.job.type !== "INTERNSHIP";
+    if (typeTab === "internships") return app.job.type === "INTERNSHIP";
+    return true;
+  });
 
   const filtered = activeApplications.filter((app) => {
     // Status filter
@@ -403,8 +407,25 @@ export default function ReceivedApplicationsPage() {
           Received Applications
         </h1>
         <p className="text-muted-foreground">
-          Review job applications submitted by candidates.
+          Review applications submitted by candidates.
         </p>
+      </div>
+
+      {/* Type tabs */}
+      <div className="flex gap-1 rounded-lg border bg-muted p-1 w-fit">
+        {(["all", "jobs", "internships"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setTypeTab(tab)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              typeTab === tab
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab === "all" ? "All" : tab === "jobs" ? "Jobs" : "Internships"}
+          </button>
+        ))}
       </div>
 
       {/* Search & Filters */}

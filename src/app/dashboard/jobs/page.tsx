@@ -692,6 +692,8 @@ export default function JobsPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState<string[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  const [typeTab, setTypeTab] = useState<"all" | "jobs" | "internships">("all");
+  const typeTabRef = useRef<"all" | "jobs" | "internships">("all");
 
   // Application state
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -716,9 +718,9 @@ export default function JobsPage() {
           params.set("department", department.join(","));
         if (country && country.length > 0)
           params.set("country", country.join(","));
-        // Job Openings page never shows internships — internships live on
-        // /dashboard/internships regardless of role (HR or candidate).
-        params.set("excludeType", "INTERNSHIP");
+        const tab = typeTabRef.current;
+        if (tab === "jobs") params.set("excludeType", "INTERNSHIP");
+        else if (tab === "internships") params.set("type", "INTERNSHIP");
 
         const res = await fetch(`/api/jobs?${params}`);
         if (res.ok) {
@@ -739,10 +741,9 @@ export default function JobsPage() {
   useEffect(() => {
     fetchJobs(1);
 
-    // Populate the country dropdown. Scoped to non-internships so it
-    // matches the listing context. Failure is non-fatal — dropdown just
+    // Populate the country dropdown. Failure is non-fatal — dropdown just
     // shows "All countries".
-    fetch("/api/jobs/countries?excludeType=INTERNSHIP")
+    fetch("/api/jobs/countries")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.countries && Array.isArray(data.countries)) {
@@ -983,11 +984,11 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Openings</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Jobs &amp; Internships</h1>
           <p className="text-muted-foreground">
             {role === "candidate"
-              ? "Browse current job openings at adidas and find your match."
-              : "Manage job openings. Sync from the adidas careers portal or create custom postings."}
+              ? "Browse current openings at adidas and find your match."
+              : "Manage job openings and internships. Sync from the adidas careers portal or create custom postings."}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1052,6 +1053,30 @@ export default function JobsPage() {
       </div>
 
       <Separator />
+
+      {/* Type tabs */}
+      <div className="flex gap-1 rounded-lg border bg-muted p-1 w-fit">
+        {(["all", "jobs", "internships"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              if (tab === typeTab) return;
+              typeTabRef.current = tab;
+              setTypeTab(tab);
+              setSearchQuery("");
+              setSearchInput("");
+              fetchJobs(1, undefined, departmentFilter.length > 0 ? departmentFilter : undefined, countryFilter.length > 0 ? countryFilter : undefined);
+            }}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              typeTab === tab
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab === "all" ? "All positions" : tab === "jobs" ? "Jobs" : "Internships"}
+          </button>
+        ))}
+      </div>
 
       {/* Search & Filter */}
       <div className="flex gap-2 flex-wrap">

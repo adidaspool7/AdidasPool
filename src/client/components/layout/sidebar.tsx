@@ -16,7 +16,6 @@ import {
   FolderKanban,
   LogOut,
   Inbox,
-  BookOpen,
   Upload,
   Megaphone,
   Menu,
@@ -59,7 +58,6 @@ const candidateNavigationSections: NavSection[] = [
   {
     items: [
       { name: "Job Openings", href: "/dashboard/jobs", icon: Briefcase },
-      { name: "Internships", href: "/dashboard/internships", icon: BookOpen },
       { name: "My Applications", href: "/dashboard/applications", icon: FolderKanban },
     ],
   },
@@ -87,12 +85,6 @@ const hrNavigationSections: NavSection[] = [
       { name: "Job Applications", href: "/dashboard/received-applications", icon: Inbox },
       { name: "Candidates", href: "/dashboard/candidates", icon: Users },
       { name: "Job Matching", href: "/dashboard/job-matching", icon: Target },
-    ],
-  },
-  {
-    items: [
-      { name: "Internships", href: "/dashboard/internships", icon: BookOpen },
-      { name: "Internship Applications", href: "/dashboard/internship-applications", icon: ClipboardCheck },
     ],
   },
   {
