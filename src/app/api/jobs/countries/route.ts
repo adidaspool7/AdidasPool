@@ -22,11 +22,15 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || undefined;
     const excludeType = searchParams.get("excludeType") || undefined;
     const internshipStatus = searchParams.get("internshipStatus") || undefined;
+    // Mirror the same default as /api/jobs so the country dropdown only
+    // shows countries that have jobs in the current status scope.
+    const status = searchParams.get("status") || "OPEN";
 
     const countries = await jobUseCases.listDistinctCountries({
       type,
       excludeType,
       internshipStatus,
+      status,
     });
     return NextResponse.json({ countries });
   } catch (error) {

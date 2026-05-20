@@ -32,8 +32,11 @@ export async function GET(request: NextRequest) {
     const country = countryRaw
       ? countryRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : undefined;
+    // Default to OPEN so candidates never see closed jobs. HR can pass
+    // status=CLOSED or status=ALL to override.
+    const status = searchParams.get("status") || "OPEN";
 
-    const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department, country });
+    const result = await jobUseCases.listJobs({ page, pageSize, search, type, excludeType, internshipStatus, department, country, status });
     return NextResponse.json(result);
   } catch (error) {
     log.error("Error fetching jobs:", error);

@@ -18,6 +18,7 @@ export class SupabaseJobRepository implements IJobRepository {
     internshipStatus?: string;
     department?: string | string[];
     country?: string | string[];
+    status?: string;
   }) {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 100;
@@ -76,6 +77,8 @@ export class SupabaseJobRepository implements IJobRepository {
         query = query.in("country", cleaned);
       }
     }
+    if (options?.status && options.status !== "ALL")
+      query = query.eq("status", options.status);
 
     const { data, error, count } = await query
       .order("created_at", { ascending: false })
@@ -110,6 +113,8 @@ export class SupabaseJobRepository implements IJobRepository {
         "internship_status",
         options.internshipStatus
       );
+    if (options?.status && options.status !== "ALL")
+      countriesQuery = countriesQuery.eq("status", options.status);
     const { data: allCountries } = await countriesQuery;
     const distinctCountries = new Set(
       (allCountries ?? []).map((r: any) => r.country)
@@ -163,6 +168,7 @@ export class SupabaseJobRepository implements IJobRepository {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
+    status?: string;
   }): Promise<string[]> {
     let q = db
       .from("jobs")
@@ -172,6 +178,8 @@ export class SupabaseJobRepository implements IJobRepository {
     if (options?.excludeType) q = q.neq("type", options.excludeType);
     if (options?.internshipStatus)
       q = q.eq("internship_status", options.internshipStatus);
+    if (options?.status && options.status !== "ALL")
+      q = q.eq("status", options.status);
     const { data, error } = await q;
     assertNoError(error, "job.findDistinctCountries");
     const set = new Set<string>();
@@ -459,5 +467,43 @@ export class SupabaseJobRepository implements IJobRepository {
       })
       .eq("id", id);
     assertNoError(error, "job.markClosed");
+  }
+
+  /**
+   * After a full scrape, bulk-close all OPEN scraper-sourced jobs whose
+   * external_id was NOT seen in the current run. Manually-created jobs
+   * (external_id IS NULL) are never touched.
+   */
+  async closeStaleScrapedJobs(seenExternalIds: string[]): Promise<number> {
+    if (seenExternalIds.length === 0) return 0;
+
+    // Fetch all currently OPEN jobs that came from the scraper
+    const { data, error } = await db
+      .from("jobs")
+      .select("id, external_id")
+      .eq("status", "OPEN")
+      .not("external_id", "is", null);
+    assertNoError(error, "job.closeStaleScrapedJobs.fetch");
+
+    const seenSet = new Set(seenExternalIds);
+    const toClose = ((data ?? []) as Array<{ id: string; external_id: string | null }>)
+      .filter((r) => r.external_id !== null && !seenSet.has(r.external_id!));
+
+    if (toClose.length === 0) return 0;
+
+    const idsToClose = toClose.map((r) => r.id);
+
+    // Bulk update in chunks to stay within Supabase payload limits
+    const CHUNK = 500;
+    for (let i = 0; i < idsToClose.length; i += CHUNK) {
+      const chunk = idsToClose.slice(i, i + CHUNK);
+      const { error: updateError } = await db
+        .from("jobs")
+        .update({ status: "CLOSED" })
+        .in("id", chunk);
+      assertNoError(updateError, `job.closeStaleScrapedJobs.update (chunk ${Math.floor(i / CHUNK) + 1})`);
+    }
+
+    return idsToClose.length;
   }
 }

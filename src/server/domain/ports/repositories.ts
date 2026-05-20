@@ -297,6 +297,8 @@ export interface IJobRepository {
     internshipStatus?: string;
     department?: string | string[];
     country?: string | string[];
+    /** Filter by job_status. Use 'ALL' to skip filtering. Defaults to no filter (all statuses). */
+    status?: string;
   }): Promise<PaginatedResult<JobRow>>;
   findById(id: string): Promise<JobRow | null>;
   findByExternalId(externalId: string): Promise<JobRow | null>;
@@ -344,6 +346,7 @@ export interface IJobRepository {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
+    status?: string;
   }): Promise<string[]>;
   /** Persist the LLM-extracted structured requirements for a job. */
   updateParsedRequirements(
@@ -353,6 +356,11 @@ export interface IJobRepository {
   ): Promise<void>;
   /** Mark a job as no longer accepting applications (detected by scraper). */
   markClosed(id: string): Promise<void>;
+  /**
+   * After a full scrape, mark all OPEN scraper-sourced jobs whose externalId
+   * is NOT in `seenExternalIds` as CLOSED. Returns count of closed jobs.
+   */
+  closeStaleScrapedJobs(seenExternalIds: string[]): Promise<number>;
   upsertMatch(
     jobId: string,
     candidateId: string,

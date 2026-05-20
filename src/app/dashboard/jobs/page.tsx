@@ -123,6 +123,7 @@ interface SyncResult {
   internships?: number;
   created: number;
   updated: number;
+  closed?: number;
   failed: number;
   durationMs: number;
   error?: string;
@@ -651,6 +652,7 @@ function SyncResultBanner({
           ` (incl. ${result.internships} internship${result.internships === 1 ? "" : "s"})`}
         {" · "}
         {result.created} new &middot; {result.updated} updated
+        {typeof result.closed === "number" && result.closed > 0 && ` · ${result.closed} closed`}
         {result.failed > 0 && ` · ${result.failed} failed`}
         {" · "}
         {(result.durationMs / 1000).toFixed(1)}s
@@ -694,6 +696,9 @@ export default function JobsPage() {
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [typeTab, setTypeTab] = useState<"all" | "jobs" | "internships">("all");
   const typeTabRef = useRef<"all" | "jobs" | "internships">("all");
+  // HR-only: filter between open and closed jobs
+  const [statusTab, setStatusTab] = useState<"open" | "closed">("open");
+  const statusTabRef = useRef<"open" | "closed">("open");
 
   // Application state
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -721,6 +726,8 @@ export default function JobsPage() {
         const tab = typeTabRef.current;
         if (tab === "jobs") params.set("excludeType", "INTERNSHIP");
         else if (tab === "internships") params.set("type", "INTERNSHIP");
+        // HR can toggle between open and closed; candidates always get OPEN (API default)
+        if (role === "hr") params.set("status", statusTabRef.current === "closed" ? "CLOSED" : "OPEN");
 
         const res = await fetch(`/api/jobs?${params}`);
         if (res.ok) {
@@ -743,7 +750,9 @@ export default function JobsPage() {
 
     // Populate the country dropdown. Failure is non-fatal — dropdown just
     // shows "All countries".
-    fetch("/api/jobs/countries")
+    const countriesParams = new URLSearchParams();
+    if (role === "hr") countriesParams.set("status", statusTabRef.current === "closed" ? "CLOSED" : "OPEN");
+    fetch(`/api/jobs/countries?${countriesParams}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.countries && Array.isArray(data.countries)) {
@@ -1077,6 +1086,42 @@ export default function JobsPage() {
           </button>
         ))}
       </div>
+
+      {/* Status tabs (HR only) */}
+      {role === "hr" && (
+        <div className="flex gap-1 rounded-lg border bg-muted p-1 w-fit">
+          {(["open", "closed"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                if (tab === statusTab) return;
+                statusTabRef.current = tab;
+                setStatusTab(tab);
+                setSearchQuery("");
+                setSearchInput("");
+                // Also refresh the country dropdown for the new status scope
+                const cp = new URLSearchParams({ status: tab === "closed" ? "CLOSED" : "OPEN" });
+                fetch(`/api/jobs/countries?${cp}`)
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then((data) => {
+                    if (data?.countries && Array.isArray(data.countries)) {
+                      setAvailableCountries(data.countries as string[]);
+                    }
+                  })
+                  .catch(() => {});
+                fetchJobs(1, undefined, departmentFilter.length > 0 ? departmentFilter : undefined, countryFilter.length > 0 ? countryFilter : undefined);
+              }}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                statusTab === tab
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab === "open" ? "Open" : "Closed"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search & Filter */}
       <div className="flex gap-2 flex-wrap">
