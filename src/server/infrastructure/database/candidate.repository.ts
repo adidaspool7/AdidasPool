@@ -74,6 +74,10 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     // Source type
     if (filters.sourceType) {
       query = query.eq("source_type", filters.sourceType);
+    } else if (filters.excludeSourceTypes && filters.excludeSourceTypes.length > 0) {
+      for (const excluded of filters.excludeSourceTypes) {
+        query = query.neq("source_type", excluded);
+      }
     }
 
     // Score range

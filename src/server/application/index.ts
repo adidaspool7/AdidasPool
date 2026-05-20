@@ -22,6 +22,8 @@ import {
   shortlistRepository,
   dashboardWidgetRepository,
   segmentRepository,
+  ambassadorProgramRepository,
+  ambassadorApplicationRepository,
   cvParserService,
   emailService,
   jobScraperService,
@@ -46,6 +48,7 @@ import { AnalyticsUseCases } from "@server/application/use-cases/analytics.use-c
 import { ShortlistUseCases } from "@server/application/use-cases/shortlist.use-cases";
 import { DashboardWidgetUseCases } from "@server/application/use-cases/dashboard-widget.use-cases";
 import { SegmentUseCases } from "@server/application/use-cases/segment.use-cases";
+import { AmbassadorUseCases } from "@server/application/use-cases/ambassador.use-cases";
 import { runWidgetQuery } from "@server/infrastructure/database/widget-query.service";
 
 // Re-export error classes so API routes import from barrel, not deep paths
@@ -93,6 +96,12 @@ export const dashboardWidgetUseCases = new DashboardWidgetUseCases(
 );
 
 export const segmentUseCases = new SegmentUseCases(segmentRepository);
+
+export const ambassadorUseCases = new AmbassadorUseCases(
+  ambassadorProgramRepository,
+  ambassadorApplicationRepository,
+  candidateRepository
+);
 
 // Direct repository exports (for simple config endpoints that don't need use-case wrapping)
 export { scoringWeightsRepository };
