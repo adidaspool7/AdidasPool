@@ -187,6 +187,7 @@ export interface CandidateFilters {
   language?: string;
   languageLevel?: string;
   sourceType?: string;
+  excludeSourceTypes?: string[];
   businessArea?: string;
   shortlisted?: boolean;
   needsReview?: boolean | null;
@@ -737,5 +738,85 @@ export interface ISegmentRepository {
   removeMember(segmentId: string, candidateId: string): Promise<boolean>;
   /** Return the segment IDs this candidate belongs to. */
   findSegmentsForCandidate(candidateId: string): Promise<string[]>;
+}
+
+// ============================================
+// AMBASSADOR PROGRAM ROW TYPES
+// ============================================
+
+export interface AmbassadorProgramRow {
+  id: string;
+  title: string;
+  description?: string | null;
+  cohort?: string | null;
+  applicationDeadline?: string | Date | null;
+  location?: string | null;
+  country?: string | null;
+  requirements?: string | null;
+  perks?: string | null;
+  status?: string | null;
+  maxApplicants?: number | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  /** Aggregated count from PostgREST join */
+  applicationCount?: number;
+  [key: string]: unknown;
+}
+
+export interface AmbassadorApplicationRow {
+  id: string;
+  programId: string;
+  candidateId: string;
+  status: string;
+  motivation?: string | null;
+  university?: string | null;
+  yearOfStudy?: string | null;
+  previousExperience?: string | null;
+  appliedAt?: string | Date;
+  updatedAt?: string | Date;
+  candidate?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    location: string | null;
+    overallCvScore: number | null;
+    status: string | null;
+    rawCvUrl: string | null;
+  };
+  [key: string]: unknown;
+}
+
+// ============================================
+// AMBASSADOR PROGRAM REPOSITORY PORT
+// ============================================
+
+export interface IAmbassadorProgramRepository {
+  findAll(opts?: { status?: string }): Promise<AmbassadorProgramRow[]>;
+  findById(id: string): Promise<AmbassadorProgramRow | null>;
+  create(data: Record<string, unknown>): Promise<AmbassadorProgramRow>;
+  update(id: string, data: Record<string, unknown>): Promise<AmbassadorProgramRow>;
+  delete(id: string): Promise<boolean>;
+}
+
+// ============================================
+// AMBASSADOR APPLICATION REPOSITORY PORT
+// ============================================
+
+export interface IAmbassadorApplicationRepository {
+  findByProgram(programId: string): Promise<AmbassadorApplicationRow[]>;
+  findByCandidate(candidateId: string): Promise<AmbassadorApplicationRow[]>;
+  findOne(programId: string, candidateId: string): Promise<AmbassadorApplicationRow | null>;
+  create(data: {
+    programId: string;
+    candidateId: string;
+    motivation?: string | null;
+    university?: string | null;
+    yearOfStudy?: string | null;
+    previousExperience?: string | null;
+  }): Promise<AmbassadorApplicationRow>;
+  updateStatus(id: string, status: string): Promise<AmbassadorApplicationRow>;
+  update(id: string, data: Record<string, unknown>): Promise<AmbassadorApplicationRow>;
+  delete(id: string): Promise<boolean>;
 }
 

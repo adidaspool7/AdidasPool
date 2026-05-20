@@ -20,6 +20,7 @@ import {
   Megaphone,
   Menu,
   Target,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@client/lib/utils";
 import { useRole, type UserRole } from "@client/components/providers/role-provider";
@@ -85,6 +86,7 @@ const hrNavigationSections: NavSection[] = [
       { name: "Job Applications", href: "/dashboard/received-applications", icon: Inbox },
       { name: "Candidates", href: "/dashboard/candidates", icon: Users },
       { name: "Job Matching", href: "/dashboard/job-matching", icon: Target },
+      { name: "Ambassador Programs", href: "/dashboard/ambassador", icon: Trophy },
     ],
   },
   {

@@ -47,7 +47,7 @@ CREATE TYPE candidate_status AS ENUM (
 );
 
 CREATE TYPE candidate_source AS ENUM (
-  'EXTERNAL', 'INTERNAL', 'PLATFORM'
+  'EXTERNAL', 'INTERNAL', 'PLATFORM', 'AMBASSADOR'
 );
 
 CREATE TYPE work_model AS ENUM (
@@ -927,6 +927,54 @@ ALTER TABLE parsing_jobs                DISABLE ROW LEVEL SECURITY;
 ALTER TABLE scoring_weights             DISABLE ROW LEVEL SECURITY;
 ALTER TABLE scoring_presets             DISABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_jobs                   DISABLE ROW LEVEL SECURITY;
+
+-- ----------------------------------------------------------------
+-- 19. AMBASSADOR PROGRAMS & APPLICATIONS
+-- ----------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS ambassador_programs (
+  id                   TEXT PRIMARY KEY,
+  title                TEXT NOT NULL,
+  description          TEXT,
+  cohort               TEXT,
+  application_deadline TIMESTAMPTZ,
+  location             TEXT,
+  country              TEXT,
+  requirements         TEXT,
+  perks                TEXT,
+  status               TEXT NOT NULL DEFAULT 'DRAFT',
+  max_applicants       INT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER set_ambassador_programs_updated_at
+  BEFORE UPDATE ON ambassador_programs
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE IF NOT EXISTS ambassador_applications (
+  id                  TEXT PRIMARY KEY,
+  program_id          TEXT NOT NULL REFERENCES ambassador_programs(id) ON DELETE CASCADE,
+  candidate_id        TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  status              TEXT NOT NULL DEFAULT 'SUBMITTED',
+  motivation          TEXT,
+  university          TEXT,
+  year_of_study       TEXT,
+  previous_experience TEXT,
+  applied_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(program_id, candidate_id)
+);
+
+CREATE TRIGGER set_ambassador_applications_updated_at
+  BEFORE UPDATE ON ambassador_applications
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_ambassador_applications_program   ON ambassador_applications(program_id);
+CREATE INDEX idx_ambassador_applications_candidate ON ambassador_applications(candidate_id);
+
+ALTER TABLE ambassador_programs     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE ambassador_applications DISABLE ROW LEVEL SECURITY;
 
 -- Insert default scoring weights row
 INSERT INTO scoring_weights (id, experience, years_of_experience, education_level, location_match, language)

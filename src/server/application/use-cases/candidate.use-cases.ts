@@ -47,6 +47,9 @@ export class CandidateUseCases {
       language: filters.language,
       languageLevel: filters.languageLevel,
       sourceType: filters.sourceType,
+      // By default, exclude AMBASSADOR candidates — they appear only in the ambassador section.
+      // If a specific sourceType is passed, exclusion is skipped.
+      excludeSourceTypes: filters.sourceType ? undefined : ["AMBASSADOR"],
       businessArea: filters.businessArea,
       shortlisted: filters.shortlisted,
       needsReview: filters.needsReview,

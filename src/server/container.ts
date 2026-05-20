@@ -21,6 +21,8 @@ import { SupabaseAnalyticsRepository } from "@server/infrastructure/database/ana
 import { SupabaseShortlistRepository } from "@server/infrastructure/database/shortlist.repository";
 import { SupabaseDashboardWidgetRepository } from "@server/infrastructure/database/dashboard-widget.repository";
 import { SupabaseSegmentRepository } from "@server/infrastructure/database/segment.repository";
+import { SupabaseAmbassadorProgramRepository } from "@server/infrastructure/database/ambassador-program.repository";
+import { SupabaseAmbassadorApplicationRepository } from "@server/infrastructure/database/ambassador-application.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
 import { JobRequirementsExtractorService } from "@server/infrastructure/ai/job-requirements-extractor.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
@@ -44,6 +46,8 @@ import type {
   IShortlistRepository,
   IDashboardWidgetRepository,
   ISegmentRepository,
+  IAmbassadorProgramRepository,
+  IAmbassadorApplicationRepository,
 } from "@server/domain/ports/repositories";
 import type {
   ICvParserService,
@@ -95,6 +99,12 @@ export const dashboardWidgetRepository: IDashboardWidgetRepository =
 
 export const segmentRepository: ISegmentRepository =
   new SupabaseSegmentRepository();
+
+export const ambassadorProgramRepository: IAmbassadorProgramRepository =
+  new SupabaseAmbassadorProgramRepository();
+
+export const ambassadorApplicationRepository: IAmbassadorApplicationRepository =
+  new SupabaseAmbassadorApplicationRepository();
 
 // ============================================
 // SERVICE INSTANCES

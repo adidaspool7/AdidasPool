@@ -75,6 +75,7 @@ export async function middleware(request: NextRequest) {
    */
   const PUBLIC_API_PREFIXES = [
     "/api/auth/", // supabase callback, if any
+    "/api/ambassador/apply/", // public program application (no login required)
   ];
   const HR_ONLY_API_PREFIXES = [
     "/api/candidates/rescore",
@@ -84,6 +85,7 @@ export async function middleware(request: NextRequest) {
     "/api/notifications/campaigns",
     "/api/upload/bulk",
     "/api/analytics",
+    "/api/ambassador/programs/",
   ];
 
   if (pathname.startsWith("/api/")) {

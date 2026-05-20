@@ -298,7 +298,7 @@ export const CandidateFilterSchema = z.object({
   maxScore: z.number().min(0).max(100).optional(),
   language: z.string().optional(),
   languageLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).optional(),
-  sourceType: z.enum(["EXTERNAL", "INTERNAL"]).optional(),
+  sourceType: z.enum(["EXTERNAL", "INTERNAL", "PLATFORM", "AMBASSADOR"]).optional(),
   businessArea: z.string().optional(),
   shortlisted: z.boolean().optional(),
   needsReview: z.boolean().nullable().optional(),
@@ -347,7 +347,7 @@ export const UpdateCandidateSchema = z
       .nullable(),
     workModel: z.enum(["REMOTE", "HYBRID", "ON_SITE"]).optional().nullable(),
     bio: z.string().max(500).optional().nullable(),
-    sourceType: z.enum(["EXTERNAL", "INTERNAL"]).optional(),
+    sourceType: z.enum(["EXTERNAL", "INTERNAL", "PLATFORM", "AMBASSADOR"]).optional(),
     status: z
       .enum([
         "NEW",
