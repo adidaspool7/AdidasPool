@@ -54,13 +54,17 @@ If turn_count < 5, require strong evidence of factual error to fail.
 
 
 LANGUAGE_EVALUATION_PROMPT = """
-You are a certified CEFR English language examiner evaluating a language assessment
-transcript. Assess the candidate's English proficiency across four dimensions:
+You are a certified CEFR language examiner evaluating a structured language assessment transcript.
+The assessment followed a fixed 4-phase script: intro, 5 oral questions, 1 writing dictation task,
+and a closing. Assess the candidate across FIVE dimensions:
 
-- Grammar accuracy and range
-- Vocabulary range and precision
-- Fluency and coherence
-- Task achievement (appropriate and extended responses)
+1. Grammar — accuracy and range across all oral turns
+2. Vocabulary — range and precision across all oral turns
+3. Fluency — coherence, natural flow, response length and depth
+4. Task achievement — did the candidate engage appropriately with the job-context questions?
+5. Writing — accuracy of the dictation turn: how faithfully did the candidate reproduce the
+   reference text? Penalise spelling errors, missing words, punctuation errors, and omissions.
+   Award full marks (C2) only for a perfect or near-perfect reproduction.
 
 ## CEFR level criteria
 - A1/A2: Basic phrases, very limited vocabulary, frequent errors
@@ -69,21 +73,34 @@ transcript. Assess the candidate's English proficiency across four dimensions:
 - C1: Fluent, flexible, precise language with rare errors
 - C2: Near-native mastery, wide range, minimal errors
 
+## Identifying the writing turn
+The writing turn is the candidate message that immediately follows the AI message presenting
+the dictation text (the adidas Porto paragraph). Compare that candidate message to the
+reference text to score the writing dimension.
+
 ## Output format — strict JSON only
 
 {
-  "technical": { "passed": true, "cefr_level": "B2", "grammar": "B2", "vocabulary": "B1", "fluency": "B2" },
+  "technical": {
+    "passed": true,
+    "cefr_level": "B2",
+    "grammar": "B2",
+    "vocabulary": "B1",
+    "fluency": "B2",
+    "writing": "B1"
+  },
   "integrity": { "status": "CLEAR" },
   "final": true,
   "evidence": [],
   "rationale": {
-    "technical": "B2 overall — good grammar control, varied vocabulary, minor errors in complex structures",
-    "integrity": "Natural conversational responses with appropriate complexity",
-    "final": "B2 — recommended for roles requiring professional English communication"
+    "technical": "B2 overall — good grammar control, varied vocabulary; writing had 3 spelling errors",
+    "integrity": "Natural responses, no copy-paste pattern detected in oral turns",
+    "final": "B2 — meets B1 threshold, recommended for roles requiring professional communication"
   }
 }
 
-Pass threshold: B1 or above (passed=true). A1/A2 is passed=false.
+Pass threshold: B1 or above overall (passed=true). A1/A2 is passed=false.
+If the writing turn is absent (candidate skipped it), set "writing": "A1" and note it in the rationale.
 
 Turn count context: {turn_count} user turns were recorded.
 """
@@ -195,6 +212,8 @@ Transcript ({turn_count} candidate turns):
             result_technical["grammar"] = str(technical_data.get("grammar", cefr_level)).upper()
             result_technical["vocabulary"] = str(technical_data.get("vocabulary", cefr_level)).upper()
             result_technical["fluency"] = str(technical_data.get("fluency", cefr_level)).upper()
+            writing = str(technical_data.get("writing", cefr_level)).upper()
+            result_technical["writing"] = writing if writing in VALID_CEFR_LEVELS else cefr_level
 
         return {
             "technical": result_technical,

@@ -169,38 +169,157 @@ Interview flow:
 """
 
 
+# ── Language mode — writing reference texts ─────────────────────────────────────
+# One translation of the adidas Porto paragraph per supported language.
+# The evaluator compares the candidate's typed text against this reference.
+
+WRITING_REFERENCE_TEXTS: dict[str, str] = {
+    "english": (
+        "adidas Porto provides globally unified services to adidas employees, consumers and other users, "
+        "based on standardized and automated solutions across different functions and markets. "
+        "We leverage state-of-the-art technology and encourage a human-centric and innovative mindset "
+        "to continually raise the bar of the user experience. This is enabling us to drive operational "
+        "efficiency, improved agility, and better decision-making whilst reducing complexity in adidas.\n"
+        "Our mandate is to be the foundation for an agile and efficient company. This is our role to "
+        "support adidas mission of being the best sports brand in the world.\n"
+        "We embrace diverse backgrounds, experiences, and perspectives and seek to create a workforce "
+        "that reflects our consumers and communities. We champion individual uniqueness and cultivate "
+        "a culture of belonging so that everyone can create at their best."
+    ),
+    "portuguese": (
+        "A adidas Porto fornece serviços globalmente unificados a colaboradores, consumidores e outros "
+        "utilizadores da adidas, com base em soluções padronizadas e automatizadas em diferentes funções "
+        "e mercados. Recorremos a tecnologia de ponta e incentivamos uma mentalidade centrada no ser humano "
+        "e inovadora para elevar continuamente o nível da experiência do utilizador. Isto permite-nos "
+        "impulsionar a eficiência operacional, melhorar a agilidade e tomar melhores decisões, reduzindo "
+        "simultaneamente a complexidade na adidas.\n"
+        "O nosso mandato é ser a fundação de uma empresa ágil e eficiente. Este é o nosso papel para apoiar "
+        "a missão da adidas de ser a melhor marca de desporto do mundo.\n"
+        "Valorizamos origens, experiências e perspetivas diversas e procuramos criar uma força de trabalho "
+        "que reflita os nossos consumidores e comunidades. Defendemos a singularidade individual e cultivamos "
+        "uma cultura de pertença para que todos possam criar ao seu melhor nível."
+    ),
+    "spanish": (
+        "adidas Porto proporciona servicios globalmente unificados a los empleados, consumidores y otros "
+        "usuarios de adidas, basados en soluciones estandarizadas y automatizadas en diferentes funciones "
+        "y mercados. Aprovechamos la tecnología más avanzada y fomentamos una mentalidad centrada en el "
+        "ser humano e innovadora para elevar continuamente el nivel de la experiencia del usuario. Esto nos "
+        "permite impulsar la eficiencia operativa, mejorar la agilidad y tomar mejores decisiones mientras "
+        "reducimos la complejidad en adidas.\n"
+        "Nuestro mandato es ser la base de una empresa ágil y eficiente. Este es nuestro papel para apoyar "
+        "la misión de adidas de ser la mejor marca deportiva del mundo.\n"
+        "Valoramos la diversidad de orígenes, experiencias y perspectivas, y buscamos crear una fuerza "
+        "laboral que refleje a nuestros consumidores y comunidades. Defendemos la singularidad individual "
+        "y cultivamos una cultura de pertenencia para que todos puedan crear en su mejor nivel."
+    ),
+    "german": (
+        "adidas Porto bietet weltweit einheitliche Dienstleistungen für adidas-Mitarbeiter, Verbraucher "
+        "und andere Nutzer an, basierend auf standardisierten und automatisierten Lösungen in verschiedenen "
+        "Funktionen und Märkten. Wir nutzen modernste Technologie und fördern eine menschenzentrierte und "
+        "innovative Denkweise, um die Messlatte für die Nutzererfahrung kontinuierlich höher zu legen. "
+        "Dies ermöglicht es uns, die betriebliche Effizienz zu steigern, die Agilität zu verbessern und "
+        "bessere Entscheidungen zu treffen, während wir die Komplexität bei adidas reduzieren.\n"
+        "Unser Auftrag ist es, das Fundament für ein agiles und effizientes Unternehmen zu sein. Dies ist "
+        "unsere Rolle zur Unterstützung der Mission von adidas, die beste Sportmarke der Welt zu sein.\n"
+        "Wir begrüßen unterschiedliche Hintergründe, Erfahrungen und Perspektiven und streben danach, eine "
+        "Belegschaft zu schaffen, die unsere Verbraucher und Gemeinschaften widerspiegelt. Wir fördern "
+        "individuelle Einzigartigkeit und kultivieren eine Kultur der Zugehörigkeit, damit jeder sein "
+        "Bestes geben kann."
+    ),
+    "french": (
+        "adidas Porto fournit des services mondialement unifiés aux employés, consommateurs et autres "
+        "utilisateurs d'adidas, basés sur des solutions standardisées et automatisées dans différentes "
+        "fonctions et marchés. Nous tirons parti des technologies de pointe et encourageons un état d'esprit "
+        "centré sur l'humain et innovant pour relever continuellement la barre de l'expérience utilisateur. "
+        "Cela nous permet de stimuler l'efficacité opérationnelle, d'améliorer l'agilité et de prendre "
+        "de meilleures décisions tout en réduisant la complexité chez adidas.\n"
+        "Notre mission est d'être le fondement d'une entreprise agile et efficace. C'est notre rôle pour "
+        "soutenir la mission d'adidas d'être la meilleure marque sportive du monde.\n"
+        "Nous accueillons des parcours, des expériences et des perspectives diversifiés et cherchons à "
+        "créer une main-d'œuvre qui reflète nos consommateurs et communautés. Nous défendons l'unicité "
+        "individuelle et cultivons une culture d'appartenance afin que chacun puisse créer au mieux de "
+        "ses capacités."
+    ),
+}
+
+WRITING_REFERENCE_TEXTS_DEFAULT = WRITING_REFERENCE_TEXTS["english"]
+
+
+def get_writing_reference_text(language: str) -> str:
+    return WRITING_REFERENCE_TEXTS.get(language.strip().lower(), WRITING_REFERENCE_TEXTS_DEFAULT)
+
+
 # ── Language mode prompts ───────────────────────────────────────────────────────
 
 LANGUAGE_PERSONA_PROMPT = """
-You are a friendly, professional CEFR language examiner assessing a candidate's English proficiency.
-Your tone is warm and encouraging, but your evaluation is rigorous.
+You are a friendly, professional CEFR language examiner conducting a structured language proficiency
+assessment on behalf of a recruitment team. Your tone is warm, professional, and encouraging.
+Your evaluation is rigorous but fair.
 """
 
 LANGUAGE_GUARDRAILS_PROMPT = """
 Strict rules you must always follow:
-1) Never discuss technical programming or IT topics — this is a language proficiency assessment only.
-2) Ask open-ended questions that require extended responses (3+ sentences minimum to answer properly).
-3) Cover a variety of topic domains: personal background, opinions, hypothetical scenarios, description of processes, storytelling.
-4) Do NOT correct grammar explicitly mid-conversation — note errors internally for evaluation.
-5) Ask exactly one question per turn.
-6) If a response is very short, ask a follow-up prompt like "Could you tell me a bit more about that?"
-7) Keep a natural conversational pace.
+1) Conduct the entire interview in the assessed language — every message you send must be in that language.
+2) Never discuss technical programming or IT topics.
+3) Do NOT correct grammar explicitly mid-conversation — note errors internally for evaluation.
+4) Ask exactly one question per turn during the oral phase.
+5) If a response is very short (under 2 sentences), follow up with: "Could you tell me a bit more about that?"
+6) If the candidate writes in the wrong language, politely remind them to respond in the assessed language.
+7) During the writing phase, present the dictation text exactly as provided — do not paraphrase or shorten it.
+8) Never skip a phase or reorder them.
 """
 
 LANGUAGE_FLOW_PROMPT = f"""
-Language assessment flow:
-- Begin with a warm-up question about the candidate's background or daily life.
-- Progress through: describing experiences → sharing opinions → handling abstract/hypothetical topics.
-- Gradually increase topic complexity to probe upper CEFR levels.
-- Keep an internal turn-state:
-  - current_domain (background/opinions/abstract/process)
-  - cefr_signal (A1/A2/B1/B2/C1/C2, updated each turn)
-  - fluency_confidence (0.0-1.0)
-  - remaining_question_budget
-- Deterministic stop conditions:
-  - max 10 questions
-  - end if fluency_confidence >= 0.85 and at least 5 questions asked
-- when ending, append {END_INTERVIEW_SENTINEL} token at response end.
+You MUST follow this exact 4-phase structure. Do not deviate from the order.
+
+══════════════════════════════════════════════════════════
+PHASE 1 — INTRO (exactly 1 turn, your opening message)
+══════════════════════════════════════════════════════════
+Deliver a warm personalized greeting using the candidate's name.
+State that this is a language proficiency assessment for the role they applied for.
+Clarify that there are no right or wrong answers — evaluation is on language fluency
+(comprehension, speaking, writing) and not on technical knowledge.
+Then ask the first oral question immediately (do not wait for a reply to the intro).
+
+══════════════════════════════════════════════════════════
+PHASE 2 — ORAL QUESTIONS (exactly 5 questions, one per turn)
+══════════════════════════════════════════════════════════
+Ask the following 5 questions in order, one per candidate reply.
+Adapt the phrasing naturally to the assessed language, but keep the intent identical.
+
+Q1: In your perspective, what are the main tasks that are allocated to the position you applied for?
+Q2: What skills do you believe are important for someone who will work in this department or area? Could you please provide some examples?
+Q3: What challenges do you believe you will deal with in the daily tasks within this department or area? Please justify your answer.
+Q4: Can you identify the values of our company? If not, can you identify some values that are important to you in a work environment?
+Q5: Which of those values do you relate to the most, and why?
+
+After the candidate answers Q5, move immediately to Phase 3.
+
+══════════════════════════════════════════════════════════
+PHASE 3 — WRITING TASK (exactly 1 turn to present, 1 candidate reply)
+══════════════════════════════════════════════════════════
+Instruct the candidate to type the following text exactly as shown in the chat.
+Present the dictation text on a new line, verbatim — do not translate or alter it.
+After the candidate submits their typed version, move immediately to Phase 4.
+
+Dictation text to present:
+{{WRITING_REFERENCE_TEXT}}
+
+══════════════════════════════════════════════════════════
+PHASE 4 — CLOSING (exactly 1 turn, then end)
+══════════════════════════════════════════════════════════
+Thank the candidate for their time.
+Inform them that the Talent Acquisition team will review their application and get back to them
+as soon as possible, and that they may contact the team if they have any questions.
+Then append the end token: {END_INTERVIEW_SENTINEL}
+
+══════════════════════════════════════════════════════════
+INTERNAL TURN STATE (update each turn, do not reveal)
+══════════════════════════════════════════════════════════
+- phase: intro | oral_q1 | oral_q2 | oral_q3 | oral_q4 | oral_q5 | writing | closing
+- oral_questions_asked: 0-5
+- writing_submitted: false | true
+- cefr_signal: A1/A2/B1/B2/C1/C2
 """
 
 
@@ -305,17 +424,22 @@ Extracted projects:
 
 
 def build_language_system_prompt(candidate: CandidateProfile) -> str:
-    name_block = f"Candidate Name: {candidate.full_name or 'Unknown'}"
+    name = candidate.full_name or "Candidate"
+    language = candidate.target_language or "English"
+    writing_text = get_writing_reference_text(language)
+    flow = LANGUAGE_FLOW_PROMPT.replace("{{WRITING_REFERENCE_TEXT}}", writing_text)
     return f"""
 {LANGUAGE_PERSONA_PROMPT}
 {LANGUAGE_GUARDRAILS_PROMPT}
-{LANGUAGE_FLOW_PROMPT}
+{flow}
 
 Candidate context:
 - Candidate ID: {candidate.candidate_id}
-- {name_block}
-- Assessment type: CEFR English Proficiency (Language Assessment mode)
-- Do NOT ask about the candidate's technical skills or programming background.
+- Candidate Name: {name}
+- Assessed language: {language}
+- Assessment type: CEFR Language Proficiency (structured 4-phase script)
+- Conduct all your messages in {language}.
+- Do NOT ask about technical programming skills.
 """.strip()
 
 
@@ -336,8 +460,8 @@ class InterviewSessionManager:
         system_prompt = build_dynamic_system_prompt(candidate)
 
         opening_instruction = (
-            "Start the language proficiency assessment now with a warm, welcoming first question "
-            "about the candidate's background or daily life."
+            "Begin the language proficiency assessment now. Deliver Phase 1 (the intro) "
+            "and immediately ask Oral Question 1 in the same message, as instructed."
             if candidate.mode == "LANGUAGE"
             else "Start the interview now with your first deeply technical question."
         )
@@ -350,10 +474,12 @@ class InterviewSessionManager:
 
         initial_turn_state: dict[str, Any] = (
             {
-                "current_domain": "background",
+                "phase": "oral_q1",
+                "oral_questions_asked": 0,
+                "writing_submitted": False,
                 "cefr_signal": "B1",
-                "fluency_confidence": 0.1,
-                "remaining_question_budget": 10,
+                # Budget: 5 oral answers + 1 writing submission + 1 closing = 7 minimum turns
+                "remaining_question_budget": 7,
             }
             if candidate.mode == "LANGUAGE"
             else {
@@ -394,10 +520,21 @@ class InterviewSessionManager:
             turn_state["remaining_question_budget"] = max(remaining - 1, 0)
 
         if mode == "LANGUAGE":
-            turn_state["fluency_confidence"] = min(
-                float(turn_state.get("fluency_confidence", 0.1)) + 0.1,
-                0.9,
-            )
+            # Advance the phase state machine
+            phase = turn_state.get("phase", "oral_q1")
+            oral_asked = int(turn_state.get("oral_questions_asked", 0))
+            writing_submitted = bool(turn_state.get("writing_submitted", False))
+
+            if phase.startswith("oral_q"):
+                oral_asked += 1
+                turn_state["oral_questions_asked"] = oral_asked
+                if oral_asked < 5:
+                    turn_state["phase"] = f"oral_q{oral_asked + 1}"
+                else:
+                    turn_state["phase"] = "writing"
+            elif phase == "writing" and not writing_submitted:
+                turn_state["writing_submitted"] = True
+                turn_state["phase"] = "closing"
         else:
             turn_state["depth_level"] = min(int(turn_state.get("depth_level", 1)) + 1, 5)
             turn_state["evidence_confidence"] = min(

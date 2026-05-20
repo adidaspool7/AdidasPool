@@ -71,12 +71,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set interview_mode separately — column added by Phase 4 migration.
-    // If the migration has not been run yet, this update is silently skipped.
+    // Set interview_mode and target_language separately — columns added by later migrations.
+    // If the migration has not been run yet, these updates are silently skipped.
     if (parsed.data.interviewMode && parsed.data.interviewMode !== "TECHNICAL") {
       await db
         .from("interview_sessions")
-        .update({ interview_mode: parsed.data.interviewMode })
+        .update({
+          interview_mode: parsed.data.interviewMode,
+          ...(parsed.data.targetLanguage
+            ? { target_language: parsed.data.targetLanguage }
+            : {}),
+        })
+        .eq("id", interviewId)
+        .then(() => null, () => null);
+    } else if (parsed.data.targetLanguage) {
+      await db
+        .from("interview_sessions")
+        .update({ target_language: parsed.data.targetLanguage })
         .eq("id", interviewId)
         .then(() => null, () => null);
     }

@@ -19,6 +19,7 @@ type InterviewSessionPayload = {
   tokenExpiresAt: string;
   targetSkill: string | null;
   interviewMode?: string | null;
+  targetLanguage?: string | null;
 };
 
 function getInterviewBackendUrl(): string {
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     const { data: sessionRow, error: sessionError } = await db
       .from("interview_sessions")
-      .select("id, candidate_id, status, signed_token_hash, token_expires_at, target_skill")
+      .select("id, candidate_id, status, signed_token_hash, token_expires_at, target_skill, interview_mode, target_language")
       .eq("id", tokenPayload.interviewId)
       .single();
 
@@ -149,12 +150,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // For LANGUAGE mode, forward target_language from session (fall back to "English")
+    const targetLanguage =
+      enforcedMode === "LANGUAGE"
+        ? (interview.targetLanguage?.trim() || "English")
+        : undefined;
+
     const startResult = await callPython("/interview/start", {
       candidate: {
         ...parsed.data.candidate,
         target_skill: enforcedTargetSkill,
         skills: scopedCandidateSkills,
         mode: enforcedMode,
+        ...(targetLanguage ? { target_language: targetLanguage } : {}),
       },
     });
 
@@ -178,6 +186,7 @@ export async function POST(request: NextRequest) {
       transport: "websocket-planned",
       fallbackMode: parsed.data.mode,
       interviewMode: enforcedMode,
+      targetLanguage: targetLanguage ?? null,
       session: {
         interviewId: interview.id,
         aiSessionId: startResult.session_id,

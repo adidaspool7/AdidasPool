@@ -22,6 +22,7 @@ class CandidateProfile(BaseModel):
     projects: list[CandidateProject] = Field(default_factory=list)
     target_skill: str | None = None
     mode: Literal["TECHNICAL", "LANGUAGE"] = "TECHNICAL"
+    target_language: str = "English"
 
 
 class ChatMessage(BaseModel):
