@@ -22,8 +22,8 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Failed to get current user",
-        // Included in dev for diagnosis — remove before final submission
-        detail: process.env.NODE_ENV !== "production" ? message : undefined,
+        // TEMP: always expose detail to diagnose production 500 — revert after fix
+        detail: message,
       },
       { status: 500 }
     );
