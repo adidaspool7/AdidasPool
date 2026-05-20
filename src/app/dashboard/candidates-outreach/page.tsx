@@ -670,7 +670,7 @@ export default function CandidatesOutreachPage() {
               <Megaphone className="h-4 w-4" /> New Campaign
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogContent className="!max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>Create Promotional Campaign</DialogTitle>
             </DialogHeader>
@@ -689,7 +689,7 @@ export default function CandidatesOutreachPage() {
       {/* Edit Dialog */}
       {editingCampaign && (
         <Dialog open onOpenChange={() => setEditingCampaign(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogContent className="!max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>Edit Campaign</DialogTitle>
             </DialogHeader>
