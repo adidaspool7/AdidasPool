@@ -198,10 +198,15 @@ function ApplicationCard({
               )}
             </CardDescription>
           </div>
-          <Badge variant={config.variant} className="gap-1 shrink-0">
-            <StatusIcon className="h-3 w-3" />
-            {config.label}
-          </Badge>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Badge variant={config.variant} className="gap-1">
+              <StatusIcon className="h-3 w-3" />
+              {config.label}
+            </Badge>
+            {job.status === "CLOSED" && (
+              <Badge variant="secondary" className="text-xs">Position closed</Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">

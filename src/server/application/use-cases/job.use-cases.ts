@@ -82,6 +82,7 @@ export class JobUseCases {
     internshipStatus?: string;
     department?: string | string[];
     country?: string | string[];
+    status?: string;
   }) {
     return this.jobRepo.findMany(options);
   }
@@ -93,6 +94,7 @@ export class JobUseCases {
     type?: string;
     excludeType?: string;
     internshipStatus?: string;
+    status?: string;
   }) {
     return this.jobRepo.findDistinctCountries(options);
   }
@@ -301,6 +303,11 @@ export class JobUseCases {
       }))
     );
 
+    // Reconcile: jobs that were OPEN in the DB but absent from this scrape
+    // have been taken down — mark them CLOSED.
+    const seenExternalIds = scrapedJobs.map((j) => j.externalId);
+    const closed = await this.jobRepo.closeStaleScrapedJobs(seenExternalIds);
+
     const durationMs = Date.now() - startTime;
 
     return {
@@ -309,6 +316,7 @@ export class JobUseCases {
       internships,
       created,
       updated,
+      closed,
       failed: 0,
       errors: [],
       durationMs,
