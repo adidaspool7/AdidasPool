@@ -20,12 +20,14 @@ import {
   TabsTrigger,
 } from "@client/components/ui/tabs";
 import {
+  AlertCircle,
   ArrowLeft,
   Briefcase,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Info,
   Loader2,
   MoreHorizontal,
   RefreshCw,
@@ -635,14 +637,32 @@ export default function MatchCandidatesPage({
 
                     {isOpen && (
                       <div className="mt-3 ml-12 grid gap-2 md:grid-cols-2">
-                        {m.fit.breakdown.map((c) => (
+                        {m.fit.breakdown.map((c) => {
+                          const weightZero =
+                            c.applicable &&
+                            (criterionWeights[c.key as CriterionKey] ?? 1) === 0;
+                          return (
                           <div
                             key={c.key}
-                            className="flex items-start gap-2 text-sm border rounded-md px-3 py-2"
+                            className={cn(
+                              "flex items-start gap-2 text-sm border rounded-md px-3 py-2",
+                              weightZero && "opacity-40"
+                            )}
                           >
                             <div className="mt-0.5">
                               {!c.applicable ? (
                                 <span className="text-muted-foreground">—</span>
+                              ) : c.key === "preferredSkills" ? (
+                                // Preferred = bonus metric, never blocks eligibility
+                                <span title="Bonus criterion — never blocks eligibility">
+                                  <Info className="w-4 h-4 text-sky-400" />
+                                </span>
+                              ) : c.met && c.score === 0 ? (
+                                // Technically passes (e.g. threshold set to 0%) but
+                                // no actual coverage — highlight as suspicious
+                                <span title="Criterion is met but coverage is zero — check your threshold setting">
+                                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                                </span>
                               ) : c.met ? (
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                               ) : (
@@ -659,7 +679,8 @@ export default function MatchCandidatesPage({
                               <div className="text-xs text-muted-foreground">{c.detail}</div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

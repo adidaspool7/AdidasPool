@@ -714,7 +714,7 @@ export class JobUseCases {
     if (this.scoringWeightsRepo) {
       try {
         const w = await this.scoringWeightsRepo.get();
-        if (typeof w.requiredSkillThreshold === "number") {
+        if (typeof w.requiredSkillThreshold === "number" && w.requiredSkillThreshold > 0) {
           fitConfig.requiredSkillThreshold = w.requiredSkillThreshold;
         }
         if (w.fitCriterionWeights) {
