@@ -40,11 +40,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: do not add code between createServerClient and getUser()
-  // as it can cause session refresh issues.
+  // Use getSession() here — reads/validates the JWT from the cookie locally
+  // without a network round-trip. This keeps middleware fast and avoids the
+  // Vercel Edge 1s timeout that getUser() (which calls Supabase Auth remotely)
+  // can hit under load. Route handlers use getUser() where revocation checking
+  // is required.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const { pathname } = request.nextUrl;
   const role = user?.app_metadata?.role as "hr" | "candidate" | undefined;
