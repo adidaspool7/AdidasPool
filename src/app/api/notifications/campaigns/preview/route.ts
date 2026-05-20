@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       targetCountries = [],
       targetFields = [],
       targetEducation = [],
+      segmentId = null,
     } = body;
 
     const count = await notificationUseCases.previewAudience({
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
       targetCountries,
       targetFields,
       targetEducation,
+      segmentId,
     });
 
     return NextResponse.json({ audienceCount: count });

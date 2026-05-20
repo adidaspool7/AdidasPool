@@ -340,10 +340,16 @@ function CampaignEditorForm({
 
   async function previewAudience() {
     try {
+      const segId = targetSegmentId !== "__none__" ? targetSegmentId : null;
       const res = await fetch("/api/notifications/campaigns/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetAll, targetCountries: targetAll ? [] : targetCountries, targetInternshipsOnly: !targetAll && targetInternshipsOnly }),
+        body: JSON.stringify({
+          targetAll: segId ? false : targetAll,
+          targetCountries: targetAll || segId ? [] : targetCountries,
+          targetInternshipsOnly: !targetAll && !segId && targetInternshipsOnly,
+          segmentId: segId,
+        }),
       });
       if (res.ok) {
         const data = await res.json();

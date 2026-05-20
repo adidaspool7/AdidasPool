@@ -363,8 +363,15 @@ export class NotificationUseCases {
     targetCountries?: string[];
     targetFields?: string[];
     targetEducation?: string[];
+    segmentId?: string | null;
   }): Promise<number> {
     if (!this.candidateRepo) return 0;
+
+    // Segment fast-path: count is simply the number of members in the segment
+    if (campaign.segmentId && this.segmentRepo) {
+      const memberIds = await this.segmentRepo.findMemberIds(campaign.segmentId);
+      return memberIds.length;
+    }
     const candidates = await this.candidateRepo.findForNotifications();
 
     // If targeting internship candidates only, get the set of candidate IDs who applied to internships
