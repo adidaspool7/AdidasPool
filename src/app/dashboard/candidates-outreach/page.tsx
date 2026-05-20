@@ -318,7 +318,6 @@ function CampaignEditorForm({
   const isEdit = !!campaign;
   const [title, setTitle] = useState(campaign?.title ?? "");
   const [body, setBody] = useState(campaign?.body ?? "");
-  const [linkUrl, setLinkUrl] = useState(campaign?.linkUrl ?? "");
   const [targetAll, setTargetAll] = useState(campaign?.targetAll ?? true);
   const [targetInternshipsOnly, setTargetInternshipsOnly] = useState(campaign?.targetInternshipsOnly ?? false);
   const [targetCountries, setTargetCountries] = useState<string[]>(campaign?.targetCountries ?? []);
@@ -363,13 +362,12 @@ function CampaignEditorForm({
       const payload = {
         title: title.trim(),
         body: body.trim(),
-        linkUrl: linkUrl.trim() || undefined,
-        targetAll: targetEmails.length > 0 || targetSegmentId ? false : targetAll,
-        targetInternshipsOnly: !targetAll && !targetSegmentId && targetInternshipsOnly,
-        targetCountries: targetAll || targetSegmentId ? [] : targetCountries,
-        targetFields: targetAll || targetSegmentId ? [] : targetFields,
-        targetEmails: targetSegmentId ? [] : targetEmails,
-        segmentId: targetSegmentId || null,
+        targetAll: targetEmails.length > 0 ? false : targetAll,
+        targetInternshipsOnly: !targetAll && targetInternshipsOnly,
+        targetCountries: targetAll ? [] : targetCountries,
+        targetFields: targetAll ? [] : targetFields,
+        targetEmails,
+        segmentId: !targetAll ? (targetSegmentId || null) : null,
         scheduledAt: scheduledAt || null,
         isPinned,
       };
@@ -408,10 +406,6 @@ function CampaignEditorForm({
         <RichTextEditor content={body} onChange={(html) => setBody(html)} placeholder="Write your notification content..." minHeight="250px" />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="camp-link">CTA Link URL (optional)</Label>
-        <Input id="camp-link" placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
-      </div>
-      <div className="space-y-2">
         <Label htmlFor="camp-schedule">Schedule Send (optional)</Label>
         <p className="text-xs text-muted-foreground">Leave empty to send manually. Set a future date/time to schedule the campaign.</p>
         <Input
@@ -437,35 +431,10 @@ function CampaignEditorForm({
       <div className="space-y-2 pt-2 border-t">
         <Label className="text-sm font-medium">Targeting</Label>
         <div className="flex gap-2 flex-wrap">
-          <Button type="button" variant={targetAll && !targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(true); setTargetSegmentId(""); }}>All candidates</Button>
-          <Button type="button" variant={!targetAll && !targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(false); setTargetSegmentId(""); }}>Targeted</Button>
-          {availableSegments.length > 0 && (
-            <Button type="button" variant={!!targetSegmentId ? "default" : "outline"} size="sm" onClick={() => { setTargetSegmentId(targetSegmentId || availableSegments[0].id); setTargetAll(false); }}>
-              Group
-            </Button>
-          )}
+          <Button type="button" variant={targetAll ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(true); setTargetSegmentId(""); }}>All candidates</Button>
+          <Button type="button" variant={!targetAll ? "default" : "outline"} size="sm" onClick={() => setTargetAll(false)}>Targeted</Button>
         </div>
-        {targetSegmentId && (
-          <div className="space-y-2 pt-2">
-            <Label className="text-xs">Select group</Label>
-            <Select value={targetSegmentId} onValueChange={(v) => setTargetSegmentId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a group…" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableSegments.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} <span className="text-muted-foreground">({s.memberCount})</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Campaign will go to all members of this group, ignoring all other targeting filters.
-            </p>
-          </div>
-        )}
-        {!targetAll && !targetSegmentId && (
+        {!targetAll && (
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between gap-4 rounded-md border p-3">
               <div className="flex items-center gap-2">
@@ -488,6 +457,25 @@ function CampaignEditorForm({
               <p className="text-xs text-muted-foreground">Only target candidates matching these fields. Leave empty for all fields.</p>
               <FieldMultiSelect selected={targetFields} onChange={setTargetFields} />
             </div>
+            {availableSegments.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Group (optional)</Label>
+                <p className="text-xs text-muted-foreground">If a group is selected, the campaign goes to all its members regardless of the filters above.</p>
+                <Select value={targetSegmentId} onValueChange={(v) => setTargetSegmentId(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No group — use filters above" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No group — use filters above</SelectItem>
+                    {availableSegments.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name} ({s.memberCount})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
         <div className="space-y-2 pt-2">
