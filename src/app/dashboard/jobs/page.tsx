@@ -1042,7 +1042,12 @@ export default function JobsPage() {
               <div>
                 <p className="text-2xl font-bold">{pagination.total}</p>
                 <p className="text-xs text-muted-foreground">
-                  Total Position{pagination.total !== 1 ? "s" : ""}
+                  {role === "hr"
+                    ? statusTab === "closed"
+                      ? "Closed"
+                      : "Open"
+                    : "Open"}{" "}
+                  Position{pagination.total !== 1 ? "s" : ""}
                 </p>
               </div>
             </div>
