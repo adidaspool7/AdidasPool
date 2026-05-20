@@ -9,6 +9,128 @@ from models import CandidateProfile, ChatMessage
 
 END_INTERVIEW_SENTINEL = "__END_INTERVIEW__"
 
+# ── Skill domain taxonomy ───────────────────────────────────────────────────────
+
+_PROGRAMMING_LANGUAGES: frozenset[str] = frozenset({
+    "python", "javascript", "typescript", "java", "c", "c++", "c#", "go", "golang",
+    "rust", "swift", "kotlin", "ruby", "php", "scala", "r", "lua", "haskell",
+    "elixir", "dart", "perl", "bash", "shell", "powershell",
+})
+
+# Core allowed topics per language — injected verbatim into scope block
+_LANGUAGE_CORE_TOPICS: dict[str, list[str]] = {
+    "python": [
+        "core syntax, scoping rules, name binding, and the GIL",
+        "built-in types and data structures: list, dict, set, tuple, comprehensions, generators",
+        "standard library: collections, itertools, functools, contextlib, pathlib, asyncio, subprocess",
+        "OOP: classes, dunder/magic methods, MRO, metaclasses, descriptors, dataclasses",
+        "decorators, context managers, closures",
+        "concurrency: threading, multiprocessing, asyncio/await coroutines",
+        "error handling, exception hierarchy, custom exceptions",
+        "memory model, garbage collection, reference counting, weak references",
+        "testing: pytest, unittest, mocking, fixtures",
+        "packaging: pip, virtualenv, pyproject.toml, __init__ vs __main__",
+        "performance profiling, caching strategies, complexity trade-offs",
+    ],
+    "javascript": [
+        "event loop, call stack, microtasks vs macrotasks",
+        "prototypal inheritance, closures, scope chain",
+        "ES2015+ features: Promises, async/await, destructuring, spread/rest, modules",
+        "the DOM and browser APIs (if applicable) or Node.js internals",
+        "type coercion, equality semantics, hoisting, TDZ",
+        "error handling, error types, try/catch/finally",
+        "functional patterns: map/filter/reduce, currying, composition",
+        "memory management, garbage collection, WeakRef",
+    ],
+    "typescript": [
+        "static type system: inference, generics, conditional types, mapped types, template literals",
+        "structural typing vs nominal typing",
+        "utility types: Partial, Required, Pick, Omit, ReturnType, etc.",
+        "declaration files and module augmentation",
+        "strict mode and compiler options",
+        "discriminated unions and exhaustiveness checking",
+        "type narrowing, type guards, assertion functions",
+    ],
+    "java": [
+        "JVM internals: class loading, bytecode, JIT compilation, GC algorithms",
+        "OOP: inheritance, polymorphism, abstract classes, interfaces, inner classes",
+        "generics and type erasure",
+        "collections framework: List, Map, Set implementations and trade-offs",
+        "concurrency: threads, synchronized, locks, volatile, java.util.concurrent",
+        "streams, lambdas, Optional, functional interfaces (Java 8+)",
+        "exception handling, checked vs unchecked",
+        "annotations, reflection",
+    ],
+    "go": [
+        "goroutines, channels, select statement",
+        "interfaces, embedding, composition",
+        "defer, panic, recover",
+        "memory model, escape analysis, garbage collector",
+        "error handling patterns (error interface, wrapping)",
+        "modules and dependency management",
+        "testing and benchmarking with go test",
+        "context package and cancellation",
+    ],
+    "rust": [
+        "ownership, borrowing, lifetimes",
+        "traits and generics",
+        "enums and pattern matching, Option, Result",
+        "closures and iterators",
+        "concurrency: Send/Sync, Arc, Mutex",
+        "unsafe Rust and when it is justified",
+        "cargo, crates, modules",
+        "zero-cost abstractions and performance trade-offs",
+    ],
+}
+
+_GENERIC_LANGUAGE_TOPICS: list[str] = [
+    "core syntax and semantics of the language",
+    "type system and memory model",
+    "standard library and built-in data structures",
+    "OOP or FP paradigms as applicable",
+    "concurrency and error handling",
+    "testing, packaging, and tooling",
+    "performance and trade-off analysis",
+]
+
+# Topics that are ALWAYS off-limits when interviewing on a plain programming language
+_LANGUAGE_FORBIDDEN_TOPICS: list[str] = [
+    "AI/ML frameworks (TensorFlow, PyTorch, Keras, Hugging Face, scikit-learn) — "
+    "unless this skill is explicitly listed as the target",
+    "prompt engineering, LLM APIs, or generative AI concepts",
+    "cloud provider services (AWS, GCP, Azure, Vercel) unless a cloud-native SDK "
+    "is the stated target skill",
+    "DevOps tooling (Docker, Kubernetes, CI/CD pipelines, Terraform) unless stated as target",
+    "data science or analytics workflows (pandas, numpy, Jupyter) unless stated in the "
+    "candidate's projects AND directly tied to Python internals",
+    "abstract system design or architecture theory not anchored to the language runtime",
+]
+
+
+def _get_skill_type(normalized_skill: str | None) -> str:
+    """Returns 'language', or 'generic'."""
+    if normalized_skill and normalized_skill in _PROGRAMMING_LANGUAGES:
+        return "language"
+    return "generic"
+
+
+def _build_language_scope_addendum(skill_name: str) -> str:
+    """Returns additional scope lines for programming-language target skills."""
+    normalized = skill_name.strip().lower()
+    core_topics = _LANGUAGE_CORE_TOPICS.get(normalized, _GENERIC_LANGUAGE_TOPICS)
+    topics_str = "\n".join(f"  • {t}" for t in core_topics)
+    forbidden_str = "\n".join(f"  ✗ {t}" for t in _LANGUAGE_FORBIDDEN_TOPICS)
+    return f"""
+Language-specific scope enforcement (CRITICAL — topic drift is a hard failure):
+You are ONLY allowed to ask questions that test the candidate's knowledge of the {skill_name} language itself. Permitted topic areas:
+{topics_str}
+
+Absolutely FORBIDDEN question domains (do not ask about these under any circumstances):
+{forbidden_str}
+
+If the candidate's answer touches a forbidden domain, acknowledge it with one sentence and redirect immediately to a core {skill_name} question.
+""".strip()
+
 
 # ── Technical mode prompts ──────────────────────────────────────────────────────
 
@@ -40,7 +162,7 @@ Interview flow:
   - evidence_confidence (0.0-1.0)
   - remaining_question_budget
 - Deterministic stop conditions:
-  - max 12 technical questions
+  - max 10 technical questions (clarification turns do NOT count)
   - end if evidence_confidence >= 0.85 and at least 6 questions asked
 - end if user repeatedly refuses technical answers
 - when ending, append {END_INTERVIEW_SENTINEL} token at response end.
@@ -138,6 +260,13 @@ def build_technical_system_prompt(candidate: CandidateProfile) -> str:
         ]
     ) or "- None provided"
 
+    skill_type = _get_skill_type(normalized_focus)
+    language_addendum = (
+        "\n\n" + _build_language_scope_addendum(focus)
+        if focus and skill_type == "language"
+        else ""
+    )
+
     scope_block = (
         f"""
 Skill scope contract (MANDATORY):
@@ -145,7 +274,7 @@ Skill scope contract (MANDATORY):
 - Every question must directly assess {focus} implementation ability.
 - Do NOT ask about unrelated tools/frameworks/cloud products, even if they appear in resume context.
 - If the candidate answers with off-topic technologies, acknowledge briefly and immediately ask the next question strictly about {focus}.
-- Off-topic skills you must avoid unless explicitly needed to explain {focus}: {off_topic_block}
+- Off-topic skills you must avoid unless explicitly needed to explain {focus}: {off_topic_block}{language_addendum}
 """.strip()
         if focus
         else """
@@ -233,7 +362,7 @@ class InterviewSessionManager:
                 ),
                 "depth_level": 1,
                 "evidence_confidence": 0.1,
-                "remaining_question_budget": 12,
+                "remaining_question_budget": 10,
             }
         )
 
@@ -247,7 +376,9 @@ class InterviewSessionManager:
         }
         return session_id, system_prompt, first_question
 
-    async def process_turn(self, session_id: str, user_text: str) -> tuple[str, bool]:
+    async def process_turn(
+        self, session_id: str, user_text: str, is_clarification: bool = False
+    ) -> tuple[str, bool]:
         if session_id not in self.sessions:
             raise ValueError("Session not found")
         state = self.sessions[session_id]
@@ -258,7 +389,9 @@ class InterviewSessionManager:
         state["messages"].append(ChatMessage(role="user", content=user_text).model_dump())
         turn_state = state.get("turn_state", {})
         remaining = int(turn_state.get("remaining_question_budget", 1))
-        turn_state["remaining_question_budget"] = max(remaining - 1, 0)
+        # Clarification turns do not consume the question budget
+        if not is_clarification:
+            turn_state["remaining_question_budget"] = max(remaining - 1, 0)
 
         if mode == "LANGUAGE":
             turn_state["fluency_confidence"] = min(

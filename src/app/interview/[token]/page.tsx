@@ -128,6 +128,10 @@ export default function InterviewRuntimePage() {
   // ── Mode
   const [interviewMode, setInterviewMode] = useState<"TECHNICAL" | "LANGUAGE">("TECHNICAL");
 
+  // ── Turn counter (non-clarification turns only)
+  const [answerTurnCount, setAnswerTurnCount] = useState(0);
+  const MAX_ANSWER_TURNS = 10;
+
   // ── Evaluation results
   const [evaluation, setEvaluation] = useState<TerminateResponse | null>(null);
 
@@ -393,6 +397,9 @@ export default function InterviewRuntimePage() {
       const displayText = text || (opts.isTimeoutAdvance ? "[Time expired – no answer provided]" : "");
       setChat((prev) => [...prev, { role: "user", content: displayText }]);
       try {
+        const clarification = opts.isClarification ?? false;
+        if (!clarification) setAnswerTurnCount((n) => n + 1);
+
         const response = await fetch("/api/interview/realtime/turn", {
           method: "POST",
           headers: {
@@ -404,6 +411,7 @@ export default function InterviewRuntimePage() {
             aiSessionId: aiSessionIdRef.current,
             userText: displayText || " ",
             mode: "text",
+            isClarification: clarification,
           }),
         });
         const data = (await response.json()) as RealtimeTurnResponse;
@@ -842,14 +850,21 @@ export default function InterviewRuntimePage() {
             ) : (
               // ── Active interview ──────────────────────────────────────────────
               <>
-                {/* Per-question timer only */}
+                {/* Timer row */}
                 <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
                   <span className="text-muted-foreground text-xs">Per-question timer</span>
-                  <span>
-                    <span className={`font-mono font-semibold ${questionTimerColor}`}>
-                      {formatTime(questionTimeLeft)}
-                    </span>
+                  <span className={`font-mono font-semibold ${questionTimerColor}`}>
+                    {formatTime(questionTimeLeft)}
                   </span>
+                  {interviewMode === "TECHNICAL" && (
+                    <span className="text-xs text-muted-foreground">
+                      Q{" "}
+                      <span className="font-semibold text-foreground">
+                        {answerTurnCount}
+                      </span>
+                      /{MAX_ANSWER_TURNS}
+                    </span>
+                  )}
                   {/* TTS toggle */}
                   <button
                     className="text-xs text-muted-foreground underline"

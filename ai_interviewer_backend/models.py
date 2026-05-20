@@ -52,6 +52,7 @@ class TurnRequest(BaseModel):
     session_id: str
     user_text: str | None = None
     user_audio_base64: str | None = None
+    is_clarification: bool = False
 
 
 class TurnResponse(BaseModel):

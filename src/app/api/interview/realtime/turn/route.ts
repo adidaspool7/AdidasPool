@@ -17,14 +17,17 @@ function getInterviewBackendUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
+// Benefit-of-doubt fallback: if the evaluation backend is unreachable,
+// do NOT auto-fail the candidate. Mark final=false so HR can review manually.
 const DEFAULT_EVALUATION = {
-  technical: { passed: false },
+  technical: { passed: true },
   integrity: { status: "REVIEW" as const },
   final: false,
+  evidence: [] as string[],
   rationale: {
-    technical: "Evaluation unavailable",
-    integrity: "Evaluation unavailable",
-    final: "Fallback decision",
+    technical: "Evaluation backend unavailable — manual review required",
+    integrity: "Could not assess automatically",
+    final: "Pending manual HR review",
   },
 };
 
@@ -124,6 +127,7 @@ export async function POST(request: NextRequest) {
       userText?: string;
       userAudioBase64?: string;
       mode?: "text" | "voice";
+      isClarification?: boolean;
     };
 
     if (!body.interviewId || !body.aiSessionId) {
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest) {
       session_id: body.aiSessionId,
       user_text: body.userText,
       user_audio_base64: body.userAudioBase64,
+      is_clarification: body.isClarification ?? false,
     });
 
     // Get current sequence count
@@ -254,6 +259,21 @@ export async function POST(request: NextRequest) {
         });
       } catch {
         evaluation = DEFAULT_EVALUATION;
+      }
+
+      // TS-level evidence gate: FAIL with no cited evidence → benefit of doubt
+      const hasEvidence = (evaluation.evidence?.length ?? 0) > 0;
+      if (!evaluation.technical.passed && !hasEvidence) {
+        evaluation = {
+          ...evaluation,
+          technical: { ...evaluation.technical, passed: true },
+          final: false,
+          rationale: {
+            ...evaluation.rationale,
+            technical: `${evaluation.rationale.technical} [overridden: no evidence cited]`,
+            final: "Inconclusive — manual HR review recommended",
+          },
+        };
       }
 
       const finalDecision = evaluation.final ? "PASS" : "FAIL";

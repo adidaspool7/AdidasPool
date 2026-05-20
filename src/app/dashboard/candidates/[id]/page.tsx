@@ -59,7 +59,9 @@ import {
   Trash2,
   Loader2,
   Send,
+  ClipboardList,
   ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Textarea } from "@client/components/ui/textarea";
 import { Input } from "@client/components/ui/input";
@@ -256,6 +258,268 @@ function SkillsVerificationPanel({
                 </div>
               );
             })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Interviews panel ──────────────────────────────────────────────
+
+type TranscriptTurn = {
+  role: string;
+  text: string;
+  sequence: number;
+  createdAt: string;
+};
+
+type InterviewSession = {
+  id: string;
+  createdAt: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  evaluatedAt?: string | null;
+  status: string;
+  targetSkill?: string | null;
+  interviewMode?: string | null;
+  finalDecision?: string | null;
+  technicalDecision?: string | null;
+  integrityDecision?: string | null;
+  evaluationRationale?: Record<string, unknown> | null;
+  terminationReason?: string | null;
+  transcript: TranscriptTurn[];
+};
+
+const DECISION_CONFIG: Record<string, { label: string; className: string }> = {
+  PASS: { label: "PASS", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  FAIL: { label: "FAIL", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+  CLEAR: { label: "CLEAR", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  REVIEW: { label: "REVIEW", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+  EVALUATED: { label: "Evaluated", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  TERMINATED: { label: "Terminated", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" },
+  IN_PROGRESS: { label: "In Progress", className: "bg-muted text-muted-foreground" },
+};
+
+function DecisionBadge({ value }: { value?: string | null }) {
+  if (!value) return <span className="text-xs text-muted-foreground">—</span>;
+  const cfg = DECISION_CONFIG[value] ?? { label: value, className: "bg-muted text-muted-foreground" };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function InterviewCard({ session }: { session: InterviewSession }) {
+  const [expanded, setExpanded] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+
+  const rationale = session.evaluationRationale as Record<string, unknown> | null;
+  const date = session.evaluatedAt || session.endedAt || session.createdAt;
+  const modeLabel = session.interviewMode === "LANGUAGE" ? "🗣️ Language" : "🔧 Technical";
+
+  return (
+    <div className="rounded-md border">
+      {/* Header row — always visible */}
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium">
+            {new Date(date).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+          <span className="text-xs text-muted-foreground">{modeLabel}</span>
+          {session.targetSkill && (
+            <span className="rounded-full border px-2 py-0.5 text-xs">
+              {session.targetSkill}
+            </span>
+          )}
+          <DecisionBadge value={session.finalDecision ?? session.status} />
+          {session.terminationReason === "user_early_exit" && (
+            <span className="text-xs text-muted-foreground italic">early exit</span>
+          )}
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="border-t px-4 pb-4 pt-3 space-y-4">
+          {/* Decision grid */}
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Final</p>
+              <DecisionBadge value={session.finalDecision} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Technical</p>
+              <DecisionBadge value={session.technicalDecision} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Integrity</p>
+              <DecisionBadge value={session.integrityDecision} />
+            </div>
+          </div>
+
+          {/* Rationale */}
+          {rationale && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Evaluation Reasoning
+              </p>
+              {(["technical", "integrity", "final"] as const).map((key) =>
+                rationale[key] ? (
+                  <div key={key} className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                    <span className="font-medium capitalize">{key}:</span>{" "}
+                    <span className="text-muted-foreground">
+                      {String(rationale[key])}
+                    </span>
+                  </div>
+                ) : null
+              )}
+              {/* CEFR / language metrics */}
+              {(["cefr_level", "grammar", "vocabulary", "fluency"] as const).some(
+                (k) => rationale[k]
+              ) && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(["cefr_level", "grammar", "vocabulary", "fluency"] as const).map(
+                    (k) =>
+                      rationale[k] ? (
+                        <span
+                          key={k}
+                          className="rounded-full border px-2 py-0.5 text-xs capitalize"
+                        >
+                          {k.replace("_", " ")}: {String(rationale[k])}
+                        </span>
+                      ) : null
+                  )}
+                </div>
+              )}
+              {/* Evidence */}
+              {Array.isArray(rationale.evidence) && rationale.evidence.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Evidence cited:</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {(rationale.evidence as string[]).map((e, i) => (
+                      <li key={i} className="text-xs text-muted-foreground">
+                        {e}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {rationale.turn_count !== undefined && (
+                <p className="text-xs text-muted-foreground">
+                  Turn count: {String(rationale.turn_count)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Transcript toggle */}
+          {session.transcript.length > 0 && (
+            <div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowTranscript((v) => !v)}
+              >
+                {showTranscript ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                {showTranscript ? "Hide" : "Show"} transcript (
+                {session.transcript.length} turns)
+              </button>
+              {showTranscript && (
+                <div className="mt-2 max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3 space-y-2">
+                  {session.transcript.map((turn, i) => (
+                    <div
+                      key={i}
+                      className={`flex gap-2 text-sm ${
+                        turn.role === "assistant" ? "flex-row-reverse" : ""
+                      }`}
+                    >
+                      <span className="shrink-0 text-xs font-semibold uppercase text-muted-foreground pt-0.5">
+                        {turn.role === "assistant" ? "AI" : "You"}
+                      </span>
+                      <p
+                        className={`rounded-md px-3 py-1.5 text-xs max-w-[80%] ${
+                          turn.role === "assistant"
+                            ? "bg-primary/10 text-foreground"
+                            : "bg-background border text-foreground"
+                        }`}
+                      >
+                        {turn.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InterviewsPanel({ candidateId }: { candidateId: string }) {
+  const [interviews, setInterviews] = useState<InterviewSession[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/candidates/${candidateId}/interviews`)
+      .then((r) => r.json())
+      .then((data: { interviews?: InterviewSession[]; error?: string }) => {
+        if (data.error) throw new Error(data.error);
+        setInterviews(data.interviews ?? []);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load interviews"))
+      .finally(() => setLoading(false));
+  }, [candidateId]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Interview History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {!error && interviews?.length === 0 && (
+          <p className="text-sm text-muted-foreground">No interviews on record.</p>
+        )}
+        {!error && interviews && interviews.length > 0 && (
+          <div className="space-y-3">
+            {interviews.map((session) => (
+              <InterviewCard key={session.id} session={session} />
+            ))}
           </div>
         )}
       </CardContent>
@@ -946,6 +1210,9 @@ export default function CandidateDetailPage({
           <TabsTrigger value="skills">
             <Sparkles className="h-4 w-4 mr-1" /> Skills
           </TabsTrigger>
+          <TabsTrigger value="interviews">
+            <ClipboardList className="h-4 w-4 mr-1" /> Interviews
+          </TabsTrigger>
         </TabsList>
 
         {/* Experience Tab */}
@@ -1076,6 +1343,11 @@ export default function CandidateDetailPage({
         {/* Skills Tab */}
         <TabsContent value="skills">
           <SkillsVerificationPanel candidateId={c.id} skills={c.skills ?? []} />
+        </TabsContent>
+
+        {/* Interviews Tab */}
+        <TabsContent value="interviews">
+          <InterviewsPanel candidateId={c.id} />
         </TabsContent>
       </Tabs>
 

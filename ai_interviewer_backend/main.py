@@ -54,7 +54,9 @@ async def next_turn(payload: TurnRequest) -> TurnResponse:
         transcript_user = payload.user_text or await stt_service.transcribe_audio(
             payload.user_audio_base64 or ""
         )
-        assistant_reply, should_end = await interviewer.process_turn(payload.session_id, transcript_user)
+        assistant_reply, should_end = await interviewer.process_turn(
+            payload.session_id, transcript_user, is_clarification=payload.is_clarification
+        )
         audio_base64, audio_mime_type = await tts_service.synthesize_text(assistant_reply)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

@@ -18,13 +18,14 @@ function getInterviewBackendUrl(): string {
 }
 
 const DEFAULT_EVALUATION = {
-  technical: { passed: false },
+  technical: { passed: true },
   integrity: { status: "REVIEW" as const },
   final: false,
+  evidence: [] as string[],
   rationale: {
-    technical: "Evaluation unavailable",
-    integrity: "Evaluation unavailable",
-    final: "Fallback decision",
+    technical: "Evaluation backend unavailable — manual review required",
+    integrity: "Could not assess automatically",
+    final: "Pending manual HR review",
   },
 };
 
@@ -217,6 +218,20 @@ export async function POST(request: NextRequest) {
         log.error("Evaluator call failed:", evalError);
         evaluation = DEFAULT_EVALUATION;
       }
+    }
+
+    const hasEvidence = (evaluation.evidence?.length ?? 0) > 0;
+    if (!evaluation.technical.passed && !hasEvidence) {
+      evaluation = {
+        ...evaluation,
+        technical: { ...evaluation.technical, passed: true },
+        final: false,
+        rationale: {
+          ...evaluation.rationale,
+          technical: `${evaluation.rationale.technical} [overridden: no evidence cited]`,
+          final: "Inconclusive — manual HR review recommended",
+        },
+      };
     }
 
     const finalDecision = evaluation.final ? "PASS" : "FAIL";
