@@ -454,6 +454,7 @@ export const StartInterviewRuntimeSchema = z.object({
   candidateId: z.string().min(1),
   targetSkill: z.string().min(1).optional(),
   interviewMode: z.enum(["TECHNICAL", "LANGUAGE"]).default("TECHNICAL"),
+  targetLanguage: z.string().min(1).optional(),
 });
 
 export const StartInterviewRealtimeSchema = z.object({

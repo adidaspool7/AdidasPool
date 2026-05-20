@@ -43,6 +43,7 @@ type RealtimeStartResponse = {
   };
   firstQuestion: string;
   interviewMode?: "TECHNICAL" | "LANGUAGE";
+  targetLanguage?: string | null;
 };
 
 type RealtimeTurnResponse = {
@@ -87,12 +88,20 @@ function isTrackTypeActive(stream: MediaStream | null, kind: "audio" | "video"):
   return tracks.some((track) => track.enabled && track.readyState === "live");
 }
 
+const LANG_TO_LOCALE: Record<string, string> = {
+  english: "en-US",
+  portuguese: "pt-PT",
+  spanish: "es-ES",
+  german: "de-DE",
+  french: "fr-FR",
+};
+
 /** Speak text with the browser TTS API (Chrome/Edge). No-op on unsupported browsers. */
-function speakText(text: string) {
+function speakText(text: string, language = "English") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   window.speechSynthesis.cancel(); // stop any current speech
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
+  utterance.lang = LANG_TO_LOCALE[language.toLowerCase()] ?? "en-US";
   utterance.rate = 1;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
@@ -127,6 +136,7 @@ export default function InterviewRuntimePage() {
 
   // ── Mode
   const [interviewMode, setInterviewMode] = useState<"TECHNICAL" | "LANGUAGE">("TECHNICAL");
+  const [targetLanguage, setTargetLanguage] = useState<string>("English");
 
   // ── Turn counter (non-clarification turns only)
   const [answerTurnCount, setAnswerTurnCount] = useState(0);
@@ -421,7 +431,7 @@ export default function InterviewRuntimePage() {
         setQuestion(assistantText);
         if (assistantText.length > 0) {
           setChat((prev) => [...prev, { role: "assistant", content: assistantText }]);
-          if (ttsEnabled) speakText(assistantText);
+          if (ttsEnabled) speakText(assistantText, targetLanguage);
         }
 
         if (data.should_end) {
@@ -536,7 +546,7 @@ export default function InterviewRuntimePage() {
 
     const recognition = new SR();
     recognitionRef.current = recognition;
-    recognition.lang = "en-US";
+    recognition.lang = LANG_TO_LOCALE[targetLanguage.toLowerCase()] ?? "en-US";
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     recognition.continuous = true;  // keep listening until user presses stop
@@ -673,10 +683,11 @@ export default function InterviewRuntimePage() {
       interviewIdRef.current = data.session.interviewId;
       aiSessionIdRef.current = data.session.aiSessionId;
       if (data.interviewMode) setInterviewMode(data.interviewMode);
+      if (data.targetLanguage) setTargetLanguage(data.targetLanguage);
       setQuestion(data.firstQuestion);
       const initialChat: ChatLine[] = [{ role: "assistant", content: data.firstQuestion }];
       setChat(appendSttFallback(initialChat));
-      if (ttsEnabled) speakText(data.firstQuestion);
+      if (ttsEnabled) speakText(data.firstQuestion, data.targetLanguage ?? "English");
       startIntegrityMonitor();
       resetQuestionTimer();
     } catch (e) {
@@ -745,7 +756,9 @@ export default function InterviewRuntimePage() {
                       : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                   }`}
                 >
-                  {interviewMode === "LANGUAGE" ? "🗣️ Language Assessment" : "🔧 Technical Assessment"}
+                  {interviewMode === "LANGUAGE"
+                    ? `\u{1F5E3}️ Language Assessment — ${targetLanguage}`
+                    : "\u{1F527} Technical Assessment"}
                 </span>
               )}
             </div>

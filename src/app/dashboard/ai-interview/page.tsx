@@ -59,6 +59,7 @@ function AiInterviewPage() {
   const [results, setResults] = useState<InterviewResult[]>([]);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState<"TECHNICAL" | "LANGUAGE">("TECHNICAL");
+  const [selectedLanguage, setSelectedLanguage] = useState("English");
 
   useEffect(() => {
     if (!role) return;
@@ -174,6 +175,7 @@ function AiInterviewPage() {
           candidateId: candidate.id,
           targetSkill: selectedMode === "TECHNICAL" ? (activeSkill || undefined) : undefined,
           interviewMode: selectedMode,
+          targetLanguage: selectedMode === "LANGUAGE" ? selectedLanguage : undefined,
         }),
       });
       const data = (await response.json()) as { token?: string; error?: string };
@@ -252,10 +254,30 @@ function AiInterviewPage() {
               </p>
             )}
             {selectedMode === "LANGUAGE" && (
-              <p className="text-xs text-muted-foreground">
-                Free-form English conversation. Scored on CEFR rubric (grammar, vocabulary, fluency).
-                No skill selection required.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Structured language proficiency assessment: intro, 5 oral questions, a writing
+                  dictation task, and a closing. Scored on CEFR rubric (grammar, vocabulary, fluency,
+                  writing). Select the language to be assessed.
+                </p>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="language-select" className="text-xs font-medium text-foreground">
+                    Language:
+                  </label>
+                  <select
+                    id="language-select"
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="rounded border bg-background px-2 py-1 text-sm text-foreground"
+                  >
+                    {["English", "Portuguese", "Spanish", "German", "French"].map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             )}
           </div>
 
