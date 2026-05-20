@@ -328,7 +328,7 @@ function CampaignEditorForm({
   const [isPinned, setIsPinned] = useState(campaign?.isPinned ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
-  const [targetSegmentId, setTargetSegmentId] = useState<string>(campaign?.segmentId ?? "");
+  const [targetSegmentId, setTargetSegmentId] = useState<string>(campaign?.segmentId ?? "__none__");
   const [availableSegments, setAvailableSegments] = useState<CandidateSegment[]>([]);
 
   useEffect(() => {
@@ -367,7 +367,7 @@ function CampaignEditorForm({
         targetCountries: targetAll ? [] : targetCountries,
         targetFields: targetAll ? [] : targetFields,
         targetEmails,
-        segmentId: !targetAll ? (targetSegmentId || null) : null,
+        segmentId: !targetAll && targetSegmentId !== "__none__" ? targetSegmentId : null,
         scheduledAt: scheduledAt || null,
         isPinned,
       };
@@ -431,7 +431,7 @@ function CampaignEditorForm({
       <div className="space-y-2 pt-2 border-t">
         <Label className="text-sm font-medium">Targeting</Label>
         <div className="flex gap-2 flex-wrap">
-          <Button type="button" variant={targetAll ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(true); setTargetSegmentId(""); }}>All candidates</Button>
+          <Button type="button" variant={targetAll ? "default" : "outline"} size="sm" onClick={() => { setTargetAll(true); setTargetSegmentId("__none__"); }}>All candidates</Button>
           <Button type="button" variant={!targetAll ? "default" : "outline"} size="sm" onClick={() => setTargetAll(false)}>Targeted</Button>
         </div>
         {!targetAll && (
@@ -466,7 +466,7 @@ function CampaignEditorForm({
                     <SelectValue placeholder="No group — use filters above" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No group — use filters above</SelectItem>
+                    <SelectItem value="__none__">No group — use filters above</SelectItem>
                     {availableSegments.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.name} ({s.memberCount})
