@@ -82,7 +82,6 @@ export async function middleware(request: NextRequest) {
     "/api/scoring/",
     "/api/export/",
     "/api/notifications/campaigns",
-    "/api/jobs/sync",
     "/api/upload/bulk",
     "/api/analytics",
   ];

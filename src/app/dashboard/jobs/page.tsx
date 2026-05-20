@@ -1007,8 +1007,8 @@ export default function JobsPage() {
           <Button
             onClick={handleSync}
             disabled={syncing}
+            variant="outline"
             className="gap-2"
-            variant={role === "hr" ? "outline" : "default"}
           >
             {syncing ? (
               <>
@@ -1025,10 +1025,10 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* Sync result banner */}
+      {/* Sync result banner — shown to all users; closed count is HR-only detail */}
       {syncResult && (
         <SyncResultBanner
-          result={syncResult}
+          result={syncResult && role !== "hr" ? { ...syncResult, closed: undefined } : syncResult}
           onDismiss={() => setSyncResult(null)}
         />
       )}
@@ -1042,7 +1042,12 @@ export default function JobsPage() {
               <div>
                 <p className="text-2xl font-bold">{pagination.total}</p>
                 <p className="text-xs text-muted-foreground">
-                  Total Position{pagination.total !== 1 ? "s" : ""}
+                  {role === "hr"
+                    ? statusTab === "closed"
+                      ? "Closed"
+                      : "Open"
+                    : "Open"}{" "}
+                  Position{pagination.total !== 1 ? "s" : ""}
                 </p>
               </div>
             </div>
