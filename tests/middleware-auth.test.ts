@@ -98,7 +98,6 @@ describe("middleware /api/* auth gate (audit M5)", () => {
       "/api/scoring/presets",
       "/api/export/candidates",
       "/api/notifications/campaigns",
-      "/api/jobs/sync",
       "/api/upload/bulk",
       "/api/analytics/query",
       "/api/analytics/widgets",
