@@ -894,8 +894,10 @@ export default function JobsPage() {
   useEffect(() => stopSyncPolling, [stopSyncPolling]);
 
   // On mount, check if a sync is running or just finished while we were away
+  // (HR-only — candidates cannot trigger syncs)
   const mountCheckedRef = useRef(false);
   useEffect(() => {
+    if (role !== "hr") return;
     if (mountCheckedRef.current) return;
     mountCheckedRef.current = true;
 
@@ -1004,29 +1006,40 @@ export default function JobsPage() {
           {role === "hr" && (
             <CreateJobDialog onCreated={() => { setSearchQuery(""); setSearchInput(""); setDepartmentFilter([]); setCountryFilter([]); fetchJobs(1); }} />
           )}
-          <Button
-            onClick={handleSync}
-            disabled={syncing}
-            className="gap-2"
-            variant={role === "hr" ? "outline" : "default"}
-          >
-            {syncing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Get current job offers
-              </>
-            )}
-          </Button>
+          {role === "hr" ? (
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              variant="outline"
+              className="gap-2"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Get current job offers
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => fetchJobs(1)}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Sync result banner */}
-      {syncResult && (
+      {/* Sync result banner (HR only — candidates never trigger syncs) */}
+      {syncResult && role === "hr" && (
         <SyncResultBanner
           result={syncResult}
           onDismiss={() => setSyncResult(null)}

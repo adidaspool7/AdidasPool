@@ -18,6 +18,7 @@ import { jobUseCases } from "@server/application";
 import db from "@server/infrastructure/database/supabase-client";
 import { generateId, camelizeKeys } from "@server/infrastructure/database/db-utils";
 import { createLogger } from "@server/infrastructure/logging/logger";
+import { requireHr } from "@/lib/auth/require-hr";
 
 const log = createLogger("api/jobs/sync");
 
@@ -40,6 +41,9 @@ async function expireStuckSyncs() {
 }
 
 export async function POST(request: NextRequest) {
+  const hrCheck = await requireHr();
+  if (hrCheck.response) return hrCheck.response;
+
   try {
     const body = await request.json().catch(() => ({}));
     const maxPages = typeof body.maxPages === "number" ? body.maxPages : 0;
@@ -113,6 +117,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const hrCheck = await requireHr();
+  if (hrCheck.response) return hrCheck.response;
+
   // Auto-expire stuck syncs so the UI isn't permanently stuck on "syncing..."
   await expireStuckSyncs();
 
