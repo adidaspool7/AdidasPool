@@ -599,6 +599,9 @@ export default function CandidatesPage() {
   const [contactSubject, setContactSubject] = useState(EMAIL_TEMPLATES[0].subject);
   const [contactBody, setContactBody] = useState(EMAIL_TEMPLATES[0].body);
   const [contactSending, setContactSending] = useState(false);
+  // bulk-contact mode (send to all selected candidates)
+  const [bulkContactOpen, setBulkContactOpen] = useState(false);
+  const [bulkContactProgress, setBulkContactProgress] = useState<{ done: number; total: number; errors: number } | null>(null);
 
   // ── Bulk selection ───────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -786,6 +789,48 @@ export default function CandidatesPage() {
     } finally {
       setContactSending(false);
     }
+  }
+
+  function openBulkContactDialog() {
+    const firstTpl = EMAIL_TEMPLATES[0];
+    setContactTemplateId("profile_interest");
+    setContactSubject(firstTpl.subject);
+    setContactBody(firstTpl.body.replace(/\{name\}/g, "Candidate"));
+    setContactStep("compose");
+    setBulkContactProgress(null);
+    setBulkContactOpen(true);
+  }
+
+  async function sendBulkContactEmail() {
+    const ids = [...selected];
+    const total = ids.length;
+    setBulkContactProgress({ done: 0, total, errors: 0 });
+    setContactSending(true);
+    let done = 0;
+    let errors = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/candidates/${id}/contact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subject: contactSubject, body: contactBody }),
+        });
+        if (res.ok) done++;
+        else errors++;
+      } catch {
+        errors++;
+      }
+      setBulkContactProgress({ done: done + errors, total, errors });
+    }
+    setContactSending(false);
+    if (errors === 0) {
+      toast.success(`Email sent to ${done} candidate${done !== 1 ? "s" : ""}`);
+    } else {
+      toast.warning(`${done} sent, ${errors} failed`);
+    }
+    setBulkContactOpen(false);
+    setBulkContactProgress(null);
+    clearSelection();
   }
 
   // ── Scoring weights modal logic ────────────────────────────────
@@ -1200,6 +1245,16 @@ export default function CandidatesPage() {
               </DropdownMenu>
             )}
             <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={openBulkContactDialog}
+              disabled={bulkBusy || contactSending}
+            >
+              <Send className="h-3.5 w-3.5 mr-1.5" />
+              Message
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-8 ml-auto"
@@ -1598,11 +1653,14 @@ export default function CandidatesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Contact Candidate Dialog (row quick-action) ──────────── */}
+      {/* ── Contact Candidate Dialog (single row action OR bulk) ──────────── */}
       <Dialog
-        open={contactDialogFor !== null}
+        open={contactDialogFor !== null || bulkContactOpen}
         onOpenChange={(open) => {
-          if (!open) setContactDialogFor(null);
+          if (!open && !contactSending) {
+            setContactDialogFor(null);
+            setBulkContactOpen(false);
+          }
         }}
       >
         <DialogContent className="max-w-2xl">
@@ -1611,17 +1669,29 @@ export default function CandidatesPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Send className="h-5 w-5" />
-                  Contact Candidate
+                  {bulkContactOpen ? "Message Selected Candidates" : "Contact Candidate"}
                 </DialogTitle>
                 <DialogDescription>
-                  Sending to{" "}
-                  <span className="font-medium text-foreground">
-                    {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}
-                  </span>
-                  {" · "}
-                  <span className="font-medium text-foreground">
-                    {contactDialogFor?.email ?? ""}
-                  </span>
+                  {bulkContactOpen ? (
+                    <>
+                      Sending to{" "}
+                      <span className="font-medium text-foreground">
+                        {selected.size} candidate{selected.size !== 1 ? "s" : ""}
+                      </span>
+                      . The same message will be sent to each recipient.
+                    </>
+                  ) : (
+                    <>
+                      Sending to{" "}
+                      <span className="font-medium text-foreground">
+                        {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}
+                      </span>
+                      {" · "}
+                      <span className="font-medium text-foreground">
+                        {contactDialogFor?.email ?? ""}
+                      </span>
+                    </>
+                  )}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1633,7 +1703,9 @@ export default function CandidatesPage() {
                     onValueChange={(v) =>
                       applyContactTemplate(
                         v as TemplateId,
-                        contactDialogFor
+                        bulkContactOpen
+                          ? "Candidate"
+                          : contactDialogFor
                           ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}`
                           : ""
                       )
@@ -1681,7 +1753,13 @@ export default function CandidatesPage() {
               </div>
 
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setContactDialogFor(null)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setContactDialogFor(null);
+                    setBulkContactOpen(false);
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -1704,8 +1782,29 @@ export default function CandidatesPage() {
               <div className="space-y-3 py-2 text-sm">
                 <div>
                   <span className="font-medium text-muted-foreground">To: </span>
-                  {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}{" "}
-                  &lt;{contactDialogFor?.email ?? ""}&gt;
+                  {bulkContactOpen ? (
+                    <span>
+                      {selected.size} candidate{selected.size !== 1 ? "s" : ""}
+                      {(() => {
+                        const names = candidates
+                          .filter((c) => selected.has(c.id))
+                          .map((c) => `${c.firstName} ${c.lastName}`.trim())
+                          .slice(0, 5);
+                        if (names.length === 0) return null;
+                        const more = selected.size - names.length;
+                        return (
+                          <span className="text-muted-foreground ml-1">
+                            ({names.join(", ")}{more > 0 ? `, +${more} more` : ""})
+                          </span>
+                        );
+                      })()}
+                    </span>
+                  ) : (
+                    <>
+                      {contactDialogFor ? `${contactDialogFor.firstName} ${contactDialogFor.lastName}` : ""}{" "}
+                      &lt;{contactDialogFor?.email ?? ""}&gt;
+                    </>
+                  )}
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">Subject: </span>
@@ -1714,6 +1813,15 @@ export default function CandidatesPage() {
                 <div className="rounded-md border bg-muted/40 p-3 text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
                   {contactBody.slice(0, 400)}{contactBody.length > 400 ? "…" : ""}
                 </div>
+                {bulkContactProgress && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Sending {bulkContactProgress.done} / {bulkContactProgress.total}
+                    {bulkContactProgress.errors > 0 && (
+                      <span className="text-destructive">({bulkContactProgress.errors} failed)</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
@@ -1724,9 +1832,16 @@ export default function CandidatesPage() {
                 >
                   Go Back
                 </Button>
-                <Button onClick={sendContactEmail} disabled={contactSending}>
-                  {contactSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                  Send Email
+                <Button
+                  onClick={bulkContactOpen ? sendBulkContactEmail : sendContactEmail}
+                  disabled={contactSending}
+                >
+                  {contactSending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  {bulkContactOpen ? `Send to ${selected.size}` : "Send Email"}
                 </Button>
               </DialogFooter>
             </>
