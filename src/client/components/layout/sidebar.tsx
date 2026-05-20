@@ -9,7 +9,6 @@ import {
   FileText,
   BarChart3,
   Settings,
-  ClipboardCheck,
   Sparkles,
   LayoutDashboard,
   Bell,
@@ -64,8 +63,7 @@ const candidateNavigationSections: NavSection[] = [
   },
   {
     items: [
-      { name: "Assessments", href: "/dashboard/assessments", icon: ClipboardCheck },
-      { name: "AI Skill Validation", href: "/dashboard/ai-interview", icon: Sparkles },
+      { name: "Skill Validation", href: "/dashboard/assessments", icon: Sparkles },
       // Improvement Tracks page is a stub — hidden until implemented (audit H3).
       // { name: "Improvement Tracks", href: "/dashboard/improvement", icon: GraduationCap },
     ],

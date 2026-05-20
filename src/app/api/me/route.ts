@@ -17,9 +17,14 @@ export async function GET() {
     const candidate = await profileUseCases.getCurrentProfile();
     return NextResponse.json(candidate);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     log.error("Error getting current user:", error);
     return NextResponse.json(
-      { error: "Failed to get current user" },
+      {
+        error: "Failed to get current user",
+        // Included in dev for diagnosis — remove before final submission
+        detail: process.env.NODE_ENV !== "production" ? message : undefined,
+      },
       { status: 500 }
     );
   }
