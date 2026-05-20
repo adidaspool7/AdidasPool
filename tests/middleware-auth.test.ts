@@ -18,10 +18,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the Supabase SSR client BEFORE the middleware module is imported.
-const mockGetUser = vi.fn();
+// Middleware uses getSession() (fast, no network round-trip); getUser() is
+// used only in route handlers. The mock reflects that split.
+const mockGetSession = vi.fn();
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
-    auth: { getUser: mockGetUser },
+    auth: { getSession: mockGetSession },
   }),
 }));
 
@@ -33,7 +35,7 @@ function buildRequest(pathname: string): NextRequest {
 }
 
 beforeEach(() => {
-  mockGetUser.mockReset();
+  mockGetSession.mockReset();
   // Required so the middleware can build its supabase client
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
@@ -42,7 +44,7 @@ beforeEach(() => {
 describe("middleware /api/* auth gate (audit M5)", () => {
   describe("unauthenticated callers", () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
+      mockGetSession.mockResolvedValue({ data: { session: null } });
     });
 
     const paths = [
@@ -75,13 +77,15 @@ describe("middleware /api/* auth gate (audit M5)", () => {
 
   describe("authenticated candidate callers", () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({
+      mockGetSession.mockResolvedValue({
         data: {
-          user: {
-            id: "user-1",
-            email: "candidate@example.com",
-            app_metadata: { role: "candidate" },
-            user_metadata: {},
+          session: {
+            user: {
+              id: "user-1",
+              email: "candidate@example.com",
+              app_metadata: { role: "candidate" },
+              user_metadata: {},
+            },
           },
         },
       });
@@ -122,13 +126,15 @@ describe("middleware /api/* auth gate (audit M5)", () => {
 
   describe("authenticated HR callers", () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({
+      mockGetSession.mockResolvedValue({
         data: {
-          user: {
-            id: "user-2",
-            email: "hr@example.com",
-            app_metadata: { role: "hr" },
-            user_metadata: {},
+          session: {
+            user: {
+              id: "user-2",
+              email: "hr@example.com",
+              app_metadata: { role: "hr" },
+              user_metadata: {},
+            },
           },
         },
       });
