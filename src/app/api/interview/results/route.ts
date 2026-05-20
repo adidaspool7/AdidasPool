@@ -29,6 +29,7 @@ export async function GET() {
         ended_at,
         evaluated_at,
         target_skill,
+        interview_mode,
         final_decision,
         technical_decision,
         integrity_decision,

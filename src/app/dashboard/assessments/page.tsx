@@ -193,20 +193,32 @@ function SkillValidationPage() {
       setLoading(false);
       return;
     }
+    // Reset to loading each time role is confirmed as candidate
+    setLoading(true);
+    setError(null);
+
     (async () => {
       try {
-        const [profileRes, resultsRes] = await Promise.all([
-          fetch("/api/me", { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }),
-          fetch("/api/interview/results"),
-        ]);
-        if (!profileRes.ok) throw new Error("Failed to load profile");
-        setCandidate((await profileRes.json()) as CandidateProfile);
-        if (resultsRes.ok) {
-          const r = (await resultsRes.json()) as { results: InterviewResult[] };
-          setResults(r.results ?? []);
+        // Fetch profile first — required to launch any assessment
+        const profileRes = await fetch("/api/me", { cache: "no-store" });
+        if (!profileRes.ok) {
+          throw new Error(`Failed to load profile (HTTP ${profileRes.status})`);
+        }
+        const profile = await profileRes.json() as CandidateProfile | null;
+        setCandidate(profile);
+
+        // Results are best-effort — failure here does not block the page
+        try {
+          const resultsRes = await fetch("/api/interview/results", { cache: "no-store" });
+          if (resultsRes.ok) {
+            const r = (await resultsRes.json()) as { results: InterviewResult[] };
+            setResults(r.results ?? []);
+          }
+        } catch {
+          // Non-blocking — results will just be empty
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        setError(err instanceof Error ? err.message : "Failed to load profile");
       } finally {
         setLoading(false);
       }
