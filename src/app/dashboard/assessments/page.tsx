@@ -1,642 +1,501 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@client/components/ui/card";
-import { Badge } from "@client/components/ui/badge";
+export const dynamic = "force-dynamic";
+
+import { Suspense } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@client/components/ui/card";
 import { Button } from "@client/components/ui/button";
-import { Progress } from "@client/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@client/components/ui/tabs";
-import { Separator } from "@client/components/ui/separator";
-import {
-  Headphones,
-  Mic,
-  BookOpen,
-  Layers,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  ArrowRight,
-  TrendingUp,
-  ClipboardCheck,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { Badge } from "@client/components/ui/badge";
+import { Sparkles, Languages, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
+import { useRole } from "@client/components/providers/role-provider";
 
-// ============================================
-// ASSESSMENT TYPES CONFIG
-// ============================================
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AssessmentTypeInfo {
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  instructions: string[];
-  estimatedMinutes: number;
-  color: string;
+type SkillVerificationStatus = "UNVERIFIED" | "PENDING" | "PASSED" | "FAILED" | "OVERRIDDEN";
+
+interface CandidateSkill {
+  name: string;
+  category?: string;
+  verificationStatus?: SkillVerificationStatus;
 }
 
-const ASSESSMENT_TYPES: Record<string, AssessmentTypeInfo> = {
-  LISTENING_WRITTEN: {
-    label: "Listening & Written Response",
-    description:
-      "Listen to an audio prompt in the target language and provide a written response demonstrating comprehension and communication skills.",
-    icon: Headphones,
-    instructions: [
-      "You will listen to an audio recording (played up to 3 times)",
-      "After listening, write a response in the target language",
-      "Your response will be evaluated on grammar, vocabulary, clarity, and comprehension",
-      "You have a set time limit to complete the task",
-    ],
-    estimatedMinutes: 30,
-    color: "text-blue-600 bg-blue-50",
-  },
-  SPEAKING: {
-    label: "Speaking Task",
-    description:
-      "Record a spoken response to a given prompt. Your speech will be transcribed and evaluated for fluency, grammar, and clarity.",
-    icon: Mic,
-    instructions: [
-      "Read the prompt carefully before recording",
-      "Click 'Record' when ready and speak clearly into your microphone",
-      "Your speech will be transcribed using AI speech-to-text",
-      "Scoring covers fluency, pronunciation, grammar, and vocabulary",
-    ],
-    estimatedMinutes: 20,
-    color: "text-emerald-600 bg-emerald-50",
-  },
-  READING_ALOUD: {
-    label: "Reading Aloud",
-    description:
-      "Read a provided text passage aloud. Your pronunciation, fluency, and intonation will be evaluated via speech-to-text analysis.",
-    icon: BookOpen,
-    instructions: [
-      "A text passage will be displayed on screen",
-      "Read through it silently first (1 minute preparation)",
-      "Click 'Record' and read the passage aloud clearly",
-      "Focus on pronunciation, natural rhythm, and correct intonation",
-    ],
-    estimatedMinutes: 15,
-    color: "text-purple-600 bg-purple-50",
-  },
-  COMBINED: {
-    label: "Combined Assessment",
-    description:
-      "A comprehensive assessment combining listening, writing, and speaking tasks to provide a complete evaluation of your language abilities.",
-    icon: Layers,
-    instructions: [
-      "This assessment has multiple sections (listening, writing, and speaking)",
-      "Each section is timed individually",
-      "Complete all sections in order — you cannot go back",
-      "Your overall score reflects performance across all sections",
-    ],
-    estimatedMinutes: 45,
-    color: "text-amber-600 bg-amber-50",
-  },
-};
-
-// ============================================
-// STATUS CONFIG
-// ============================================
-
-interface StatusInfo {
-  label: string;
-  variant: "default" | "secondary" | "destructive" | "outline";
-  icon: LucideIcon;
-}
-
-const ASSESSMENT_STATUS: Record<string, StatusInfo> = {
-  PENDING: { label: "Pending", variant: "outline", icon: Clock },
-  IN_PROGRESS: { label: "In Progress", variant: "secondary", icon: AlertCircle },
-  SUBMITTED: { label: "Submitted", variant: "secondary", icon: CheckCircle2 },
-  SCORED: { label: "Scored", variant: "default", icon: CheckCircle2 },
-  REVIEWED: { label: "Reviewed", variant: "default", icon: CheckCircle2 },
-  EXPIRED: { label: "Expired", variant: "destructive", icon: AlertCircle },
-};
-
-// ============================================
-// SCORING DIMENSIONS
-// ============================================
-
-const SCORING_DIMENSIONS = [
-  { key: "grammar", label: "Grammar", description: "Sentence structure and correctness" },
-  { key: "vocabulary", label: "Vocabulary", description: "Range and accuracy of word choice" },
-  { key: "clarity", label: "Clarity", description: "Clear communication of ideas" },
-  { key: "fluency", label: "Fluency", description: "Natural flow and ease of expression" },
-  { key: "customerHandling", label: "Customer Handling", description: "Professional communication ability" },
-] as const;
-
-// ============================================
-// CEFR DISPLAY
-// ============================================
-
-const CEFR_INFO: Record<string, { label: string; color: string }> = {
-  A1: { label: "A1 — Beginner", color: "bg-red-100 text-red-800" },
-  A2: { label: "A2 — Elementary", color: "bg-orange-100 text-orange-800" },
-  B1: { label: "B1 — Intermediate", color: "bg-yellow-100 text-yellow-800" },
-  B2: { label: "B2 — Upper Intermediate", color: "bg-blue-100 text-blue-800" },
-  C1: { label: "C1 — Advanced", color: "bg-green-100 text-green-800" },
-  C2: { label: "C2 — Proficient", color: "bg-emerald-100 text-emerald-800" },
-};
-
-// ============================================
-// MOCK DATA (will be replaced by API calls)
-// ============================================
-
-interface MockAssessment {
+interface CandidateProfile {
   id: string;
-  type: string;
-  language: string;
-  status: string;
+  firstName?: string;
+  lastName?: string;
+  skills?: CandidateSkill[];
+  experiences?: Array<{ jobTitle?: string; description?: string }>;
+}
+
+interface InterviewResult {
+  id: string;
   createdAt: string;
-  expiresAt: string;
-  magicToken: string;
-  jobTitle?: string;
-  result?: {
-    overallScore: number;
-    grammarScore: number;
-    vocabularyScore: number;
-    clarityScore: number;
-    fluencyScore: number;
-    customerHandlingScore: number;
-    cefrEstimation: string;
-    isBorderline: boolean;
-    feedbackSummary: string;
-  };
+  evaluatedAt: string | null;
+  targetSkill: string | null;
+  interviewMode: string | null;
+  finalDecision: "PASS" | "FAIL" | null;
+  technicalDecision: "PASS" | "FAIL" | null;
+  integrityDecision: string | null;
+  evaluationRationale: Record<string, string> | null;
+  terminationReason: string | null;
 }
 
-// TODO: Replace with real API call to GET /api/assessments?candidateId=...
-const MOCK_ASSESSMENTS: MockAssessment[] = [
-  {
-    id: "1",
-    type: "LISTENING_WRITTEN",
-    language: "English",
-    status: "PENDING",
-    createdAt: "2026-02-20T10:00:00Z",
-    expiresAt: "2026-02-27T10:00:00Z",
-    magicToken: "abc123",
-    jobTitle: "Customer Service Representative — Berlin",
-  },
-  {
-    id: "2",
-    type: "SPEAKING",
-    language: "German",
-    status: "SCORED",
-    createdAt: "2026-02-15T10:00:00Z",
-    expiresAt: "2026-02-17T10:00:00Z",
-    magicToken: "def456",
-    jobTitle: "Support Specialist — Munich",
-    result: {
-      overallScore: 72,
-      grammarScore: 75,
-      vocabularyScore: 68,
-      clarityScore: 80,
-      fluencyScore: 65,
-      customerHandlingScore: 72,
-      cefrEstimation: "B2",
-      isBorderline: false,
-      feedbackSummary:
-        "Good command of German with solid grammar fundamentals. Vocabulary range is adequate for professional settings. Consider expanding topic-specific vocabulary for customer interactions. Clarity of expression is a strength — ideas are communicated effectively.",
-    },
-  },
-  {
-    id: "3",
-    type: "COMBINED",
-    language: "French",
-    status: "SCORED",
-    createdAt: "2026-02-10T10:00:00Z",
-    expiresAt: "2026-02-12T10:00:00Z",
-    magicToken: "ghi789",
-    jobTitle: "Finance Analyst — Paris",
-    result: {
-      overallScore: 52,
-      grammarScore: 55,
-      vocabularyScore: 48,
-      clarityScore: 58,
-      fluencyScore: 45,
-      customerHandlingScore: 54,
-      cefrEstimation: "B1",
-      isBorderline: true,
-      feedbackSummary:
-        "Shows foundational understanding of French but struggles with complex sentence structures. Vocabulary is limited for professional contexts. We recommend enrolling in the improvement track to strengthen fluency and expand vocabulary before reassessment.",
-    },
-  },
-];
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// ============================================
-// SUB-COMPONENTS
-// ============================================
+const SUPPORTED_LANGUAGES = ["English", "Portuguese", "Spanish", "German", "French"] as const;
 
-function AssessmentStatusBadge({ status }: { status: string }) {
-  const info = ASSESSMENT_STATUS[status] || ASSESSMENT_STATUS.PENDING;
-  const Icon = info.icon;
+const CEFR_COLORS: Record<string, string> = {
+  A1: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  A2: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  B1: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  B2: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  C1: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  C2: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+};
 
-  return (
-    <Badge variant={info.variant} className="gap-1">
-      <Icon className="h-3 w-3" />
-      {info.label}
-    </Badge>
-  );
+const STATUS_CONFIG: Record<
+  SkillVerificationStatus,
+  { label: string; icon: React.ReactNode; badge: string }
+> = {
+  UNVERIFIED: {
+    label: "Unverified",
+    icon: <Clock className="h-3 w-3" />,
+    badge: "bg-muted text-muted-foreground",
+  },
+  PENDING: {
+    label: "Pending validation",
+    icon: <AlertCircle className="h-3 w-3 text-blue-500" />,
+    badge: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  },
+  PASSED: {
+    label: "Validated",
+    icon: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+    badge: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  },
+  FAILED: {
+    label: "Failed",
+    icon: <XCircle className="h-3 w-3 text-red-500" />,
+    badge: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  },
+  OVERRIDDEN: {
+    label: "Overridden",
+    icon: <CheckCircle2 className="h-3 w-3 text-purple-500" />,
+    badge: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function canLaunch(status: SkillVerificationStatus | undefined): boolean {
+  if (!status || status === "UNVERIFIED") return true;
+  return status === "PENDING";
 }
 
-function ScoreBar({
-  label,
-  description,
-  score,
-}: {
-  label: string;
-  description: string;
-  score: number;
-}) {
-  const getScoreColor = (s: number) => {
-    if (s >= 75) return "text-green-600";
-    if (s >= 60) return "text-blue-600";
-    if (s >= 45) return "text-orange-600";
-    return "text-red-600";
-  };
+// ─── Past results card ────────────────────────────────────────────────────────
+
+function PastResultCard({ r, mode }: { r: InterviewResult; mode: "LANGUAGE" | "TECHNICAL" }) {
+  const isLanguage = mode === "LANGUAGE";
+  const cefrLevel =
+    isLanguage
+      ? (r.evaluationRationale?.["cefr_level"] ?? r.technicalDecision ?? null)
+      : null;
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm font-medium">{label}</span>
-          <span className="text-xs text-muted-foreground ml-2">
-            {description}
-          </span>
-        </div>
-        <span className={`text-sm font-bold ${getScoreColor(score)}`}>
-          {score}/100
+    <div className="rounded-md border p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {r.evaluatedAt
+            ? new Date(r.evaluatedAt).toLocaleString()
+            : new Date(r.createdAt).toLocaleString()}
+          {isLanguage && r.evaluationRationale?.["target_language"]
+            ? ` — ${r.evaluationRationale["target_language"]}`
+            : ""}
+          {!isLanguage && r.targetSkill ? ` — ${r.targetSkill}` : ""}
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+            r.finalDecision === "PASS"
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : r.finalDecision === "FAIL"
+              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {r.finalDecision ?? "Pending"}
         </span>
       </div>
-      <Progress value={score} className="h-2" />
+
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {isLanguage && cefrLevel && (
+          <span>
+            CEFR:{" "}
+            <span className={`rounded px-1.5 py-0.5 font-semibold ${CEFR_COLORS[cefrLevel] ?? "bg-muted text-muted-foreground"}`}>
+              {cefrLevel}
+            </span>
+          </span>
+        )}
+        {isLanguage && r.evaluationRationale?.["grammar"] && (
+          <span>Grammar: <strong className="text-foreground">{r.evaluationRationale["grammar"]}</strong></span>
+        )}
+        {isLanguage && r.evaluationRationale?.["vocabulary"] && (
+          <span>Vocabulary: <strong className="text-foreground">{r.evaluationRationale["vocabulary"]}</strong></span>
+        )}
+        {isLanguage && r.evaluationRationale?.["fluency"] && (
+          <span>Fluency: <strong className="text-foreground">{r.evaluationRationale["fluency"]}</strong></span>
+        )}
+        {isLanguage && r.evaluationRationale?.["writing"] && (
+          <span>Writing: <strong className="text-foreground">{r.evaluationRationale["writing"]}</strong></span>
+        )}
+        {!isLanguage && (
+          <span>Technical: <strong className="text-foreground">{r.technicalDecision ?? "—"}</strong></span>
+        )}
+        <span>Integrity: <strong className="text-foreground">{r.integrityDecision ?? "—"}</strong></span>
+      </div>
+
+      {r.evaluationRationale?.["final"] && (
+        <p className="mt-1.5 text-xs text-muted-foreground italic">
+          {r.evaluationRationale["final"]}
+        </p>
+      )}
+      {r.terminationReason && r.terminationReason !== "backend_ended" && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ended: {r.terminationReason.replace(/_/g, " ")}
+        </p>
+      )}
     </div>
   );
 }
 
-function AssessmentCard({ assessment }: { assessment: MockAssessment }) {
-  const typeInfo = ASSESSMENT_TYPES[assessment.type] || ASSESSMENT_TYPES.COMBINED;
-  const Icon = typeInfo.icon;
-  const isPending = assessment.status === "PENDING";
-  const hasResult = !!assessment.result;
-  const isExpired = assessment.status === "EXPIRED";
+// ─── Main page (inner) ────────────────────────────────────────────────────────
 
-  const expiresDate = new Date(assessment.expiresAt);
-  const now = new Date();
-  const daysLeft = Math.max(
-    0,
-    Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+function SkillValidationPage() {
+  const { role } = useRole();
+  const searchParams = useSearchParams();
+  const requestedSkill = searchParams.get("skill") ?? "";
+
+  const [candidate, setCandidate] = useState<CandidateProfile | null>(null);
+  const [results, setResults] = useState<InterviewResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Language assessment state
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("English");
+  const [launchingLanguage, setLaunchingLanguage] = useState(false);
+
+  // Technical assessment state
+  const [launchingSkill, setLaunchingSkill] = useState<string | null>(null);
+
+  // ── Load profile + past results
+  useEffect(() => {
+    if (!role || role === "hr") {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const [profileRes, resultsRes] = await Promise.all([
+          fetch("/api/me", { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }),
+          fetch("/api/interview/results"),
+        ]);
+        if (!profileRes.ok) throw new Error("Failed to load profile");
+        setCandidate((await profileRes.json()) as CandidateProfile);
+        if (resultsRes.ok) {
+          const r = (await resultsRes.json()) as { results: InterviewResult[] };
+          setResults(r.results ?? []);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [role]);
+
+  // ── Derived data
+  const skills = useMemo(
+    () => (candidate?.skills ?? []).filter((s) => Boolean(s.name)),
+    [candidate]
   );
 
-  return (
-    <Card className={isExpired ? "opacity-60" : ""}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`rounded-lg p-2 ${typeInfo.color}`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">{typeInfo.label}</CardTitle>
-              <CardDescription>
-                {assessment.language}
-                {assessment.jobTitle && ` · ${assessment.jobTitle}`}
-              </CardDescription>
-            </div>
-          </div>
-          <AssessmentStatusBadge status={assessment.status} />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Pending state — show instructions + CTA */}
-        {isPending && (
-          <>
-            <p className="text-sm text-muted-foreground">
-              {typeInfo.description}
-            </p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>~{typeInfo.estimatedMinutes} minutes</span>
-              <span className="text-muted-foreground">·</span>
-              <span className={daysLeft <= 2 ? "text-red-600 font-medium" : ""}>
-                {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining
-              </span>
-            </div>
-            <Link href={`/assess/${assessment.magicToken}`}>
-              <Button className="w-full gap-2">
-                Start Assessment <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </>
-        )}
+  const activeSkill = useMemo(() => {
+    if (!requestedSkill) return "";
+    const match = skills.find((s) => s.name === requestedSkill);
+    return match && canLaunch(match.verificationStatus) ? match.name : "";
+  }, [requestedSkill, skills]);
 
-        {/* Scored/Reviewed state — show results */}
-        {hasResult && assessment.result && (
-          <AssessmentResults result={assessment.result} />
-        )}
+  const languageResults = useMemo(
+    () => results.filter((r) => r.interviewMode === "LANGUAGE"),
+    [results]
+  );
+  const technicalResults = useMemo(
+    () => results.filter((r) => r.interviewMode !== "LANGUAGE"),
+    [results]
+  );
 
-        {/* Submitted state — waiting */}
-        {assessment.status === "SUBMITTED" && (
-          <div className="rounded-lg border bg-muted/50 p-4 text-center">
-            <CheckCircle2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">
-              Your assessment has been submitted and is being scored by AI.
-              Results will appear here shortly.
-            </p>
-          </div>
-        )}
+  // ── Launch helpers
+  async function launchWindow(
+    mode: "LANGUAGE" | "TECHNICAL",
+    opts: { targetSkill?: string; targetLanguage?: string }
+  ) {
+    if (!candidate) return;
+    const res = await fetch("/api/interview/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidateId: candidate.id,
+        interviewMode: mode,
+        targetSkill: opts.targetSkill,
+        targetLanguage: opts.targetLanguage,
+      }),
+    });
+    const data = (await res.json()) as { token?: string; error?: string };
+    if (!res.ok) throw new Error(data.error ?? "Failed to create session");
+    const win = window.open(
+      `/interview/${encodeURIComponent(data.token ?? "")}`,
+      "ai-interview-runtime",
+      "popup=yes,width=1280,height=800,noopener,noreferrer"
+    );
+    if (!win) throw new Error("Popup blocked — please allow popups and try again.");
+    win.focus();
+    // Refresh results after a short delay
+    setTimeout(() => {
+      fetch("/api/interview/results")
+        .then((r) => r.json())
+        .then((r: { results?: InterviewResult[] }) => setResults(r.results ?? []))
+        .catch(() => {});
+    }, 5000);
+  }
 
-        {/* In Progress state */}
-        {assessment.status === "IN_PROGRESS" && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              You have started this assessment. Continue where you left off.
-            </p>
-            <Link href={`/assess/${assessment.magicToken}`}>
-              <Button variant="outline" className="w-full gap-2">
-                Continue Assessment <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        )}
+  async function launchLanguageAssessment() {
+    setLaunchingLanguage(true);
+    setError(null);
+    try {
+      await launchWindow("LANGUAGE", { targetLanguage: selectedLanguage });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Launch failed");
+    } finally {
+      setLaunchingLanguage(false);
+    }
+  }
 
-        {/* Expired state */}
-        {isExpired && (
+  async function launchTechnicalAssessment(skillName: string) {
+    setLaunchingSkill(skillName);
+    setError(null);
+    try {
+      await launchWindow("TECHNICAL", { targetSkill: skillName });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Launch failed");
+    } finally {
+      setLaunchingSkill(null);
+    }
+  }
+
+  // ── Guard: HR sees nothing here
+  if (role === "hr") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Skill Validation</CardTitle>
+        </CardHeader>
+        <CardContent>
           <p className="text-sm text-muted-foreground">
-            This assessment link has expired. Contact your recruiter for a new
-            invitation.
+            Skill validation is available for candidates only.
           </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+        </CardContent>
+      </Card>
+    );
+  }
 
-function AssessmentResults({
-  result,
-}: {
-  result: NonNullable<MockAssessment["result"]>;
-}) {
-  const cefrInfo = CEFR_INFO[result.cefrEstimation] || {
-    label: result.cefrEstimation,
-    color: "bg-gray-100 text-gray-800",
-  };
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Skill Validation</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Loading your profile…</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const getOverallColor = (score: number) => {
-    if (score >= 75) return "text-green-600";
-    if (score >= 60) return "text-blue-600";
-    if (score >= 45) return "text-orange-600";
-    return "text-red-600";
-  };
-
-  const scores = [
-    { ...SCORING_DIMENSIONS[0], score: result.grammarScore },
-    { ...SCORING_DIMENSIONS[1], score: result.vocabularyScore },
-    { ...SCORING_DIMENSIONS[2], score: result.clarityScore },
-    { ...SCORING_DIMENSIONS[3], score: result.fluencyScore },
-    { ...SCORING_DIMENSIONS[4], score: result.customerHandlingScore },
-  ];
+  if (error && !candidate) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Skill Validation</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Overall score + CEFR */}
-      <div className="flex items-center gap-4">
-        <div className="text-center">
-          <div className={`text-3xl font-bold ${getOverallColor(result.overallScore)}`}>
-            {result.overallScore}
-          </div>
-          <div className="text-xs text-muted-foreground">Overall</div>
-        </div>
-        <Separator orientation="vertical" className="h-12" />
-        <div>
-          <Badge className={cefrInfo.color}>{cefrInfo.label}</Badge>
-          <p className="text-xs text-muted-foreground mt-1">
-            Estimated CEFR Level
-          </p>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Sub-scores */}
-      <div className="space-y-3">
-        {scores.map((s) => (
-          <ScoreBar
-            key={s.key}
-            label={s.label}
-            description={s.description}
-            score={s.score}
-          />
-        ))}
-      </div>
-
-      {/* Feedback */}
-      {result.feedbackSummary && (
-        <>
-          <Separator />
-          <div>
-            <h4 className="text-sm font-semibold mb-1">Feedback</h4>
-            <p className="text-sm text-muted-foreground">
-              {result.feedbackSummary}
-            </p>
-          </div>
-        </>
-      )}
-
-      {/* Borderline notice */}
-      {result.isBorderline && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-          <div className="flex items-start gap-3">
-            <TrendingUp className="h-5 w-5 text-orange-600 mt-0.5" />
-            <div>
-              <h4 className="text-sm font-semibold text-orange-800">
-                Borderline Result — Improvement Track Available
-              </h4>
-              <p className="text-sm text-orange-700 mt-1">
-                Your score falls in the borderline range (45–60). You are
-                eligible for a 2-week micro-learning improvement track to
-                strengthen your skills before reassessment. Your recruiter
-                will reach out with the next steps.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// ASSESSMENT TYPE OVERVIEW CARDS
-// ============================================
-
-function AssessmentTypeCard({ type }: { type: string }) {
-  const info = ASSESSMENT_TYPES[type];
-  if (!info) return null;
-  const Icon = info.icon;
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className={`rounded-lg p-2 ${info.color}`}>
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <CardTitle className="text-base">{info.label}</CardTitle>
-            <CardDescription>~{info.estimatedMinutes} min</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground mb-3">{info.description}</p>
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
-            What to expect
-          </p>
-          <ul className="space-y-1">
-            {info.instructions.map((instruction, i) => (
-              <li
-                key={i}
-                className="text-sm text-muted-foreground flex items-start gap-2"
-              >
-                <span className="text-primary font-bold text-xs mt-0.5">
-                  {i + 1}.
-                </span>
-                {instruction}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============================================
-// MAIN PAGE
-// ============================================
-
-export default function AssessmentsPage() {
-  const [activeTab, setActiveTab] = useState("my-assessments");
-
-  // TODO: Replace with real API call filtered by candidate
-  const assessments = MOCK_ASSESSMENTS;
-  const pendingCount = assessments.filter(
-    (a) => a.status === "PENDING" || a.status === "IN_PROGRESS"
-  ).length;
-  const completedCount = assessments.filter(
-    (a) =>
-      a.status === "SCORED" ||
-      a.status === "REVIEWED" ||
-      a.status === "SUBMITTED"
-  ).length;
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8">
+      {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">My Assessments</h1>
-        <p className="text-muted-foreground">
-          View your language assessments, take pending tests, and review your
-          results.
+        <h1 className="text-2xl font-bold tracking-tight">Skill Validation</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Validate your language proficiency and technical skills through AI-powered assessments.
         </p>
       </div>
 
-      {/* Quick stats */}
-      <div className="flex gap-4">
-        <Card className="flex-1">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">{pendingCount}</p>
-                <p className="text-xs text-muted-foreground">
-                  Pending Assessment{pendingCount !== 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="flex-1">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">{completedCount}</p>
-                <p className="text-xs text-muted-foreground">
-                  Completed Assessment{completedCount !== 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">AI Skill Validation</CardTitle>
-          <CardDescription>
-            Validate technical skills through AI interview sessions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/dashboard/ai-interview">
-            <Button variant="outline" className="gap-2">
+      {/* ── Section 1: Language Assessment ──────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Languages className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Language Assessment</h2>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            Primary
+          </span>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI Language Proficiency Interview</CardTitle>
+            <CardDescription>
+              A structured assessment conducted by an AI examiner following the official Language
+              Assessment Protocol. The interview consists of a personalised intro, five oral questions
+              about your professional background and values, a written dictation task, and a closing.
+              Scored on the CEFR rubric across grammar, vocabulary, fluency, and writing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <label htmlFor="lang-select" className="text-sm font-medium whitespace-nowrap">
+                Language to assess:
+              </label>
+              <select
+                id="lang-select"
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rounded-md border bg-muted/40 px-4 py-3 text-xs text-muted-foreground space-y-1">
+              <p>• The interview window requires camera and microphone access and runs in fullscreen.</p>
+              <p>• Voice input (STT) is supported on Chrome and Edge. You can also type your answers.</p>
+              <p>• The AI will conduct the entire session in <strong className="text-foreground">{selectedLanguage}</strong>.</p>
+              <p>• Results appear below after the session ends.</p>
+            </div>
+
+            <Button
+              onClick={launchLanguageAssessment}
+              disabled={launchingLanguage || !candidate}
+              className="gap-2"
+            >
               <Sparkles className="h-4 w-4" />
-              Start Skill Validation
+              {launchingLanguage ? "Launching…" : `Launch ${selectedLanguage} Assessment`}
             </Button>
-          </Link>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="my-assessments">My Assessments</TabsTrigger>
-          <TabsTrigger value="assessment-types">Assessment Types</TabsTrigger>
-        </TabsList>
-
-        {/* Tab: My Assessments */}
-        <TabsContent value="my-assessments" className="space-y-4 mt-4">
-          {assessments.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">
-                  You don&apos;t have any assessments yet. When an HR manager
-                  invites you to a language assessment, it will appear here.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            assessments.map((assessment) => (
-              <AssessmentCard key={assessment.id} assessment={assessment} />
-            ))
-          )}
-        </TabsContent>
-
-        {/* Tab: Assessment Types Overview */}
-        <TabsContent value="assessment-types" className="mt-4">
-          <div className="space-y-3 mb-4">
-            <p className="text-sm text-muted-foreground">
-              The platform supports the following assessment types. Each
-              evaluates your language skills across 5 dimensions: grammar,
-              vocabulary, clarity, fluency, and customer handling ability.
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {Object.keys(ASSESSMENT_TYPES).map((type) => (
-              <AssessmentTypeCard key={type} type={type} />
+        {/* Past language results */}
+        {languageResults.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Past language assessments</p>
+            {languageResults.map((r) => (
+              <PastResultCard key={r.id} r={r} mode="LANGUAGE" />
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </section>
+
+      {/* ── Section 2: Technical Skill Validation ───────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Technical Skill Validation</h2>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">CV-Extracted Skills</CardTitle>
+            <CardDescription>
+              Skills extracted from your uploaded CV. Skills marked as{" "}
+              <span className="font-medium text-foreground">Pending validation</span> by your recruiter
+              can be validated through an AI technical interview.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {skills.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No skills found in your profile. Upload your CV first to have skills extracted automatically.
+              </p>
+            ) : (
+              <div className="divide-y">
+                {skills.map((skill) => {
+                  const status = skill.verificationStatus ?? "UNVERIFIED";
+                  const cfg = STATUS_CONFIG[status];
+                  const launchable = canLaunch(skill.verificationStatus);
+                  const isLaunching = launchingSkill === skill.name;
+
+                  return (
+                    <div
+                      key={skill.name}
+                      className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{skill.name}</p>
+                        {skill.category && (
+                          <p className="text-xs text-muted-foreground">{skill.category}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg.badge}`}
+                        >
+                          {cfg.icon}
+                          {cfg.label}
+                        </span>
+                        {launchable && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isLaunching || launchingSkill !== null}
+                            onClick={() => launchTechnicalAssessment(skill.name)}
+                          >
+                            {isLaunching ? "Launching…" : "Validate"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Past technical results */}
+        {technicalResults.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Past technical assessments</p>
+            {technicalResults.map((r) => (
+              <PastResultCard key={r.id} r={r} mode="TECHNICAL" />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
+  );
+}
+
+// ─── Wrapper (Suspense boundary for useSearchParams) ──────────────────────────
+
+export default function AssessmentsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+      <SkillValidationPage />
+    </Suspense>
   );
 }
