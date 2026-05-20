@@ -203,18 +203,23 @@ export class ProfileUseCases {
       return existing;
     }
 
-    // 2. Check for an HR-uploaded candidate with the same email but no user_id
-    //    This merges the HR-created profile with the real authenticated user.
+    // 2. Check for a candidate with the same email (HR-uploaded without user_id,
+    //    or an existing record whose user_id wasn't linked yet).
     if (user.email) {
       const emailMatch = await this.candidateRepo.findByEmail(user.email);
       if (emailMatch) {
-        // Claim the HR-uploaded record: link user_id, set activated
-        await this.candidateRepo.update(emailMatch.id, {
-          userId: user.id,
-          activatedAt: new Date().toISOString(),
-        });
-        emailMatch.userId = user.id;
-        emailMatch.activatedAt = new Date().toISOString();
+        if (!emailMatch.userId) {
+          // Claim the unlinked record: set user_id and mark activated.
+          await this.candidateRepo.update(emailMatch.id, {
+            userId: user.id,
+            activatedAt: new Date().toISOString(),
+          });
+          emailMatch.userId = user.id;
+          emailMatch.activatedAt = new Date().toISOString();
+        } else if (!emailMatch.activatedAt) {
+          await this.candidateRepo.update(emailMatch.id, { activatedAt: new Date().toISOString() });
+          emailMatch.activatedAt = new Date().toISOString();
+        }
         return emailMatch;
       }
     }

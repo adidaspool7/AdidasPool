@@ -198,7 +198,6 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
       .from("candidates")
       .select("*")
       .eq("email", email)
-      .is("user_id", null)
       .limit(1)
       .single();
     if (error) return null;

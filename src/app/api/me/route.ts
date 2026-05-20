@@ -22,8 +22,6 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Failed to get current user",
-        // TEMP: always expose detail to diagnose production 500 — revert after fix
-        detail: message,
       },
       { status: 500 }
     );
