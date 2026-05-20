@@ -265,11 +265,13 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
         const cid = (row as { candidate_id?: string }).candidate_id;
         if (cid) ids.add(cid);
       }
-      candidateIdFilter = [...ids];
-      // No candidate has experience in any of the requested fields -> return
-      // an empty pool early instead of fetching all candidates and scoring
-      // each one to zero.
-      if (candidateIdFilter.length === 0) return [];
+      // Only apply the pre-filter when it returns a meaningful pool (>= 5).
+      // If fewer candidates pass, fall back to the full pool so that
+      // untagged candidates (CVs parsed before fields_of_work tagging was
+      // introduced) are still scored rather than silently excluded.
+      if (ids.size >= 5) {
+        candidateIdFilter = [...ids];
+      }
     }
 
     // Filter out status=NEW and hard duplicates. Tolerate is_duplicate=NULL
