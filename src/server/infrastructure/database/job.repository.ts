@@ -146,7 +146,9 @@ export class SupabaseJobRepository implements IJobRepository {
       const { data, error } = await db
         .from("jobs")
         .select("id, title, department, country")
-        .not("status", "in", '("CLOSED","CANCELLED","FILLED")')
+        .neq("status", "CLOSED")
+        .neq("status", "CANCELLED")
+        .neq("status", "FILLED")
         .order("title", { ascending: true })
         .range(from, from + pageSize - 1);
       assertNoError(error, "job.findAllForPicker");
