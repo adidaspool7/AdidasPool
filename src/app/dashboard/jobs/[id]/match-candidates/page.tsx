@@ -150,6 +150,32 @@ function missingSkillsSummary(breakdown: CriterionResult[]): string | null {
 // PAGE
 // ============================================
 
+/**
+ * Recompute overallScore and isEligible for a fit result using a new set
+ * of criterion weights — without a server round-trip.
+ *
+ * NOTE: `c.met` for each individual criterion is NOT recomputed here; it
+ * was set server-side based on the threshold at the time of the match.
+ * Threshold changes therefore still require a full server re-run.
+ */
+function reweightFit(
+  fit: { overallScore: number; isEligible: boolean; breakdown: CriterionResult[] },
+  weights: Record<string, number>
+): { overallScore: number; isEligible: boolean; breakdown: CriterionResult[] } {
+  const applicable = fit.breakdown.filter((c) => c.applicable);
+  const totalWeight = applicable.reduce((sum, c) => sum + (weights[c.key] ?? 0), 0);
+  const overallScore =
+    totalWeight === 0
+      ? 0
+      : Math.round(
+          applicable.reduce((sum, c) => sum + c.score * (weights[c.key] ?? 0), 0) /
+            totalWeight
+        );
+  const contributing = applicable.filter((c) => (weights[c.key] ?? 0) > 0);
+  const isEligible = contributing.every((c) => c.met);
+  return { ...fit, overallScore, isEligible };
+}
+
 export default function MatchCandidatesPage({
   params,
 }: {
@@ -184,6 +210,15 @@ export default function MatchCandidatesPage({
 
   // Pure UI knob — minimum fit score to display. Not persisted.
   const [scoreFloor, setScoreFloor] = useState<number>(0);
+
+  // Reweighted matches — recomputed locally whenever criterionWeights
+  // change, avoiding a server round-trip for pure weight adjustments.
+  const displayMatches = useMemo(() => {
+    if (!data) return [];
+    return data.matches
+      .map((m) => ({ ...m, fit: reweightFit(m.fit, criterionWeights) }))
+      .sort((a, b) => b.fit.overallScore - a.fit.overallScore);
+  }, [data, criterionWeights]);
 
   // Load the current threshold + weights once.
   useEffect(() => {
@@ -330,7 +365,10 @@ export default function MatchCandidatesPage({
     });
   };
 
-  // Persist threshold + weights and re-load matches so scores reflect them.
+  // Persist threshold + weights. Only re-fetches from server when the
+  // threshold changes (it affects per-criterion 'met' which can't be
+  // recomputed locally). Pure weight changes are applied instantly via
+  // the displayMatches useMemo — no server round-trip needed.
   const saveConfig = async () => {
     const thresholdChanged = Math.abs(thresholdDraft - threshold) >= 0.005;
     const weightsChanged = (Object.keys(criterionWeightsDraft) as CriterionKey[]).some(
@@ -350,7 +388,11 @@ export default function MatchCandidatesPage({
       if (res.ok) {
         setThreshold(thresholdDraft);
         setCriterionWeights(criterionWeightsDraft);
-        await load();
+        // Threshold change affects 'met' on requiredSkills — server must
+        // recompute. Weight-only changes are handled by displayMatches memo.
+        if (thresholdChanged) {
+          await load();
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         const msg =
@@ -428,10 +470,10 @@ export default function MatchCandidatesPage({
 
   if (!data) return null;
 
-  const eligible = data.matches.filter((m) => m.fit.isEligible);
-  const ineligible = data.matches.filter((m) => !m.fit.isEligible);
+  const eligible = displayMatches.filter((m) => m.fit.isEligible);
+  const ineligible = displayMatches.filter((m) => !m.fit.isEligible);
   // Always rank everyone; HR uses the score floor (UI-only) to filter.
-  const visible = data.matches.filter((m) => m.fit.overallScore >= scoreFloor);
+  const visible = displayMatches.filter((m) => m.fit.overallScore >= scoreFloor);
 
   return (
     <div className="p-6 space-y-6">
@@ -518,7 +560,7 @@ export default function MatchCandidatesPage({
           <span className="font-semibold text-foreground">{visible.length}</span>{" "}
           shown · <span className="font-semibold text-foreground">{eligible.length}</span> meet
           all reqs · <span className="font-semibold text-foreground">{ineligible.length}</span>{" "}
-          partial · {data.matches.length} total
+          partial · {displayMatches.length} total
         </div>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Min fit</span>
@@ -546,7 +588,7 @@ export default function MatchCandidatesPage({
           <div className="divide-y">
             {visible.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                {data.matches.length === 0
+                {displayMatches.length === 0
                   ? "No candidates yet. Upload more CVs."
                   : `No candidates above ${scoreFloor}% fit. Lower the Min fit slider to see more.`}
               </div>

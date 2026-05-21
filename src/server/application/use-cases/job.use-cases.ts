@@ -577,7 +577,7 @@ export class JobUseCases {
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
-      if (fetched.status === "CLOSED") {
+      if (fetched.status === "CLOSED" || fetched.status === "UNAVAILABLE") {
         await this.jobRepo.markClosed(jobId);
         throw new JobClosedError(
           `Job ${jobId} is no longer accepting applications (closed by source).`
@@ -642,7 +642,7 @@ export class JobUseCases {
         );
       }
       const fetched = await this.jobScraperService.fetchJobDescription(sourceUrl);
-      if (fetched.status === "CLOSED") {
+      if (fetched.status === "CLOSED" || fetched.status === "UNAVAILABLE") {
         await this.jobRepo.markClosed(jobId);
         throw new JobClosedError(
           `Job ${jobId} is no longer accepting applications (closed by source).`

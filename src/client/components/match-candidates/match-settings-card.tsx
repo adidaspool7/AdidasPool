@@ -134,48 +134,43 @@ export function MatchSettingsCard({
       </CardHeader>
       {open && (
         <CardContent className="pt-2 pb-4 px-4">
-          {/* Per-criterion weight sliders */}
-          <div className="grid gap-3 md:grid-cols-2">
+          {/* Per-criterion weight buttons: Off / ★ / ★★ / ★★★ */}
+          <div className="grid gap-2 md:grid-cols-2">
             {CRITERION_KEYS.map((k) => {
               const v = weightsDraft[k];
-              const isOff = v === 0;
               return (
-                <div key={k} className="flex items-center gap-3 text-sm">
+                <div key={k} className="flex items-center justify-between gap-2 text-sm">
                   <span
                     className={cn(
-                      "w-44 shrink-0",
-                      isOff && "text-muted-foreground line-through"
+                      "font-medium",
+                      v === 0 && "text-muted-foreground line-through"
                     )}
                   >
                     {CRITERION_LABELS[k]}
                   </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={v}
-                    onChange={(e) =>
-                      onWeightsDraftChange({
-                        ...weightsDraft,
-                        [k]: Number(e.target.value),
-                      })
-                    }
-                    className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-muted accent-blue-600"
-                    disabled={saving}
-                  />
-                  <span
-                    className={cn(
-                      "w-16 text-right text-xs",
-                      isOff
-                        ? "text-muted-foreground italic"
-                        : "text-blue-600"
-                    )}
-                    aria-label={isOff ? "off" : `weight ${v} of 3`}
-                    title={isOff ? "Ignored" : `Weight ${v} of 3`}
-                  >
-                    {isOff ? "off" : "★".repeat(v) + "☆".repeat(3 - v)}
-                  </span>
+                  <div className="flex gap-1">
+                    {([0, 1, 2, 3] as const).map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() =>
+                          onWeightsDraftChange({ ...weightsDraft, [k]: level })
+                        }
+                        disabled={saving}
+                        title={level === 0 ? "Disabled" : `Weight ${level} of 3`}
+                        className={cn(
+                          "w-9 h-7 rounded text-xs border transition-colors select-none",
+                          v === level
+                            ? level === 0
+                              ? "bg-muted border-border text-muted-foreground"
+                              : "bg-blue-600 border-blue-600 text-white"
+                            : "border-border text-muted-foreground bg-background hover:border-blue-400 hover:text-foreground"
+                        )}
+                      >
+                        {level === 0 ? "–" : "★".repeat(level)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               );
             })}
