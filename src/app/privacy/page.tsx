@@ -45,9 +45,12 @@ export default function PrivacyPage() {
           <P>
             This platform is part of the{" "}
             <strong>BlendEd / BIP project</strong>, developed in
-            collaboration with adidas by a two-person team: Fernando
-            Ribeiro and Stratos. It demonstrates end-to-end AI-powered
-            recruitment tooling and is{" "}
+            collaboration with adidas by a multidisciplinary team
+            including developers, designers, researchers, and academic
+            supervisors. The technical development was led by{" "}
+            <strong>Fernando Ribeiro</strong> and{" "}
+            <strong>Stratos</strong>. It demonstrates end-to-end
+            AI-powered recruitment tooling and is{" "}
             <strong>not</strong> an official adidas product.
           </P>
           <P>
@@ -59,6 +62,12 @@ export default function PrivacyPage() {
             >
               fr.soul@gmail.com
             </a>
+          </P>
+          <P>
+            This platform is intended for users aged{" "}
+            <strong>18 or over</strong>. We do not knowingly collect
+            personal data from minors. If you believe a minor has
+            registered, please contact the data controller immediately.
           </P>
         </Section>
 
@@ -107,6 +116,17 @@ export default function PrivacyPage() {
             Legal basis (GDPR Art. 6): <em>Legitimate interest</em> for
             authentication and recruitment operations; <em>Consent</em> for
             optional analytics cookies (accepted via the cookie banner).
+          </P>
+          <P>
+            <strong>Automated profiling (GDPR Art. 22):</strong> The
+            platform uses AI models to parse CVs, compute match scores,
+            and rank candidate profiles against job requirements. This
+            automated scoring{" "}
+            <em>assists</em> HR reviewers but does not constitute a
+            final automated hiring decision — a human reviewer always
+            makes the ultimate determination. You may request a manual
+            review of any AI-generated score by contacting the data
+            controller.
           </P>
         </Section>
 
@@ -215,8 +235,21 @@ export default function PrivacyPage() {
             We do not sell personal data to any third party.
           </P>
         </Section>
-
-        <Section title="7. Your rights (GDPR)">
+        <Section title="7. International data transfers">
+          <P>
+            Some sub-processors listed in section 6 are based outside
+            the European Economic Area (EEA). Specifically, Groq,
+            OpenAI, Vercel, and Resend are US-based companies. Transfers
+            to these processors are covered by Standard Contractual
+            Clauses (SCCs) approved by the European Commission, or
+            equivalent transfer mechanisms under GDPR Chapter V.
+          </P>
+          <P>
+            Supabase stores data in an EU region; no EEA transfer occurs
+            for database and file storage operations.
+          </P>
+        </Section>
+        <Section title="8. Your rights (GDPR)">
           <P>
             Under the General Data Protection Regulation you have the right
             to:
@@ -230,7 +263,7 @@ export default function PrivacyPage() {
               profile from the candidate dashboard).
             </li>
             <li>
-              <strong>Erase</strong> your data (&ldquo;right to be
+              <strong>Erase</strong>{" "}your data (&ldquo;right to be
               forgotten&rdquo;) — contact the data controller and your
               account and all associated data will be deleted within 30
               days.
@@ -245,6 +278,11 @@ export default function PrivacyPage() {
             <li>
               <strong>Object</strong> to processing based on legitimate
               interest.
+            </li>
+            <li>
+              <strong>Not be subject to automated decisions</strong>{" "}
+              with significant effects (Art. 22) — you may request human
+              review of any AI-generated match or assessment score.
             </li>
             <li>
               <strong>Withdraw consent</strong> at any time (e.g. by
@@ -265,17 +303,22 @@ export default function PrivacyPage() {
           </P>
         </Section>
 
-        <Section title="8. Security">
+        <Section title="9. Security">
           <P>
             All data in transit is encrypted with TLS 1.3. Data at rest is
             encrypted by Supabase (AES-256). Access to the database is
             limited to server-side processes using a service-role key that
             is never exposed to the browser. Row-level security policies are
             applied where appropriate.
-          </P>
-        </Section>
+          </P>          <P>
+            In the event of a personal data breach, we will notify the
+            relevant supervisory authority within 72 hours where required
+            by GDPR Art. 33. Where the breach is likely to result in a
+            high risk to individuals, affected users will be informed
+            without undue delay (GDPR Art. 34).
+          </P>        </Section>
 
-        <Section title="9. Changes to this policy">
+        <Section title="10. Changes to this policy">
           <P>
             We may update this policy as the platform evolves. Material
             changes will be announced via a notice on the sign-in page. The
