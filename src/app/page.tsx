@@ -39,6 +39,7 @@ export default function HomePage() {
   };
 
   return (
+    <>
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-background to-muted">
       {/* Subtle three-stripes motif on the right edge (adidas brand hint) */}
       <div
@@ -183,5 +184,6 @@ export default function HomePage() {
     </div>
 
     <CookieConsent />
+    </>
   );
 }
