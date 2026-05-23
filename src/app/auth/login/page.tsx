@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -27,7 +28,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-muted px-4">
+    <div className="flex min-h-screen flex-col items-center bg-gradient-to-b from-background to-muted px-4">
+      <div className="flex flex-1 w-full items-center justify-center">
       <div className="w-full max-w-sm space-y-8">
         {/* Brand */}
         <div className="text-center space-y-2">
@@ -80,6 +82,25 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="mt-auto pb-6 pt-10 text-center text-xs text-muted-foreground space-y-1">
+        <p>
+          Academic project &mdash; BlendEd / BIP &times; adidas &mdash; 2026
+        </p>
+        <p>
+          Fernando Ribeiro &amp; Efstratios Demertzoglou
+        </p>
+        <p>
+          <Link
+            href="/privacy"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            Privacy Policy &amp; Cookie Settings
+          </Link>
+        </p>
+      </footer>
     </div>
   );
 }
