@@ -105,6 +105,8 @@ export default function AmbassadorProgramDetailPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [updatingApp, setUpdatingApp] = useState<string | null>(null);
+  const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -143,6 +145,19 @@ export default function AmbassadorProgramDetailPage() {
       );
     } finally {
       setUpdatingApp(null);
+    }
+  }
+
+  async function handleBulkStatusChange(newStatus: string) {
+    if (selectedApps.size === 0 || !newStatus) return;
+    setBulkUpdating(true);
+    try {
+      await Promise.all(
+        [...selectedApps].map((appId) => handleStatusChange(appId, newStatus))
+      );
+      setSelectedApps(new Set());
+    } finally {
+      setBulkUpdating(false);
     }
   }
 
@@ -273,9 +288,55 @@ export default function AmbassadorProgramDetailPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <>
+              {/* Bulk action toolbar */}
+              {selectedApps.size > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-muted/60 border-b text-sm">
+                  <span className="font-medium">{selectedApps.size} selected</span>
+                  <Select
+                    onValueChange={(v) => void handleBulkStatusChange(v)}
+                    disabled={bulkUpdating}
+                    value=""
+                  >
+                    <SelectTrigger className="h-7 w-40 text-xs">
+                      <SelectValue placeholder="Set status…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APP_STATUS_OPTIONS.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {bulkUpdating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs ml-auto"
+                    onClick={() => setSelectedApps(new Set())}
+                    disabled={bulkUpdating}
+                  >
+                    Clear selection
+                  </Button>
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      className="cursor-pointer"
+                      checked={selectedApps.size === applications.length && applications.length > 0}
+                      onChange={(e) =>
+                        setSelectedApps(
+                          e.target.checked ? new Set(applications.map((a) => a.id)) : new Set()
+                        )
+                      }
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>University</TableHead>
@@ -288,7 +349,22 @@ export default function AmbassadorProgramDetailPage() {
               </TableHeader>
               <TableBody>
                 {applications.map((app) => (
-                  <TableRow key={app.id}>
+                  <TableRow key={app.id} className={selectedApps.has(app.id) ? "bg-muted/40" : ""}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        className="cursor-pointer"
+                        checked={selectedApps.has(app.id)}
+                        onChange={(e) =>
+                          setSelectedApps((prev) => {
+                            const next = new Set(prev);
+                            e.target.checked ? next.add(app.id) : next.delete(app.id);
+                            return next;
+                          })
+                        }
+                        aria-label="Select row"
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       {[app.candidate?.firstName, app.candidate?.lastName]
                         .filter(Boolean)
@@ -345,6 +421,7 @@ export default function AmbassadorProgramDetailPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>

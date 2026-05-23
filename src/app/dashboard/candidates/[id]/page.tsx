@@ -62,6 +62,7 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronUp,
+  Trophy,
 } from "lucide-react";
 import { Textarea } from "@client/components/ui/textarea";
 import { Input } from "@client/components/ui/input";
@@ -1387,6 +1388,7 @@ export default function CandidateDetailPage({
       {/* ── Interaction History ──────────────────────────────────── */}
       <InteractionHistory candidateId={c.id} />
       <ShortlistedFor candidateId={c.id} />
+      <AmbassadorPrograms candidateId={c.id} />
     </div>
   );
 }
@@ -1751,6 +1753,122 @@ function ShortlistedFor({ candidateId }: { candidateId: string }) {
               </li>
             );
           })}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Ambassador Programs component (HR-only) ──────────────────────
+// Lists all ambassador programs this candidate has applied to.
+
+interface AmbassadorAppRow {
+  id: string;
+  programId: string;
+  status: string;
+  appliedAt?: string | null;
+  university?: string | null;
+  pitchVideoUrl?: string | null;
+  program?: {
+    id: string;
+    title: string;
+    cohort?: string | null;
+    status: string;
+  } | null;
+}
+
+const AMB_APP_STATUS_COLORS: Record<string, string> = {
+  SUBMITTED: "bg-blue-100 text-blue-700",
+  UNDER_REVIEW: "bg-amber-100 text-amber-700",
+  INVITED: "bg-purple-100 text-purple-700",
+  ASSESSED: "bg-indigo-100 text-indigo-700",
+  SHORTLISTED: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
+  WITHDRAWN: "bg-slate-100 text-slate-600",
+};
+
+function AmbassadorPrograms({ candidateId }: { candidateId: string }) {
+  const [rows, setRows] = useState<AmbassadorAppRow[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/candidates/${candidateId}/ambassador-applications`)
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return (await r.json()) as { applications: AmbassadorAppRow[] };
+      })
+      .then((j) => {
+        if (!alive) return;
+        setRows(j?.applications ?? []);
+      })
+      .catch(() => { if (alive) setRows([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [candidateId]);
+
+  if (loading || !rows || rows.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Trophy className="h-4 w-4 text-amber-500" />
+          Ambassador Programs ({rows.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {rows.map((app) => (
+            <li
+              key={app.id}
+              className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3 text-sm"
+            >
+              <div className="min-w-0 flex-1">
+                <a
+                  href={`/dashboard/ambassador/${app.programId}`}
+                  className="font-medium hover:underline truncate inline-block max-w-full"
+                >
+                  {app.program?.title ?? app.programId}
+                </a>
+                <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-2 items-center">
+                  {app.program?.cohort && (
+                    <span>{app.program.cohort}</span>
+                  )}
+                  {app.university && (
+                    <span>· {app.university}</span>
+                  )}
+                  {app.appliedAt && (
+                    <span>
+                      · Applied{" "}
+                      {new Date(app.appliedAt).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  )}
+                  {app.pitchVideoUrl && (
+                    <a
+                      href={app.pitchVideoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Pitch video
+                    </a>
+                  )}
+                </div>
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  AMB_APP_STATUS_COLORS[app.status] ?? "bg-muted text-muted-foreground"
+                }`}
+              >
+                {app.status.replace(/_/g, " ")}
+              </span>
+            </li>
+          ))}
         </ul>
       </CardContent>
     </Card>

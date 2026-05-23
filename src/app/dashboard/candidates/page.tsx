@@ -79,6 +79,7 @@ import {
   UserPlus,
   Trash2,
   Plus,
+  Trophy,
 } from "lucide-react";
 import { FIELDS_OF_WORK } from "@client/lib/constants";
 import { formatLocation } from "@client/lib/utils";
@@ -636,10 +637,10 @@ export default function CandidatesPage() {
         if (statusFilter === "SHORTLISTED_FILTER") params.set("shortlisted", "true");
         if (businessAreaFilter) params.set("businessArea", businessAreaFilter);
         if (locationSearch) params.set("locationSearch", locationSearch);
-        // sourceFilter values: ALL | PLATFORM | NON_PLATFORM (UI labels:
-        // "Self-applied" / "Added by HR"). The DB enum has 3 raw values
-        // but we collapse EXTERNAL+INTERNAL into one HR-facing label.
+        // sourceFilter values: ALL | PLATFORM | NON_PLATFORM | AMBASSADOR
+        // AMBASSADOR maps to exact sourceType; NON_PLATFORM is client-side.
         if (sourceFilter === "PLATFORM") params.set("sourceType", "PLATFORM");
+        if (sourceFilter === "AMBASSADOR") params.set("sourceType", "AMBASSADOR");
         if (!showUnparsed) params.set("excludeUnparsed", "true");
 
         const res = await fetch(`/api/candidates?${params}`);
@@ -649,7 +650,7 @@ export default function CandidatesPage() {
         // "Added by HR" filter is client-side because the API only accepts
         // exact enum values; this is acceptable since pageSize=20.
         if (sourceFilter === "NON_PLATFORM") {
-          rows = rows.filter((c) => c.sourceType !== "PLATFORM");
+          rows = rows.filter((c) => c.sourceType !== "PLATFORM" && c.sourceType !== "AMBASSADOR");
         }
         setCandidates(rows);
         setPagination(data.pagination);
@@ -1125,6 +1126,7 @@ export default function CandidatesPage() {
             <SelectItem value="ALL">All sources</SelectItem>
             <SelectItem value="PLATFORM">Self-applied</SelectItem>
             <SelectItem value="NON_PLATFORM">Added by HR</SelectItem>
+            <SelectItem value="AMBASSADOR">Ambassador</SelectItem>
           </SelectContent>
         </Select>
 
@@ -1500,6 +1502,11 @@ export default function CandidatesPage() {
                         <Badge variant="default" className="text-xs gap-1">
                           <UserCheck className="h-3 w-3" />
                           Self-applied
+                        </Badge>
+                      ) : c.sourceType === "AMBASSADOR" ? (
+                        <Badge variant="outline" className="text-xs gap-1 bg-amber-50 text-amber-700 border-amber-300">
+                          <Trophy className="h-3 w-3" />
+                          Ambassador
                         </Badge>
                       ) : (
                         <div className="flex flex-col items-center gap-1">

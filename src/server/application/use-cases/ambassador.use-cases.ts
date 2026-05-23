@@ -104,6 +104,12 @@ export class AmbassadorUseCases {
     return this.applicationRepo.findByProgram(programId);
   }
 
+  async listApplicationsByCandidate(
+    candidateId: string
+  ): Promise<AmbassadorApplicationRow[]> {
+    return this.applicationRepo.findByCandidate(candidateId);
+  }
+
   async updateApplicationStatus(
     applicationId: string,
     status: string
