@@ -43,15 +43,22 @@ export default function PrivacyPage() {
 
         <Section title="1. Who we are">
           <P>
-            This platform is an academic project developed as part of a
-            graduate research programme. It is designed to demonstrate
-            end-to-end AI-powered recruitment tooling in the style of a
-            large multinational organisation (adidas). It is{" "}
+            This platform is part of the{" "}
+            <strong>BlendEd / BIP project</strong>, developed in
+            collaboration with adidas by a two-person team: Fernando
+            Ribeiro and Stratos. It demonstrates end-to-end AI-powered
+            recruitment tooling and is{" "}
             <strong>not</strong> an official adidas product.
           </P>
           <P>
-            <strong>Data controller:</strong> Stratos (project owner) —
-            contact available via the academic institution.
+            <strong>Data controller:</strong> Fernando Ribeiro (project
+            owner) — questions?{" "}
+            <a
+              href="mailto:fr.soul@gmail.com"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              fr.soul@gmail.com
+            </a>
           </P>
         </Section>
 
@@ -241,14 +248,20 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Withdraw consent</strong> at any time (e.g. by
-              clearing the <code>adidas_cookie_consent</code> key in your
+              clearing the <code>adidas_cookie_consent</code>{" "}key in your
               browser&apos;s local storage).
             </li>
           </Ul>
           <P>
-            To exercise any of these rights, contact the data controller via
-            the academic institution. You also have the right to lodge a
-            complaint with your national data protection authority.
+            To exercise any of these rights, email the data controller at{" "}
+            <a
+              href="mailto:fr.soul@gmail.com"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              fr.soul@gmail.com
+            </a>
+            . You also have the right to lodge a complaint with your
+            national data protection authority.
           </P>
         </Section>
 
