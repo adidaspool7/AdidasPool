@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CookieConsent } from "@client/components/ui/cookie-consent";
@@ -182,6 +183,24 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+
+    {/* Footer */}
+    <footer className="w-full border-t bg-background/80 px-4 py-4 text-center text-xs text-muted-foreground space-y-1">
+      <p>
+        Academic project &mdash; BlendEd / BIP &times; adidas &mdash; 2026
+      </p>
+      <p>
+        Fernando Ribeiro &amp; Efstratios Demertzoglou
+      </p>
+      <p>
+        <Link
+          href="/privacy"
+          className="underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          Privacy Policy &amp; Cookie Settings
+        </Link>
+      </p>
+    </footer>
 
     <CookieConsent />
     </>
