@@ -50,7 +50,7 @@ export default function HomePage() {
         {[0.05, 0.035, 0.02].map((o, i) => (
           <div
             key={i}
-            className="h-full w-[18px]"
+            className="h-full w-[36px]"
             style={{ background: `rgba(0,0,0,${o})` }}
           />
         ))}
@@ -188,9 +188,6 @@ export default function HomePage() {
     <footer className="w-full border-t bg-background/80 px-4 py-4 text-center text-xs text-muted-foreground space-y-1">
       <p>
         Academic project &mdash; BlendEd / BIP &times; adidas &mdash; 2026
-      </p>
-      <p>
-        Fernando Ribeiro &amp; Efstratios Demertzoglou
       </p>
       <p>
         <Link
