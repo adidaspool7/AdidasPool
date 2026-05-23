@@ -49,7 +49,7 @@ export default function PrivacyPage() {
             including developers, designers, researchers, and academic
             supervisors. The technical development was led by{" "}
             <strong>Fernando Ribeiro</strong> and{" "}
-            <strong>Stratos</strong>. It demonstrates end-to-end
+            <strong>Efstratios Demertzoglou</strong>. It demonstrates end-to-end
             AI-powered recruitment tooling and is{" "}
             <strong>not</strong> an official adidas product.
           </P>
