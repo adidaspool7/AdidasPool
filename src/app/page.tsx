@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { CookieConsent } from "@client/components/ui/cookie-consent";
 
 /**
  * Public landing page.
@@ -180,5 +181,7 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+
+    <CookieConsent />
   );
 }
