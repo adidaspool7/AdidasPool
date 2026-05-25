@@ -816,9 +816,9 @@ export default function SettingsPage() {
                     <SelectValue placeholder="🌐 Code" />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
-                    {COUNTRY_CODES.map(({ code, flag, name, dialCode }) => (
+                    {COUNTRY_CODES.map(({ code, name, dialCode }) => (
                       <SelectItem key={code} value={dialCode}>
-                        {flag} {name} ({dialCode})
+                        {name} ({dialCode})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -981,9 +981,9 @@ export default function SettingsPage() {
                   <SelectValue placeholder="🌐 Code" />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
-                  {COUNTRY_CODES.map(({ code, flag, name, dialCode }) => (
+                  {COUNTRY_CODES.map(({ code, name, dialCode }) => (
                     <SelectItem key={code} value={dialCode}>
-                      {flag} {name} ({dialCode})
+                      {name} ({dialCode})
                     </SelectItem>
                   ))}
                 </SelectContent>
