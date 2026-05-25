@@ -348,6 +348,93 @@ function NotifPrefToggle({
   );
 }
 
+// ─── Country dial codes ──────────────────────────────────────────
+
+const COUNTRY_CODES = [
+  { code: "AL", flag: "🇦🇱", name: "Albania", dialCode: "+355" },
+  { code: "DZ", flag: "🇩🇿", name: "Algeria", dialCode: "+213" },
+  { code: "AR", flag: "🇦🇷", name: "Argentina", dialCode: "+54" },
+  { code: "AU", flag: "🇦🇺", name: "Australia", dialCode: "+61" },
+  { code: "AT", flag: "🇦🇹", name: "Austria", dialCode: "+43" },
+  { code: "BD", flag: "🇧🇩", name: "Bangladesh", dialCode: "+880" },
+  { code: "BE", flag: "🇧🇪", name: "Belgium", dialCode: "+32" },
+  { code: "BR", flag: "🇧🇷", name: "Brazil", dialCode: "+55" },
+  { code: "BG", flag: "🇧🇬", name: "Bulgaria", dialCode: "+359" },
+  { code: "CA", flag: "🇨🇦", name: "Canada", dialCode: "+1" },
+  { code: "CL", flag: "🇨🇱", name: "Chile", dialCode: "+56" },
+  { code: "CN", flag: "🇨🇳", name: "China", dialCode: "+86" },
+  { code: "CO", flag: "🇨🇴", name: "Colombia", dialCode: "+57" },
+  { code: "HR", flag: "🇭🇷", name: "Croatia", dialCode: "+385" },
+  { code: "CZ", flag: "🇨🇿", name: "Czech Republic", dialCode: "+420" },
+  { code: "DK", flag: "🇩🇰", name: "Denmark", dialCode: "+45" },
+  { code: "EG", flag: "🇪🇬", name: "Egypt", dialCode: "+20" },
+  { code: "EE", flag: "🇪🇪", name: "Estonia", dialCode: "+372" },
+  { code: "FI", flag: "🇫🇮", name: "Finland", dialCode: "+358" },
+  { code: "FR", flag: "🇫🇷", name: "France", dialCode: "+33" },
+  { code: "DE", flag: "🇩🇪", name: "Germany", dialCode: "+49" },
+  { code: "GR", flag: "🇬🇷", name: "Greece", dialCode: "+30" },
+  { code: "HU", flag: "🇭🇺", name: "Hungary", dialCode: "+36" },
+  { code: "IN", flag: "🇮🇳", name: "India", dialCode: "+91" },
+  { code: "ID", flag: "🇮🇩", name: "Indonesia", dialCode: "+62" },
+  { code: "IE", flag: "🇮🇪", name: "Ireland", dialCode: "+353" },
+  { code: "IL", flag: "🇮🇱", name: "Israel", dialCode: "+972" },
+  { code: "IT", flag: "🇮🇹", name: "Italy", dialCode: "+39" },
+  { code: "JP", flag: "🇯🇵", name: "Japan", dialCode: "+81" },
+  { code: "KR", flag: "🇰🇷", name: "South Korea", dialCode: "+82" },
+  { code: "LV", flag: "🇱🇻", name: "Latvia", dialCode: "+371" },
+  { code: "LT", flag: "🇱🇹", name: "Lithuania", dialCode: "+370" },
+  { code: "LU", flag: "🇱🇺", name: "Luxembourg", dialCode: "+352" },
+  { code: "MY", flag: "🇲🇾", name: "Malaysia", dialCode: "+60" },
+  { code: "MX", flag: "🇲🇽", name: "Mexico", dialCode: "+52" },
+  { code: "MA", flag: "🇲🇦", name: "Morocco", dialCode: "+212" },
+  { code: "NL", flag: "🇳🇱", name: "Netherlands", dialCode: "+31" },
+  { code: "NZ", flag: "🇳🇿", name: "New Zealand", dialCode: "+64" },
+  { code: "NG", flag: "🇳🇬", name: "Nigeria", dialCode: "+234" },
+  { code: "NO", flag: "🇳🇴", name: "Norway", dialCode: "+47" },
+  { code: "PK", flag: "🇵🇰", name: "Pakistan", dialCode: "+92" },
+  { code: "PL", flag: "🇵🇱", name: "Poland", dialCode: "+48" },
+  { code: "PT", flag: "🇵🇹", name: "Portugal", dialCode: "+351" },
+  { code: "RO", flag: "🇷🇴", name: "Romania", dialCode: "+40" },
+  { code: "RU", flag: "🇷🇺", name: "Russia", dialCode: "+7" },
+  { code: "SA", flag: "🇸🇦", name: "Saudi Arabia", dialCode: "+966" },
+  { code: "RS", flag: "🇷🇸", name: "Serbia", dialCode: "+381" },
+  { code: "SG", flag: "🇸🇬", name: "Singapore", dialCode: "+65" },
+  { code: "SK", flag: "🇸🇰", name: "Slovakia", dialCode: "+421" },
+  { code: "SI", flag: "🇸🇮", name: "Slovenia", dialCode: "+386" },
+  { code: "ZA", flag: "🇿🇦", name: "South Africa", dialCode: "+27" },
+  { code: "ES", flag: "🇪🇸", name: "Spain", dialCode: "+34" },
+  { code: "SE", flag: "🇸🇪", name: "Sweden", dialCode: "+46" },
+  { code: "CH", flag: "🇨🇭", name: "Switzerland", dialCode: "+41" },
+  { code: "TH", flag: "🇹🇭", name: "Thailand", dialCode: "+66" },
+  { code: "TR", flag: "🇹🇷", name: "Turkey", dialCode: "+90" },
+  { code: "UA", flag: "🇺🇦", name: "Ukraine", dialCode: "+380" },
+  { code: "AE", flag: "🇦🇪", name: "UAE", dialCode: "+971" },
+  { code: "GB", flag: "🇬🇧", name: "United Kingdom", dialCode: "+44" },
+  { code: "US", flag: "🇺🇸", name: "United States", dialCode: "+1" },
+  { code: "VN", flag: "🇻🇳", name: "Vietnam", dialCode: "+84" },
+] as const;
+
+/**
+ * Splits a stored phone string (e.g. "+351 912345678") into its
+ * country dial code and local number parts.
+ */
+function parsePhoneValue(phone: string): { dialCode: string; local: string } {
+  if (!phone) return { dialCode: "", local: "" };
+  if (phone.startsWith("+")) {
+    const spaceIdx = phone.indexOf(" ");
+    if (spaceIdx > 0) {
+      return { dialCode: phone.slice(0, spaceIdx), local: phone.slice(spaceIdx + 1) };
+    }
+    // No space — longest-match against known dial codes
+    const sorted = [...COUNTRY_CODES].sort((a, b) => b.dialCode.length - a.dialCode.length);
+    const match = sorted.find((c) => phone.startsWith(c.dialCode));
+    if (match) {
+      return { dialCode: match.dialCode, local: phone.slice(match.dialCode.length).trim() };
+    }
+  }
+  return { dialCode: "", local: phone };
+}
+
 // ─── HR localStorage profile ─────────────────────────────────────
 
 // Key is scoped by the user's email so different HR accounts on the
@@ -365,6 +452,7 @@ interface HRProfile {
   lastName: string;
   email: string; // always overridden by Supabase auth email at load time
   secondaryEmail: string;
+  phoneDialCode: string;
   phone: string;
   location: string;
 }
@@ -374,6 +462,7 @@ const DEFAULT_HR_PROFILE: HRProfile = {
   lastName: "Manager",
   email: "",
   secondaryEmail: "",
+  phoneDialCode: "",
   phone: "",
   location: "Maia, Porto, Portugal",
 };
@@ -412,6 +501,7 @@ export default function SettingsPage() {
     lastName: "",
     email: "",
     secondaryEmail: "",
+    phoneDialCode: "",
     phone: "",
     location: "",
     nationality: "",
@@ -429,8 +519,14 @@ export default function SettingsPage() {
       // HR profile is localStorage-based, scoped by authenticated email
       const key = hrProfileKey(userEmail);
       const stored = loadHRProfile(key);
-      // Always use the real Supabase email — never trust the stored value
-      setHrForm({ ...stored, email: userEmail ?? "" });
+      // Parse legacy combined phone values on first load after upgrade
+      const parsedPhone = parsePhoneValue(stored.phone);
+      setHrForm({
+        ...stored,
+        email: userEmail ?? "",
+        phone: stored.phoneDialCode ? stored.phone : parsedPhone.local,
+        phoneDialCode: stored.phoneDialCode || parsedPhone.dialCode,
+      });
       setLoading(false);
       return;
     }
@@ -446,7 +542,7 @@ export default function SettingsPage() {
           lastName: data.lastName ?? "",
           email: data.email ?? "",
           secondaryEmail: data.secondaryEmail ?? "",
-          phone: data.phone ?? "",
+          ...(() => { const p = parsePhoneValue(data.phone ?? ""); return { phoneDialCode: p.dialCode, phone: p.local }; })(),
           location: data.location ?? "",
           nationality: data.nationality ?? "",
           linkedinUrl: data.linkedinUrl ?? "",
@@ -505,8 +601,11 @@ export default function SettingsPage() {
         payload.email = form.email || null;
       if (form.secondaryEmail !== (profile?.secondaryEmail ?? ""))
         payload.secondaryEmail = form.secondaryEmail || null;
-      if (form.phone !== (profile?.phone ?? ""))
-        payload.phone = form.phone || null;
+      const combinedPhone = form.phoneDialCode
+        ? `${form.phoneDialCode} ${form.phone}`.trim()
+        : form.phone;
+      if (combinedPhone !== (profile?.phone ?? ""))
+        payload.phone = combinedPhone || null;
       if (form.location !== (profile?.location ?? ""))
         payload.location = form.location || null;
       if (form.nationality !== (profile?.nationality ?? ""))
@@ -708,12 +807,31 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="hrPhone">Phone</Label>
-              <Input
-                id="hrPhone"
-                type="tel"
-                value={hrForm.phone}
-                onChange={(e) => updateHrField("phone", e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Select
+                  value={hrForm.phoneDialCode}
+                  onValueChange={(v) => updateHrField("phoneDialCode", v)}
+                >
+                  <SelectTrigger className="w-[150px] shrink-0">
+                    <SelectValue placeholder="🌐 Code" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {COUNTRY_CODES.map(({ code, flag, name, dialCode }) => (
+                      <SelectItem key={code} value={dialCode}>
+                        {flag} {name} ({dialCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="hrPhone"
+                  type="tel"
+                  className="flex-1"
+                  value={hrForm.phone}
+                  onChange={(e) => updateHrField("phone", e.target.value)}
+                  placeholder="912 345 678"
+                />
+              </div>
             </div>
           </div>
         </Card>
@@ -854,13 +972,31 @@ export default function SettingsPage() {
               <Phone className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
               Phone Number
             </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={form.phone}
-              onChange={(e) => updateField("phone", e.target.value)}
-              placeholder="+351 912 345 678"
-            />
+            <div className="flex gap-2">
+              <Select
+                value={form.phoneDialCode}
+                onValueChange={(v) => updateField("phoneDialCode", v)}
+              >
+                <SelectTrigger className="w-[150px] shrink-0">
+                  <SelectValue placeholder="🌐 Code" />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {COUNTRY_CODES.map(({ code, flag, name, dialCode }) => (
+                    <SelectItem key={code} value={dialCode}>
+                      {flag} {name} ({dialCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                id="phone"
+                type="tel"
+                className="flex-1"
+                value={form.phone}
+                onChange={(e) => updateField("phone", e.target.value)}
+                placeholder="912 345 678"
+              />
+            </div>
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="linkedin">
