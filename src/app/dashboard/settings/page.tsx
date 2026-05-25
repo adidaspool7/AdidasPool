@@ -349,7 +349,11 @@ function NotifPrefToggle({
 
 // ─── HR localStorage profile ─────────────────────────────────────
 
-const HR_PROFILE_KEY = "ti_hr_profile";
+// Key is scoped by the user's email so different HR accounts on the
+// same browser never share profile data.
+const hrProfileKey = (email: string | null) =>
+  email ? `ti_hr_profile_${email}` : "ti_hr_profile";
+
 const LS_CV_DATA_KEY = "cv-upload-data";
 const LS_CV_META_KEY = "cv-upload-meta";
 const LS_ML_DATA_KEY = "ml-upload-data";
@@ -358,7 +362,7 @@ const LS_LA_DATA_KEY = "la-upload-data";
 interface HRProfile {
   firstName: string;
   lastName: string;
-  email: string;
+  email: string; // always overridden by Supabase auth email at load time
   phone: string;
   location: string;
 }
@@ -366,28 +370,28 @@ interface HRProfile {
 const DEFAULT_HR_PROFILE: HRProfile = {
   firstName: "HR",
   lastName: "Manager",
-  email: "hr.manager@adidas.com",
+  email: "",
   phone: "",
   location: "Maia, Porto, Portugal",
 };
 
-function loadHRProfile(): HRProfile {
+function loadHRProfile(key: string): HRProfile {
   if (typeof window === "undefined") return DEFAULT_HR_PROFILE;
   try {
-    const raw = localStorage.getItem(HR_PROFILE_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) return { ...DEFAULT_HR_PROFILE, ...JSON.parse(raw) };
   } catch { /* ignore */ }
   return DEFAULT_HR_PROFILE;
 }
 
-function saveHRProfile(profile: HRProfile) {
-  localStorage.setItem(HR_PROFILE_KEY, JSON.stringify(profile));
+function saveHRProfile(key: string, profile: HRProfile) {
+  localStorage.setItem(key, JSON.stringify(profile));
 }
 
 // ─── Component ───────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const { role } = useRole();
+  const { role, userEmail } = useRole();
   const isHR = role === "hr";
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -418,14 +422,16 @@ export default function SettingsPage() {
   // ─── Fetch profile ────────────────────────────────────────────
   useEffect(() => {
     if (isHR) {
-      // HR profile is localStorage-based — no backend candidate record
-      const stored = loadHRProfile();
-      setHrForm(stored);
+      // HR profile is localStorage-based, scoped by authenticated email
+      const key = hrProfileKey(userEmail);
+      const stored = loadHRProfile(key);
+      // Always use the real Supabase email — never trust the stored value
+      setHrForm({ ...stored, email: userEmail ?? "" });
       setLoading(false);
       return;
     }
 
-    async function fetchProfile() {
+  async function fetchProfile() {
       try {
         const res = await fetch("/api/me");
         if (!res.ok) throw new Error("Failed to load profile");
@@ -472,7 +478,10 @@ export default function SettingsPage() {
 
   // ─── Save ─────────────────────────────────────────────────────
   async function handleSaveHR() {
-    saveHRProfile(hrForm);
+    const key = hrProfileKey(userEmail);
+    // Never persist email — it is always read from Supabase auth
+    const toStore: HRProfile = { ...hrForm, email: userEmail ?? "" };
+    saveHRProfile(key, toStore);
     setDirty(false);
     toast.success("HR profile saved");
   }
@@ -669,8 +678,13 @@ export default function SettingsPage() {
                 id="hrEmail"
                 type="email"
                 value={hrForm.email}
-                onChange={(e) => updateHrField("email", e.target.value)}
+                readOnly
+                disabled
+                className="bg-muted text-muted-foreground cursor-not-allowed"
               />
+              <p className="text-xs text-muted-foreground">
+                This email comes from your Google account and cannot be changed here.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="hrPhone">Phone</Label>
