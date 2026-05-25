@@ -52,8 +52,12 @@ export async function POST(
 
     const candidateName = `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim() || "Candidate";
 
+    // Build recipient list — primary email always present, secondary if set
+    const recipients: string[] = [candidate.email];
+    if (candidate.secondaryEmail) recipients.push(candidate.secondaryEmail);
+
     const result = await emailService.sendContactEmail(
-      candidate.email,
+      recipients,
       candidateName,
       subject,
       body

@@ -325,6 +325,9 @@ CREATE TABLE candidates (
   is_duplicate             BOOLEAN NOT NULL DEFAULT FALSE,
   duplicate_of             TEXT,
 
+  -- Optional secondary contact email (self-declared by the user)
+  secondary_email          TEXT,
+
   -- Activation / invitation tracking
   -- activated_at: set when the candidate first logs in (Google OAuth).
   --   HR-uploaded candidates have activated_at = NULL until the real

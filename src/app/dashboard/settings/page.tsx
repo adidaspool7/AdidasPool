@@ -63,6 +63,7 @@ interface Profile {
   firstName: string;
   lastName: string;
   email: string | null;
+  secondaryEmail: string | null;
   phone: string | null;
   location: string | null;
   country: string | null;
@@ -363,6 +364,7 @@ interface HRProfile {
   firstName: string;
   lastName: string;
   email: string; // always overridden by Supabase auth email at load time
+  secondaryEmail: string;
   phone: string;
   location: string;
 }
@@ -371,6 +373,7 @@ const DEFAULT_HR_PROFILE: HRProfile = {
   firstName: "HR",
   lastName: "Manager",
   email: "",
+  secondaryEmail: "",
   phone: "",
   location: "Maia, Porto, Portugal",
 };
@@ -408,6 +411,7 @@ export default function SettingsPage() {
     firstName: "",
     lastName: "",
     email: "",
+    secondaryEmail: "",
     phone: "",
     location: "",
     nationality: "",
@@ -441,6 +445,7 @@ export default function SettingsPage() {
           firstName: data.firstName ?? "",
           lastName: data.lastName ?? "",
           email: data.email ?? "",
+          secondaryEmail: data.secondaryEmail ?? "",
           phone: data.phone ?? "",
           location: data.location ?? "",
           nationality: data.nationality ?? "",
@@ -498,6 +503,8 @@ export default function SettingsPage() {
         payload.lastName = form.lastName;
       if (form.email !== (profile?.email ?? ""))
         payload.email = form.email || null;
+      if (form.secondaryEmail !== (profile?.secondaryEmail ?? ""))
+        payload.secondaryEmail = form.secondaryEmail || null;
       if (form.phone !== (profile?.phone ?? ""))
         payload.phone = form.phone || null;
       if (form.location !== (profile?.location ?? ""))
@@ -687,6 +694,19 @@ export default function SettingsPage() {
               </p>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="hrSecondaryEmail">
+                Secondary Email
+                <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="hrSecondaryEmail"
+                type="email"
+                value={hrForm.secondaryEmail}
+                onChange={(e) => updateHrField("secondaryEmail", e.target.value)}
+                placeholder="another.email@example.com"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="hrPhone">Phone</Label>
               <Input
                 id="hrPhone"
@@ -813,6 +833,20 @@ export default function SettingsPage() {
               value={form.email}
               onChange={(e) => updateField("email", e.target.value)}
               placeholder="your.email@example.com"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="secondaryEmail">
+              <Mail className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+              Secondary Email
+              <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="secondaryEmail"
+              type="email"
+              value={form.secondaryEmail}
+              onChange={(e) => updateField("secondaryEmail", e.target.value)}
+              placeholder="another.email@example.com"
             />
           </div>
           <div className="space-y-2">

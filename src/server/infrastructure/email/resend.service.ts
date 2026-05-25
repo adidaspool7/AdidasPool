@@ -48,7 +48,7 @@ export class ResendEmailService implements IEmailService {
   }
 
   async sendContactEmail(
-    to: string,
+    to: string | string[],
     candidateName: string,
     subject: string,
     body: string

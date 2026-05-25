@@ -21,6 +21,7 @@ const PROFILE_SELECT = {
   firstName: true,
   lastName: true,
   email: true,
+  secondaryEmail: true,
   phone: true,
   location: true,
   country: true,

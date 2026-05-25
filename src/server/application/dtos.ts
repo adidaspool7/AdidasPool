@@ -427,6 +427,7 @@ export const UpdateProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required").optional(),
   lastName: z.string().min(1, "Last name is required").optional(),
   email: z.string().email("Invalid email address").optional().nullable(),
+  secondaryEmail: z.string().email("Invalid secondary email address").optional().nullable(),
   phone: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   nationality: z.string().optional().nullable(),

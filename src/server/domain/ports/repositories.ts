@@ -41,6 +41,7 @@ export interface CandidateRow {
   id: string;
   userId?: string | null;
   email?: string | null;
+  secondaryEmail?: string | null;
   firstName?: string;
   lastName?: string;
   status?: string;
