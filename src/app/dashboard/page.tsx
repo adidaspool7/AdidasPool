@@ -27,7 +27,14 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 // ─── HR Dashboard ────────────────────────────────────────────────
-
+interface HrActivityItem {
+  id: string;
+  type: string;
+  createdAt: string;
+  metadata?: Record<string, unknown> | null;
+  candidate?: { id: string; firstName: string | null; lastName: string | null } | null;
+  job?: { id: string; title: string } | null;
+}
 function HRDashboard() {
   const [overview, setOverview] = useState({
     totalCandidates: 0,
@@ -37,6 +44,7 @@ function HRDashboard() {
     assessments: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [hrActivity, setHrActivity] = useState<HrActivityItem[]>([]);
 
   useEffect(() => {
     fetch("/api/analytics")
@@ -44,6 +52,13 @@ function HRDashboard() {
       .then((d) => setOverview(d.overview))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/hr/me/activity")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (Array.isArray(d)) setHrActivity(d); })
+      .catch(() => {});
   }, []);
 
   const stats = [
@@ -124,6 +139,81 @@ function HRDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Activity Log ─────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-muted-foreground" />
+            Activity Log
+            <span className="text-sm font-normal text-muted-foreground ml-auto">
+              {hrActivity.length} action{hrActivity.length !== 1 ? "s" : ""}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hrActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {hrActivity.map((item) => {
+                const typeLabels: Record<string, string> = {
+                  STATUS_CHANGE: "Status changed",
+                  CONTACT_EMAIL_SENT: "Email sent",
+                  PROMOTIONAL: "Campaign sent",
+                  JOB_POSTED: "Job posted",
+                  APPLICATION_RECEIVED: "Application",
+                };
+                const typeColors: Record<string, string> = {
+                  STATUS_CHANGE: "bg-blue-100 text-blue-700",
+                  CONTACT_EMAIL_SENT: "bg-green-100 text-green-700",
+                  PROMOTIONAL: "bg-purple-100 text-purple-700",
+                  JOB_POSTED: "bg-orange-100 text-orange-700",
+                };
+                const label = typeLabels[item.type] ?? item.type;
+                const colorClass = typeColors[item.type] ?? "bg-muted text-muted-foreground";
+                const candidateName = item.candidate
+                  ? [item.candidate.firstName, item.candidate.lastName].filter(Boolean).join(" ") || "Unknown"
+                  : null;
+                const newStatus = item.metadata?.newStatus as string | undefined;
+                const emailSubject = item.metadata?.subject as string | undefined;
+                return (
+                  <div key={item.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                    <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${colorClass}`}>
+                      {label}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {candidateName && (
+                        <a
+                          href={`/dashboard/candidates/${item.candidate?.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {candidateName}
+                        </a>
+                      )}
+                      {newStatus && (
+                        <span className="ml-1 text-muted-foreground">→ {newStatus}</span>
+                      )}
+                      {emailSubject && (
+                        <span className="ml-1 text-muted-foreground truncate">&ldquo;{emailSubject}&rdquo;</span>
+                      )}
+                      {item.job && (
+                        <span className="ml-1 text-muted-foreground text-xs">· {item.job.title}</span>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(item.createdAt).toLocaleDateString("en-GB", {
+                        day: "numeric", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
