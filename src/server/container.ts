@@ -23,6 +23,7 @@ import { SupabaseDashboardWidgetRepository } from "@server/infrastructure/databa
 import { SupabaseSegmentRepository } from "@server/infrastructure/database/segment.repository";
 import { SupabaseAmbassadorProgramRepository } from "@server/infrastructure/database/ambassador-program.repository";
 import { SupabaseAmbassadorApplicationRepository } from "@server/infrastructure/database/ambassador-application.repository";
+import { SupabaseHrProfileRepository } from "@server/infrastructure/database/hr-profile.repository";
 import { OpenAiCvParserService } from "@server/infrastructure/ai/cv-parser.service";
 import { JobRequirementsExtractorService } from "@server/infrastructure/ai/job-requirements-extractor.service";
 import { ResendEmailService } from "@server/infrastructure/email/resend.service";
@@ -48,6 +49,7 @@ import type {
   ISegmentRepository,
   IAmbassadorProgramRepository,
   IAmbassadorApplicationRepository,
+  IHrProfileRepository,
 } from "@server/domain/ports/repositories";
 import type {
   ICvParserService,
@@ -105,6 +107,9 @@ export const ambassadorProgramRepository: IAmbassadorProgramRepository =
 
 export const ambassadorApplicationRepository: IAmbassadorApplicationRepository =
   new SupabaseAmbassadorApplicationRepository();
+
+export const hrProfileRepository: IHrProfileRepository =
+  new SupabaseHrProfileRepository();
 
 // ============================================
 // SERVICE INSTANCES

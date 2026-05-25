@@ -984,3 +984,27 @@ ALTER TABLE ambassador_applications DISABLE ROW LEVEL SECURITY;
 INSERT INTO scoring_weights (id, experience, years_of_experience, education_level, location_match, language)
 VALUES ('default', 0.25, 0.10, 0.15, 0.15, 0.35)
 ON CONFLICT (id) DO NOTHING;
+
+-- ── HR Profiles ───────────────────────────────────────────────────────────────
+-- Stores HR user profile data in the DB (replaces localStorage).
+-- Email is NOT stored here — read from Supabase auth.users instead.
+CREATE TABLE hr_profiles (
+  id              TEXT PRIMARY KEY,
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  first_name      TEXT NOT NULL DEFAULT 'HR',
+  last_name       TEXT NOT NULL DEFAULT 'Manager',
+  secondary_email TEXT,
+  phone_dial_code TEXT,
+  phone           TEXT,
+  location        TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX hr_profiles_user_id_idx ON hr_profiles(user_id);
+
+CREATE TRIGGER set_hr_profiles_updated_at
+  BEFORE UPDATE ON hr_profiles
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE hr_profiles DISABLE ROW LEVEL SECURITY;

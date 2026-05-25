@@ -199,6 +199,25 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
   }
 
+  /**
+   * Returns all notifications that were triggered BY a specific HR user
+   * (identified by `created_by`), newest-first.
+   * Joins candidate basics + job title for display in the activity log.
+   */
+  async findHrActivity(createdBy: string) {
+    const { data, error } = await db
+      .from("notifications")
+      .select(`
+        *,
+        candidate:candidates(id, first_name, last_name, email),
+        job:jobs(id, title)
+      `)
+      .eq("created_by", createdBy)
+      .order("created_at", { ascending: false });
+    assertNoError(error, "notification.findHrActivity");
+    return (data ?? []).map((r: Record<string, unknown>) => camelizeKeys<any>(r));
+  }
+
   async deleteNotification(id: string) {
     const { error } = await db.from("notifications").delete().eq("id", id);
     assertNoError(error, "notification.delete");

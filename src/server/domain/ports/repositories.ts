@@ -429,6 +429,8 @@ export interface INotificationRepository {
   countUnread(candidateId?: string, targetRole?: string): Promise<number>;
   /** Returns full interaction history for a candidate, all types + archived, newest first. */
   findInteractionHistory(candidateId: string): Promise<NotificationRow[]>;
+  /** Returns all notifications triggered BY a specific HR user (via created_by), newest first. */
+  findHrActivity(createdBy: string): Promise<NotificationRow[]>;
   /** Single notification by id (used for ownership checks before mutations). */
   findById(id: string): Promise<NotificationRow | null>;
 
@@ -821,5 +823,33 @@ export interface IAmbassadorApplicationRepository {
   updateStatus(id: string, status: string): Promise<AmbassadorApplicationRow>;
   update(id: string, data: Record<string, unknown>): Promise<AmbassadorApplicationRow>;
   delete(id: string): Promise<boolean>;
+}
+
+// ============================================
+// HR PROFILE REPOSITORY PORT
+// ============================================
+
+export interface HrProfileRow {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  secondaryEmail?: string | null;
+  phoneDialCode?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  [key: string]: unknown;
+}
+
+export interface IHrProfileRepository {
+  /** Returns null if the HR user has never saved a profile. */
+  findByUserId(userId: string): Promise<HrProfileRow | null>;
+  /** Upsert: creates if missing, updates if present. Returns final row. */
+  upsert(
+    userId: string,
+    data: Partial<Omit<HrProfileRow, "id" | "userId" | "createdAt" | "updatedAt">>
+  ): Promise<HrProfileRow>;
 }
 

@@ -490,3 +490,16 @@ export type InterviewProctoringEventInput = z.infer<
 >;
 export type StartInterviewRuntimeInput = z.infer<typeof StartInterviewRuntimeSchema>;
 export type StartInterviewRealtimeInput = z.infer<typeof StartInterviewRealtimeSchema>;
+
+// ── HR Profile ───────────────────────────────────────────────────────────────
+
+export const UpdateHrProfileSchema = z.object({
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  secondaryEmail: z.string().email().optional().nullable(),
+  phoneDialCode: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+});
+
+export type UpdateHrProfileInput = z.infer<typeof UpdateHrProfileSchema>;

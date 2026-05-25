@@ -437,11 +437,6 @@ function parsePhoneValue(phone: string): { dialCode: string; local: string } {
 
 // ─── HR localStorage profile ─────────────────────────────────────
 
-// Key is scoped by the user's email so different HR accounts on the
-// same browser never share profile data.
-const hrProfileKey = (email: string | null) =>
-  email ? `ti_hr_profile_${email}` : "ti_hr_profile";
-
 const LS_CV_DATA_KEY = "cv-upload-data";
 const LS_CV_META_KEY = "cv-upload-meta";
 const LS_ML_DATA_KEY = "ml-upload-data";
@@ -450,34 +445,31 @@ const LS_LA_DATA_KEY = "la-upload-data";
 interface HRProfile {
   firstName: string;
   lastName: string;
-  email: string; // always overridden by Supabase auth email at load time
+  email: string; // display only — always overridden by Supabase auth email
   secondaryEmail: string;
   phoneDialCode: string;
   phone: string;
   location: string;
 }
 
-const DEFAULT_HR_PROFILE: HRProfile = {
-  firstName: "HR",
-  lastName: "Manager",
-  email: "",
-  secondaryEmail: "",
-  phoneDialCode: "",
-  phone: "",
-  location: "Maia, Porto, Portugal",
-};
-
-function loadHRProfile(key: string): HRProfile {
-  if (typeof window === "undefined") return DEFAULT_HR_PROFILE;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return { ...DEFAULT_HR_PROFILE, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
-  return DEFAULT_HR_PROFILE;
+interface HrApiProfile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  secondaryEmail?: string | null;
+  phoneDialCode?: string | null;
+  phone?: string | null;
+  location?: string | null;
 }
 
-function saveHRProfile(key: string, profile: HRProfile) {
-  localStorage.setItem(key, JSON.stringify(profile));
+interface HrActivityItem {
+  id: string;
+  type: string;
+  createdAt: string;
+  metadata?: Record<string, unknown> | null;
+  candidate?: { id: string; firstName: string | null; lastName: string | null } | null;
+  job?: { id: string; title: string } | null;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -493,7 +485,17 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false);
 
   // HR-specific profile state
-  const [hrForm, setHrForm] = useState<HRProfile>(DEFAULT_HR_PROFILE);
+  const [hrProfile, setHrProfile] = useState<HrApiProfile | null>(null);
+  const [hrActivity, setHrActivity] = useState<HrActivityItem[]>([]);
+  const [hrForm, setHrForm] = useState<HRProfile>({
+    firstName: "HR",
+    lastName: "Manager",
+    email: "",
+    secondaryEmail: "",
+    phoneDialCode: "",
+    phone: "",
+    location: "",
+  });
 
   // Form state — mirrors profile but editable
   const [form, setForm] = useState({
@@ -516,18 +518,42 @@ export default function SettingsPage() {
   // ─── Fetch profile ────────────────────────────────────────────
   useEffect(() => {
     if (isHR) {
-      // HR profile is localStorage-based, scoped by authenticated email
-      const key = hrProfileKey(userEmail);
-      const stored = loadHRProfile(key);
-      // Parse legacy combined phone values on first load after upgrade
-      const parsedPhone = parsePhoneValue(stored.phone);
-      setHrForm({
-        ...stored,
-        email: userEmail ?? "",
-        phone: stored.phoneDialCode ? stored.phone : parsedPhone.local,
-        phoneDialCode: stored.phoneDialCode || parsedPhone.dialCode,
-      });
-      setLoading(false);
+      async function fetchHrProfile() {
+        try {
+          const res = await fetch("/api/hr/me");
+          if (!res.ok) throw new Error("Failed to load HR profile");
+          const data: HrApiProfile = await res.json();
+          setHrProfile(data);
+          const storedPhone = data.phoneDialCode
+            ? `${data.phoneDialCode} ${data.phone ?? ""}`.trim()
+            : (data.phone ?? "");
+          const parsedPhone = parsePhoneValue(storedPhone);
+          setHrForm({
+            firstName: data.firstName ?? "HR",
+            lastName: data.lastName ?? "Manager",
+            email: userEmail ?? "",
+            secondaryEmail: data.secondaryEmail ?? "",
+            phoneDialCode: data.phoneDialCode ?? parsedPhone.dialCode,
+            phone: data.phoneDialCode ? (data.phone ?? "") : parsedPhone.local,
+            location: data.location ?? "",
+          });
+        } catch {
+          toast.error("Could not load HR profile");
+        } finally {
+          setLoading(false);
+        }
+      }
+      fetchHrProfile();
+
+      async function fetchHrActivity() {
+        try {
+          const res = await fetch("/api/hr/me/activity");
+          if (!res.ok) return;
+          const data = await res.json();
+          if (Array.isArray(data)) setHrActivity(data);
+        } catch { /* non-critical */ }
+      }
+      fetchHrActivity();
       return;
     }
 
@@ -579,12 +605,48 @@ export default function SettingsPage() {
 
   // ─── Save ─────────────────────────────────────────────────────
   async function handleSaveHR() {
-    const key = hrProfileKey(userEmail);
-    // Never persist email — it is always read from Supabase auth
-    const toStore: HRProfile = { ...hrForm, email: userEmail ?? "" };
-    saveHRProfile(key, toStore);
-    setDirty(false);
-    toast.success("HR profile saved");
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {};
+      if (hrForm.firstName !== (hrProfile?.firstName ?? "HR"))
+        payload.firstName = hrForm.firstName;
+      if (hrForm.lastName !== (hrProfile?.lastName ?? "Manager"))
+        payload.lastName = hrForm.lastName;
+      if (hrForm.secondaryEmail !== (hrProfile?.secondaryEmail ?? ""))
+        payload.secondaryEmail = hrForm.secondaryEmail || null;
+      if (hrForm.phoneDialCode !== (hrProfile?.phoneDialCode ?? ""))
+        payload.phoneDialCode = hrForm.phoneDialCode || null;
+      if (hrForm.phone !== (hrProfile?.phone ?? ""))
+        payload.phone = hrForm.phone || null;
+      if (hrForm.location !== (hrProfile?.location ?? ""))
+        payload.location = hrForm.location || null;
+
+      if (Object.keys(payload).length === 0) {
+        toast.info("No changes to save");
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch("/api/hr/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Update failed");
+      }
+
+      const updated: HrApiProfile = await res.json();
+      setHrProfile(updated);
+      setDirty(false);
+      toast.success("Profile saved successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSave() {
@@ -741,8 +803,12 @@ export default function SettingsPage() {
               Manage your HR manager display information.
             </p>
           </div>
-          <Button onClick={handleSaveHR} disabled={!dirty}>
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSaveHR} disabled={saving || !dirty}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             Save Changes
           </Button>
         </div>
@@ -853,11 +919,77 @@ export default function SettingsPage() {
         </Card>
 
         <Separator />
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Badge variant="outline" className="text-xs">HR Manager</Badge>
-          <span>·</span>
-          <span>Profile stored locally on this device</span>
-        </div>
+
+        {/* ── Activity Log ─────────────────────────────── */}
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Activity Log</h2>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {hrActivity.length} action{hrActivity.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {hrActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {hrActivity.map((item) => {
+                const typeLabels: Record<string, string> = {
+                  STATUS_CHANGE: "Status changed",
+                  CONTACT_EMAIL_SENT: "Email sent",
+                  PROMOTIONAL: "Campaign sent",
+                  JOB_POSTED: "Job posted",
+                  APPLICATION_RECEIVED: "Application",
+                };
+                const typeColors: Record<string, string> = {
+                  STATUS_CHANGE: "bg-blue-100 text-blue-700",
+                  CONTACT_EMAIL_SENT: "bg-green-100 text-green-700",
+                  PROMOTIONAL: "bg-purple-100 text-purple-700",
+                  JOB_POSTED: "bg-orange-100 text-orange-700",
+                };
+                const label = typeLabels[item.type] ?? item.type;
+                const colorClass = typeColors[item.type] ?? "bg-muted text-muted-foreground";
+                const candidateName = item.candidate
+                  ? [item.candidate.firstName, item.candidate.lastName].filter(Boolean).join(" ") || "Unknown"
+                  : null;
+                const newStatus = item.metadata?.newStatus as string | undefined;
+                const emailSubject = item.metadata?.subject as string | undefined;
+                return (
+                  <div key={item.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                    <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${colorClass}`}>
+                      {label}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {candidateName && (
+                        <a
+                          href={`/dashboard/candidates/${item.candidate?.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {candidateName}
+                        </a>
+                      )}
+                      {newStatus && (
+                        <span className="ml-1 text-muted-foreground">→ {newStatus}</span>
+                      )}
+                      {emailSubject && (
+                        <span className="ml-1 text-muted-foreground truncate">&ldquo;{emailSubject}&rdquo;</span>
+                      )}
+                      {item.job && (
+                        <span className="ml-1 text-muted-foreground text-xs">· {item.job.title}</span>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(item.createdAt).toLocaleDateString("en-GB", {
+                        day: "numeric", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       </div>
     );
   }
