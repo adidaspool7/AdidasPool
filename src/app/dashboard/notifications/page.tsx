@@ -121,7 +121,7 @@ function emptyMessageForHrTab(tab: HrTypeTab, status: HrStatusFilter): string {
     internships: "No internship application notifications",
     assessments: "No assessment notifications",
     talent_pool: "No talent pool notifications",
-    other: "No notifications",
+    other: "No general notifications",
   }[tab];
   if (status === "unread") return `${base} to read.`;
   if (status === "read") return `${base} marked as read.`;
@@ -862,7 +862,10 @@ export default function NotificationsPage() {
           </span>
           {unreadCount > 0 && (
             <Badge variant="default" className="text-xs">
-              {unreadCount} unread
+              {role === "hr"
+                ? Object.values(hrTabUnreadCounts).reduce((a, b) => a + b, 0)
+                : unreadCount}{" "}
+              unread
             </Badge>
           )}
         </div>
@@ -947,6 +950,14 @@ export default function NotificationsPage() {
                 {hrTabUnreadCounts.talent_pool > 0 && (
                   <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
                     {hrTabUnreadCounts.talent_pool}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="other" className="gap-1.5">
+                <Bell className="h-3.5 w-3.5" /> General
+                {hrTabUnreadCounts.other > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
+                    {hrTabUnreadCounts.other}
                   </Badge>
                 )}
               </TabsTrigger>
