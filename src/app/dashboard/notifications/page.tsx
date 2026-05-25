@@ -49,7 +49,6 @@ import {
   UserCog,
   Users,
   ArchiveRestore,
-  RotateCcw,
 } from "lucide-react";
 
 // ============================================
@@ -286,11 +285,11 @@ function NotificationRow({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 text-muted-foreground"
                 onClick={() => onMarkUnread(notification.id)}
                 title="Mark as unread"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <CheckCheck className="h-3.5 w-3.5" />
               </Button>
             )}
             <Button
