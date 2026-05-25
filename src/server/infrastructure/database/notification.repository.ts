@@ -160,6 +160,17 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     assertNoError(error, "notification.markAllAsRead");
   }
 
+  async markAsUnread(id: string) {
+    const { data, error } = await db
+      .from("notifications")
+      .update({ read: false, read_at: null })
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "notification.markAsUnread");
+    return camelizeKeys<any>(data as Record<string, unknown>);
+  }
+
   async archiveNotification(id: string) {
     const { data, error } = await db
       .from("notifications")
@@ -168,6 +179,17 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       .select()
       .single();
     assertNoError(error, "notification.archive");
+    return camelizeKeys<any>(data as Record<string, unknown>);
+  }
+
+  async unarchiveNotification(id: string) {
+    const { data, error } = await db
+      .from("notifications")
+      .update({ archived: false })
+      .eq("id", id)
+      .select()
+      .single();
+    assertNoError(error, "notification.unarchive");
     return camelizeKeys<any>(data as Record<string, unknown>);
   }
 

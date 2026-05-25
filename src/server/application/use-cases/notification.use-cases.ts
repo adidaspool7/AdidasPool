@@ -74,6 +74,10 @@ export class NotificationUseCases {
     return this.notificationRepo.markAsRead(id);
   }
 
+  async markAsUnread(id: string) {
+    return this.notificationRepo.markAsUnread(id);
+  }
+
   async markAllAsRead(candidateId?: string, targetRole?: string) {
     return this.notificationRepo.markAllAsRead(candidateId, targetRole);
   }
@@ -82,6 +86,10 @@ export class NotificationUseCases {
 
   async archiveNotification(id: string) {
     return this.notificationRepo.archiveNotification(id);
+  }
+
+  async unarchiveNotification(id: string) {
+    return this.notificationRepo.unarchiveNotification(id);
   }
 
   async archiveMany(ids: string[]) {

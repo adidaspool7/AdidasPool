@@ -440,8 +440,10 @@ export interface INotificationRepository {
   create(data: CreateNotificationData): Promise<NotificationRow>;
   createMany(data: CreateNotificationData[]): Promise<number>;
   markAsRead(id: string): Promise<NotificationRow>;
+  markAsUnread(id: string): Promise<NotificationRow>;
   markAllAsRead(candidateId?: string, targetRole?: string): Promise<void>;
   archiveNotification(id: string): Promise<NotificationRow>;
+  unarchiveNotification(id: string): Promise<NotificationRow>;
   archiveMany(ids: string[]): Promise<number>;
   deleteNotification(id: string): Promise<void>;
 

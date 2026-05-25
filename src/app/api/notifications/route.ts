@@ -156,11 +156,13 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, markAllRead, archive, archiveIds } = body as {
+    const { id, markAllRead, archive, archiveIds, unarchive, markUnread } = body as {
       id?: string;
       markAllRead?: boolean;
       archive?: boolean;
       archiveIds?: unknown;
+      unarchive?: boolean;
+      markUnread?: boolean;
     };
 
     // Archive a single notification
@@ -173,6 +175,32 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       const updated = await notificationUseCases.archiveNotification(id);
+      return NextResponse.json(updated);
+    }
+
+    // Unarchive a single notification
+    if (unarchive && id) {
+      const existing = await notificationUseCases.getById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (!callerOwnsNotification(caller, existing)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const updated = await notificationUseCases.unarchiveNotification(id);
+      return NextResponse.json(updated);
+    }
+
+    // Mark a single notification as unread
+    if (markUnread && id) {
+      const existing = await notificationUseCases.getById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (!callerOwnsNotification(caller, existing)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const updated = await notificationUseCases.markAsUnread(id);
       return NextResponse.json(updated);
     }
 

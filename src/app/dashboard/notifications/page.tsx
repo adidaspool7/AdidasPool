@@ -48,6 +48,8 @@ import {
   Filter,
   UserCog,
   Users,
+  ArchiveRestore,
+  RotateCcw,
 } from "lucide-react";
 
 // ============================================
@@ -184,14 +186,18 @@ function timeAgo(date: string): string {
 function NotificationRow({
   notification,
   onMarkRead,
+  onMarkUnread,
   onArchive,
+  onUnarchive,
   onClick,
   selected,
   onSelect,
 }: {
   notification: Notification;
   onMarkRead: (id: string) => void;
+  onMarkUnread: (id: string) => void;
   onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
   onClick: (n: Notification) => void;
   selected: boolean;
   onSelect: (id: string, checked: boolean) => void;
@@ -204,21 +210,24 @@ function NotificationRow({
   return (
     <div
       className={`flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors ${
-        !notification.read ? "bg-primary/[0.03] border-l-2 border-l-primary" : ""
+        !notification.read && !notification.archived ? "bg-primary/[0.03] border-l-2 border-l-primary" : ""
       } ${selected ? "bg-primary/[0.06]" : ""}`}
       onClick={() => onClick(notification)}
     >
-      {/* Checkbox */}
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={(e) => {
-          e.stopPropagation();
-          onSelect(notification.id, e.target.checked);
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
-      />
+      {/* Checkbox — hidden for archived notifications */}
+      {!notification.archived && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onSelect(notification.id, e.target.checked);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
+        />
+      )}
+      {notification.archived && <div className="h-4 w-4 shrink-0" />}
 
       {/* Icon */}
       <div className="shrink-0">
@@ -227,7 +236,7 @@ function NotificationRow({
 
       {/* Content - single line */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
-        {!notification.read && (
+        {!notification.read && !notification.archived && (
           <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
         )}
         <span className="text-sm truncate">
@@ -250,35 +259,58 @@ function NotificationRow({
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {!notification.read && (
+        {notification.archived ? (
+          // Archived state: only Unarchive
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => onMarkRead(notification.id)}
-            title="Mark as read"
+            onClick={() => onUnarchive(notification.id)}
+            title="Unarchive"
           >
-            <CheckCheck className="h-3.5 w-3.5" />
+            <ArchiveRestore className="h-3.5 w-3.5" />
           </Button>
+        ) : (
+          <>
+            {!notification.read ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onMarkRead(notification.id)}
+                title="Mark as read"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onMarkUnread(notification.id)}
+                title="Mark as unread"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => onArchive(notification.id)}
+              title="Archive"
+            >
+              <Archive className="h-3.5 w-3.5" />
+            </Button>
+          </>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onArchive(notification.id)}
-          title="Archive"
-        >
-          <Archive className="h-3.5 w-3.5" />
-        </Button>
-        {notification.applicationId && (
+        {(notification.applicationId || notification.candidate) && (
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => {
-              /* handled by row click */
-            }}
-            title="View application"
+            onClick={() => onClick(notification)}
+            title="View candidate"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
@@ -660,6 +692,26 @@ export default function NotificationsPage() {
     }
   }
 
+  async function handleMarkUnread(id: string) {
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, markUnread: true }),
+      });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: false } : n))
+      );
+      setUnreadCount((c) => {
+        const next = c + 1;
+        window.dispatchEvent(new CustomEvent("notifications:unread", { detail: next }));
+        return next;
+      });
+    } catch (error) {
+      console.error("Error marking notification as unread:", error);
+    }
+  }
+
   async function handleArchive(id: string) {
     try {
       await fetch("/api/notifications", {
@@ -694,11 +746,32 @@ export default function NotificationsPage() {
     }
   }
 
+  async function handleUnarchive(id: string) {
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, unarchive: true }),
+      });
+      // Remove from the archived list; it returns to Read state in the DB
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    } catch (error) {
+      console.error("Error unarchiving notification:", error);
+    }
+  }
+
   function handleNotificationClick(n: Notification) {
-    // Mark as read when clicking
-    if (!n.read) handleMarkRead(n.id);
-    // Navigate to application view if applicable
-    if (n.applicationId) {
+    // Mark as read when clicking (unless already read or archived)
+    if (!n.read && !n.archived) handleMarkRead(n.id);
+    // Navigate to the candidate profile for HR application/candidate notifications
+    if (n.candidate?.id) {
+      router.push(`/dashboard/candidates/${n.candidate.id}`);
+    } else if (n.applicationId) {
       router.push(`/dashboard/received-applications`);
     }
   }
@@ -909,7 +982,9 @@ export default function NotificationsPage() {
                 notifications={hrFiltered}
                 loading={loading}
                 onMarkRead={handleMarkRead}
+                onMarkUnread={handleMarkUnread}
                 onArchive={handleArchive}
+                onUnarchive={handleUnarchive}
                 onClick={handleNotificationClick}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
@@ -985,7 +1060,9 @@ function HRNotificationList({
   notifications,
   loading,
   onMarkRead,
+  onMarkUnread,
   onArchive,
+  onUnarchive,
   onClick,
   selectedIds,
   onSelect,
@@ -997,7 +1074,9 @@ function HRNotificationList({
   notifications: Notification[];
   loading: boolean;
   onMarkRead: (id: string) => void;
+  onMarkUnread: (id: string) => void;
   onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
   onClick: (n: Notification) => void;
   selectedIds: Set<string>;
   onSelect: (id: string, checked: boolean) => void;
@@ -1042,7 +1121,9 @@ function HRNotificationList({
           key={notification.id}
           notification={notification}
           onMarkRead={onMarkRead}
+          onMarkUnread={onMarkUnread}
           onArchive={onArchive}
+          onUnarchive={onUnarchive}
           onClick={onClick}
           selected={selectedIds.has(notification.id)}
           onSelect={onSelect}
