@@ -239,6 +239,16 @@ export class SupabaseCandidateRepository implements ICandidateRepository {
     return camelizeKeys<any>(data as Record<string, unknown>);
   }
 
+  async addTag(candidateId: string, tag: string): Promise<void> {
+    const { error } = await db
+      .from("candidate_tags")
+      .upsert(
+        { id: generateId(), candidate_id: candidateId, tag },
+        { onConflict: "candidate_id,tag", ignoreDuplicates: true }
+      );
+    assertNoError(error, "candidate.addTag");
+  }
+
   async updateStatus(candidateId: string, status: string) {
     const { error } = await db
       .from("candidates")

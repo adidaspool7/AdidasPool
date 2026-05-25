@@ -226,6 +226,7 @@ export interface ICandidateRepository {
   ): Promise<CandidateRow>;
 
   addNote(candidateId: string, author: string, content: string): Promise<{ id: string; [key: string]: unknown }>;
+  addTag(candidateId: string, tag: string): Promise<void>;
   updateStatus(candidateId: string, status: string): Promise<void>;
   findForMatching(opts?: { fieldsOfWork?: string[] }): Promise<CandidateRow[]>;
   findByIdForMatching(candidateId: string): Promise<CandidateRow | null>;

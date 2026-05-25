@@ -173,6 +173,9 @@ export class AmbassadorUseCases {
       sourceType: "AMBASSADOR",
     });
 
+    // Tag the candidate so they can be targeted via bulk outreach
+    await this.candidateRepo.addTag(opts.candidateId, "brand-ambassador");
+
     return this.applicationRepo.create({
       programId: opts.programId,
       candidateId: opts.candidateId,

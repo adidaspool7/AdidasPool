@@ -5,12 +5,22 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@client/components/ui/button";
 import { Badge } from "@client/components/ui/badge";
+import { Input } from "@client/components/ui/input";
+import { Label } from "@client/components/ui/label";
+import { Textarea } from "@client/components/ui/textarea";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@client/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@client/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -36,6 +46,8 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface AmbassadorProgram {
@@ -49,6 +61,11 @@ interface AmbassadorProgram {
   status: string;
   maxApplicants?: number | null;
   applicationCount?: number;
+}
+
+interface AmbassadorProgramFull extends AmbassadorProgram {
+  requirements?: string | null;
+  perks?: string | null;
 }
 
 interface Candidate {
@@ -108,6 +125,23 @@ export default function AmbassadorProgramDetailPage() {
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  // Edit dialog
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCohort, setEditCohort] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editCountry, setEditCountry] = useState("");
+  const [editRequirements, setEditRequirements] = useState("");
+  const [editPerks, setEditPerks] = useState("");
+  const [editStatus, setEditStatus] = useState("DRAFT");
+  const [editMaxApplicants, setEditMaxApplicants] = useState("");
+
+  // Delete
+  const [deleting, setDeleting] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -158,6 +192,67 @@ export default function AmbassadorProgramDetailPage() {
       setSelectedApps(new Set());
     } finally {
       setBulkUpdating(false);
+    }
+  }
+
+  function openEditDialog() {
+    if (!program) return;
+    setEditTitle(program.title);
+    setEditDescription(program.description ?? "");
+    setEditCohort(program.cohort ?? "");
+    setEditDeadline(
+      program.applicationDeadline
+        ? new Date(program.applicationDeadline).toISOString().slice(0, 10)
+        : ""
+    );
+    setEditLocation(program.location ?? "");
+    setEditCountry(program.country ?? "");
+    setEditRequirements((program as AmbassadorProgramFull).requirements ?? "");
+    setEditPerks((program as AmbassadorProgramFull).perks ?? "");
+    setEditStatus(program.status);
+    setEditMaxApplicants(program.maxApplicants != null ? String(program.maxApplicants) : "");
+    setEditOpen(true);
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTitle.trim()) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/ambassador/programs/${programId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription || null,
+          cohort: editCohort || null,
+          applicationDeadline: editDeadline || null,
+          location: editLocation || null,
+          country: editCountry || null,
+          requirements: editRequirements || null,
+          perks: editPerks || null,
+          status: editStatus,
+          maxApplicants: editMaxApplicants ? parseInt(editMaxApplicants) : null,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json() as AmbassadorProgram;
+        setProgram(updated);
+        setEditOpen(false);
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete "${program?.title}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/ambassador/programs/${programId}`, { method: "DELETE" });
+      router.push("/dashboard/ambassador");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -231,6 +326,24 @@ export default function AmbassadorProgramDetailPage() {
               Preview form
             </Button>
           </a>
+          <Button variant="outline" size="sm" onClick={openEditDialog}>
+            <Pencil className="h-4 w-4 mr-1" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 border-red-200 hover:bg-red-50"
+            onClick={() => void handleDelete()}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-1" />
+            )}
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -425,6 +538,126 @@ export default function AmbassadorProgramDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit program dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Program</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => void handleEdit(e)} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="edit-title">Title *</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-cohort">Cohort</Label>
+                <Input
+                  id="edit-cohort"
+                  value={editCohort}
+                  onChange={(e) => setEditCohort(e.target.value)}
+                  placeholder="e.g. 2025/2026"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-deadline">Application deadline</Label>
+                <Input
+                  id="edit-deadline"
+                  type="date"
+                  value={editDeadline}
+                  onChange={(e) => setEditDeadline(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-location">Location</Label>
+                <Input
+                  id="edit-location"
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-country">Country</Label>
+                <Input
+                  id="edit-country"
+                  value={editCountry}
+                  onChange={(e) => setEditCountry(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-requirements">Requirements</Label>
+              <Textarea
+                id="edit-requirements"
+                value={editRequirements}
+                onChange={(e) => setEditRequirements(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-perks">Perks</Label>
+              <Textarea
+                id="edit-perks"
+                value={editPerks}
+                onChange={(e) => setEditPerks(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger id="edit-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["DRAFT", "OPEN", "CLOSED", "ARCHIVED"].map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-max">Max applicants</Label>
+                <Input
+                  id="edit-max"
+                  type="number"
+                  min="1"
+                  value={editMaxApplicants}
+                  onChange={(e) => setEditMaxApplicants(e.target.value)}
+                  placeholder="Unlimited"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editSaving}>
+                {editSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
