@@ -1,9 +1,9 @@
 # GDPR Compliance Plan
 
-> **Status**: Proposal — awaiting approval before implementation
+> **Status**: Partially implemented — see §2.0 for current state
 > **Scope**: Entire Talent Intelligence & Language Verification Platform, with special focus on CV parsing, AI interviews, and assessments
 > **Owner**: Stratos
-> **Last updated**: 2026-04-30
+> **Last updated**: 2026-05-25
 > **Legal reference**: Regulation (EU) 2016/679 — General Data Protection Regulation
 
 ---
@@ -19,6 +19,41 @@ This plan must be implemented **before any real production launch with non-test 
 ---
 
 ## 2. Current State Assessment (Gaps)
+
+### 2.0 Implementation Status (May 2026 audit)
+
+| Priority | Item | Status | Notes |
+|----------|------|--------|-------|
+| P0-1 | Privacy Policy published | ✅ Done | `/privacy` page covers legal basis, Art. 22 text, SCCs, cookies, data subject rights. Linked from landing + login. No separate ToS page. |
+| P0-2 | Granular consent at signup | ❌ Missing | No `user_consents` table in schema. No onboarding consent step. |
+| P0-3 | HR-upload consent workflow | ❌ Missing | No `consent_status` column on `candidates`, no invitation email, no 30-day auto-purge cron. |
+| P0-4 | DPAs with Groq / OpenAI | ❌ Missing | `legal/` folder does not exist. Privacy page mentions "enterprise DPAs" but no signed copies stored. |
+| P0-5 | Transfer Impact Assessments | ❌ Missing | No `legal/tia-groq.md` or `legal/tia-openai.md`. |
+| P0-6 | `DELETE /api/me` (right to erasure) | 🟡 Partial | Route exists (`src/app/api/me/route.ts`). Deletes candidate row + storage blobs. **Auth user NOT deleted** — `supabase.auth.admin.deleteUser()` never called. Google/Supabase auth account persists. |
+| P0-7 | `GET /api/me/export` (portability) | ❌ Missing | Route does not exist. Privacy policy promises "export as CSV from settings" but neither the endpoint nor the settings button exists. |
+| P0-8 | Consent withdrawal button in settings | ❌ Missing | Settings page has notification opt-outs (different concern). No processing-consent withdrawal flow. |
+| P0-9 | Art. 22 notice + `request_human_review` | 🟡 Partial | Text-only in privacy policy and interview pre-consent checkbox. No `request_human_review` button/flag on AI results or match scores. |
+| P0-10 | Cookie consent banner | ✅ Done | `cookie-consent.tsx` — Accept/Decline, localStorage, links to privacy policy. Correct for strictly-necessary-only setup. |
+| P0-11 | ROPA (`legal/ropa.md`) | ❌ Missing | |
+| P0-12 | DPIA (`legal/dpia.md`) | ❌ Missing | |
+| P1-1 | Retention cron jobs | ❌ Missing | No pg_cron jobs anywhere in the codebase. |
+| P1-2 | Breach response runbook | ❌ Missing | Privacy policy commits to 72h notification; no actual runbook document exists. |
+| P1-3 | `hr_audit_log` table | ❌ Missing | Table not in schema. |
+| P1-4 | Least-privilege Supabase (RLS) | ❌ Missing | Service role used in all routes; no RLS enabled. |
+| P1-5 | Sub-processor list page | ❌ Missing | No `/legal/subprocessors` page. |
+| P1-6 | Log sanitisation (no PII in logs) | 🟡 Partial | `createLogger` with field redaction exists. No confirmed PII audit pass across all routes. |
+| P1-9 | Source type tracking (G28) | 🟡 Partial | `candidates.source_type` column exists (EXTERNAL / PLATFORM / AMBASSADOR). No `consent_status` column. |
+| P2-5 | EU region confirmed | ❓ Unknown | Supabase region not verified programmatically. |
+
+**Summary — P0**: 2 done, 2 partial, 8 missing. **P1**: 0 done, 1 partial, 7 missing.
+
+### Prioritised next actions
+
+1. **Fix erasure gap** *(30 min)* — call `supabase.auth.admin.deleteUser(userId)` at end of `deleteCurrentProfile()` in `profile.use-cases.ts`.
+2. **Add `GET /api/me/export`** *(2–3 h)* — candidate self-service JSON/CSV download; add button in `/dashboard/settings`.
+3. **Add `request_human_review` flag + button** *(2–3 h)* — `assessment_results.human_review_requested BOOLEAN`; button on results page; email HR.
+4. **Write ROPA + DPIA** *(1 day)* — markdown documents in `legal/`; no code changes.
+5. **Granular consent at signup** *(2–3 days)* — `user_consents` DB table + onboarding modal (biggest P0 dev effort).
 
 ### 2.1 Legal Basis & Consent
 
@@ -207,18 +242,20 @@ This diagram belongs in `legal/ropa.md`.
 
 ## 8. Checklist for "Ready for Real Candidates" Launch
 
-- [ ] Privacy Policy + ToS published and linked on signup
-- [ ] Granular consent collection live
-- [ ] Right to erasure endpoint live + tested
-- [ ] Right to access/export endpoint live + tested
-- [ ] Consent withdrawal live
-- [ ] AI Art. 22 notice + human-review request button
-- [ ] DPAs with Groq and OpenAI signed and stored
-- [ ] TIAs written for US transfers
-- [ ] ROPA document complete
-- [ ] DPIA for AI processing complete
-- [ ] HR-upload candidate-invitation workflow live
-- [ ] Retention cron jobs scheduled
+- [x] Privacy Policy published and linked on signup *(`/privacy` — complete; no separate ToS page yet)*
+- [x] Cookie consent banner live *(strictly-necessary disclosure — complete)*
+- [ ] Terms of Service page (`/legal/terms`)
+- [ ] Granular consent collection live (`user_consents` table + onboarding step)
+- [ ] Right to erasure endpoint fully live + tested *(route exists; auth user deletion missing)*
+- [ ] Right to access/export endpoint live + tested (`GET /api/me/export` + settings button)
+- [ ] Consent withdrawal live (distinct from notification opt-outs)
+- [ ] AI Art. 22 notice + `request_human_review` button on results
+- [ ] DPAs with Groq and OpenAI signed and stored in `legal/dpas/`
+- [ ] TIAs written for US transfers (`legal/tia-groq.md`, `legal/tia-openai.md`)
+- [ ] ROPA document complete (`legal/ropa.md`)
+- [ ] DPIA for AI processing complete (`legal/dpia.md`)
+- [ ] HR-upload candidate-invitation workflow live (`consent_status` + invitation email)
+- [ ] Retention cron jobs scheduled (pg_cron for CV text, audio, inactive accounts)
 - [ ] Breach runbook documented
 - [ ] DPO contact (even if external/fractional) identified
 - [ ] Supabase region confirmed EU
