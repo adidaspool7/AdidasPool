@@ -1,6 +1,6 @@
 # adidas Talent Intelligence Platform — HR Manager User Guide
 
-> **Version:** 1.3 — May 2026
+> **Version:** 1.4 — May 2026
 > **Platform URL:** [adidas-pool.vercel.app](https://adidas-pool.vercel.app)
 > **Audience:** HR managers, recruiters, hiring coordinators.
 > **Candidate counterpart:** [USER_GUIDE_CANDIDATE.md](USER_GUIDE_CANDIDATE.md)
@@ -20,12 +20,13 @@
 9. [Internship Applications](#9-internship-applications)
 10. [Language Assessments & AI Interviews](#10-language-assessments--ai-interviews)
 11. [Promotional Campaigns](#11-promotional-campaigns)
-12. [Notifications & Interaction History](#12-notifications--interaction-history)
-13. [Analytics & Reporting](#13-analytics--reporting)
-14. [Improvement Tracks](#14-improvement-tracks)
-15. [Data Export](#15-data-export)
-16. [Tips & Conventions](#16-tips--conventions)
-17. [Feature Roadmap & Implementation Status](#17-feature-roadmap--implementation-status)
+12. [Ambassador Program Management](#12-ambassador-program-management)
+13. [Notifications & Interaction History](#13-notifications--interaction-history)
+14. [Analytics & Reporting](#14-analytics--reporting)
+15. [Improvement Tracks](#15-improvement-tracks)
+16. [Data Export](#16-data-export)
+17. [Tips & Conventions](#17-tips--conventions)
+18. [Feature Roadmap & Implementation Status](#18-feature-roadmap--implementation-status)
 
 ---
 
@@ -50,6 +51,7 @@ As an HR manager, the platform provides:
 - Invite candidates for written assessments, real-time AI interviews, or skill verification.
 - View analytics on the recruitment pipeline and performance.
 - Create and send targeted promotional campaigns.
+- Create and manage brand ambassador programs, review applications, and update applicant status.
 - Manage notifications for all recruitment events.
 - Export candidate data to CSV.
 - Maintain a per-candidate audit trail of every status change, email, assessment, and campaign.
@@ -599,7 +601,102 @@ For Sent, Terminated, and Archived campaigns, the card shows:
 
 ---
 
-## 12. Notifications & Interaction History
+## 12. Ambassador Program Management
+
+### Overview
+
+The Ambassador Program module lets HR create and manage **brand ambassador recruitment programs** — distinct from job postings. Candidates apply through their own portal and HR reviews applications per-program.
+
+**URL:** `/dashboard/ambassador`
+
+---
+
+### Viewing Programs
+
+Navigate to **Ambassador** in the HR sidebar. You see a card grid of all existing programs showing:
+
+- **Title** and **cohort** label
+- **Deadline** and **location / country**
+- **Status badge** — `DRAFT`, `OPEN`, or `CLOSED`
+- **Applicant count**
+
+---
+
+### Creating a Program
+
+1. Click **+ Create Program** in the top-right.
+2. Fill in the creation form:
+
+| Field | Notes |
+|-------|-------|
+| Title | Short descriptive name (e.g. "Spring 2026 Campus Ambassadors") |
+| Description | Rich text overview visible to candidates |
+| Cohort | Label (e.g. "2026-Q1") |
+| Application Deadline | Date picker |
+| Location | City / venue |
+| Country | Country of activity |
+| Requirements | Bullet list of expectations |
+| Perks | Benefits for accepted ambassadors |
+| Status | `DRAFT` (hidden from candidates), `OPEN` (visible + accepting applications), `CLOSED` |
+| Max Applicants | Optional capacity cap |
+
+3. Click **Create** — program is immediately saved and visible in the list with the selected status.
+
+---
+
+### Editing a Program
+
+1. Open the program by clicking its card.
+2. Click the **Edit** button (top of detail page).
+3. An edit dialog pre-fills all fields. Change any field and click **Save**.
+
+> **Tip:** Flip status from `DRAFT` → `OPEN` when you are ready for candidates to apply.
+
+---
+
+### Deleting a Program
+
+1. Open the program detail page.
+2. Click **Delete Program** (bottom of page).
+3. Confirm in the browser confirmation dialog.
+
+> **Warning:** Deletion is permanent. All applications for that program are also deleted (cascade).
+
+---
+
+### Viewing & Managing Applications
+
+Each program detail page (`/dashboard/ambassador/[id]`) shows a table of all submitted applications:
+
+| Column | Description |
+|--------|-------------|
+| Candidate name / email | Links to candidate profile |
+| University | Applicant's university |
+| Year of study | Year stated in application |
+| Motivation | Free-text motivation statement |
+| Previous experience | Any prior ambassador / relevant experience |
+| Pitch video | Link to submitted video (if provided) |
+| Applied at | Submission timestamp |
+| Status | Current application status badge |
+
+---
+
+### Updating Application Status
+
+For each application row, use the **Status** dropdown to change:
+
+| Status | Meaning |
+|--------|---------|
+| `SUBMITTED` | Default on receipt |
+| `UNDER_REVIEW` | HR is reviewing |
+| `ACCEPTED` | Candidate accepted as ambassador |
+| `REJECTED` | Application rejected |
+
+Status changes are persisted immediately. Accepted candidates are automatically tagged with **"brand-ambassador"** in their candidate profile.
+
+---
+
+## 13. Notifications & Interaction History
 
 ### HR Notification Feed
 
@@ -632,7 +729,7 @@ Each entry shows the type badge, the HR sender (or system), the timestamp, and r
 
 ---
 
-## 13. Analytics & Reporting
+## 14. Analytics & Reporting
 
 The Analytics page provides HR managers with real-time aggregate statistics across the entire recruitment pipeline. Data is rendered using the Recharts charting library (v3.7).
 
@@ -668,7 +765,7 @@ Widgets are stored per user in `hr_dashboard_widgets`; the seven default analyti
 
 ---
 
-## 14. Improvement Tracks
+## 15. Improvement Tracks
 
 > **🚧 Placeholder:** The Improvement Tracks page exists in the dashboard but is currently a stub. The feature is designed for borderline candidates (score 45–60) who are close to meeting requirements.
 
@@ -697,7 +794,7 @@ The full implementation will include:
 
 ---
 
-## 15. Data Export
+## 16. Data Export
 
 ### CSV Export
 
@@ -717,7 +814,7 @@ Export includes:
 
 ---
 
-## 16. Tips & Conventions
+## 17. Tips & Conventions
 
 - **Quality is candidate-intrinsic. Fit is the hiring signal.** Always rank candidates against a specific job before short-listing.
 - Re-rank candidates after editing job requirements — the cache rebuilds on demand and JD parse cache is invalidated when the source URL changes.
@@ -728,7 +825,7 @@ Export includes:
 
 ---
 
-## 17. Feature Roadmap & Implementation Status
+## 18. Feature Roadmap & Implementation Status
 
 ### ✅ Fully Implemented
 

@@ -51,10 +51,22 @@ erDiagram
     promo_campaigns    ||--o{ notifications        : "drives"
 
     %% ============================================================
+    %% Ambassador Program
+    %% ============================================================
+    ambassador_programs    ||--o{ ambassador_applications : "receives"
+    candidates             ||--o{ ambassador_applications : "submits"
+
+    %% ============================================================
+    %% Candidate Segments
+    %% ============================================================
+    candidate_segments     ||--o{ candidate_segment_members : "contains"
+    candidates             ||--o{ candidate_segment_members : "member of"
+
+    %% ============================================================
     %% Standalone / ops tables (no FK in/out shown for brevity)
     %% ============================================================
     %% scoring_weights, scoring_presets, sync_jobs, parsing_jobs,
-    %% hr_dashboard_widgets
+    %% hr_dashboard_widgets, jd_parsing_telemetry, hr_profiles
 
     candidates {
         TEXT id PK
@@ -224,6 +236,58 @@ erDiagram
         TEXT status
         TIMESTAMPTZ scheduled_at
     }
+    ambassador_programs {
+        TEXT id PK
+        TEXT title
+        TEXT description
+        TEXT cohort
+        TIMESTAMPTZ application_deadline
+        TEXT location
+        TEXT country
+        TEXT requirements
+        TEXT perks
+        TEXT status "DRAFT/OPEN/CLOSED"
+        INT max_applicants
+    }
+    ambassador_applications {
+        TEXT id PK
+        TEXT program_id FK
+        TEXT candidate_id FK
+        TEXT status "SUBMITTED/UNDER_REVIEW/ACCEPTED/REJECTED"
+        TEXT motivation
+        TEXT university
+        INT year_of_study
+        TEXT previous_experience
+        TEXT pitch_video_url
+        TIMESTAMPTZ applied_at
+    }
+    candidate_segments {
+        TEXT id PK
+        TEXT name
+        TEXT description
+        TEXT created_by
+    }
+    candidate_segment_members {
+        TEXT segment_id FK
+        TEXT candidate_id FK
+    }
+    hr_profiles {
+        TEXT id PK
+        UUID user_id "auth.users"
+        TEXT full_name
+        TEXT department
+        TEXT phone
+    }
+    jd_parsing_telemetry {
+        TEXT id PK
+        TEXT job_id FK
+        TEXT provider
+        TEXT model
+        BOOLEAN success
+        INT duration_ms
+        BOOLEAN fallback_used
+        TEXT error_kind
+    }
 ```
 
 ## Cardinality summary
@@ -258,8 +322,16 @@ erDiagram
 | `promo_campaigns` → `notifications` | 1 → many | SET NULL |
 | `auth.users` → `candidates.user_id` | 1 → 1 | SET NULL |
 | `auth.users` → `hr_dashboard_widgets.user_id` | 1 → many | (none) |
+| `ambassador_programs` → `ambassador_applications` | 1 → many | CASCADE |
+| `candidates` → `ambassador_applications` | 1 → many | CASCADE |
+| `candidate_segments` → `candidate_segment_members` | 1 → many | CASCADE |
+| `candidates` → `candidate_segment_members` | 1 → many | CASCADE |
+| `auth.users` → `hr_profiles.user_id` | 1 → 1 | (none) |
+| `jobs` → `jd_parsing_telemetry.job_id` | 1 → many | CASCADE |
 
 ## Tables without inbound or outbound FKs
 
 - `scoring_weights`, `scoring_presets` — config singletons
 - `sync_jobs`, `parsing_jobs` — async job logs
+- `hr_profiles` — HR user profile (FK to `auth.users`)
+- `jd_parsing_telemetry` — fire-and-forget telemetry (FK to `jobs`)

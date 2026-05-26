@@ -8,8 +8,9 @@
 
 | Component | Choice | Version |
 |-----------|--------|---------|
-| Test Runner | Vitest | 4.0.18 |
+| Test Runner | Vitest | 4.1.5 |
 | React Plugin | @vitejs/plugin-react | 5.1.4 |
+| Coverage | @vitest/coverage-v8 | — |
 | Environment | `node` (not jsdom) | — |
 | Globals | Enabled (`describe`, `it`, `expect`) | — |
 | Test Scripts | `npm test` (single run), `npm run test:watch` (dev) | — |
@@ -50,20 +51,31 @@ export default defineConfig({
 
 | # | File | Tests | Category | Layer |
 |---|------|-------|----------|-------|
-| 1 | `cv-validation.test.ts` | 15 | Schema validation | Application (DTOs) |
-| 2 | `scoring.test.ts` | 9 | Domain logic | Domain (services) |
-| 3 | `matching.test.ts` | 4 | Domain logic | Domain (services) |
-| 4 | `text-extraction.test.ts` | 8 | Infrastructure | Infrastructure (extraction) |
-| 5 | `upload-use-cases.test.ts` | 16 | Use case orchestration | Application |
-| 6 | `interview-runtime.test.ts` | 49 | Interview rubric + evidence persistence | Application + Infrastructure |
+| 1 | `adidas-job-scraper.test.ts` | 10 | Integration / scraper | Application |
+| 2 | `analytics-catalog.test.ts` | 16 | Domain logic + security | Domain (services) |
+| 3 | `cv-fields-of-work.test.ts` | 5 | Schema validation | Application (DTOs) |
+| 4 | `cv-validation.test.ts` | 19 | Schema validation | Application (DTOs) |
+| 5 | `escape-or-term.test.ts` | 9 | Security (injection prevention) | Infrastructure (db-utils) |
+| 6 | `interview-runtime.test.ts` | 37 | Interview rubric + evidence persistence | Application + Infrastructure |
+| 7 | `interview-token.test.ts` | 6 | Auth token round-trips + expiry | Infrastructure (auth) |
+| 8 | `job-fit.test.ts` | 25 | Domain logic (matching engine) | Domain (services) |
+| 9 | `job-requirements-schema.test.ts` | 9 | Schema validation | Application (DTOs) |
+| 10 | `job-shortlist-use-cases.test.ts` | 8 | Use case orchestration | Application |
+| 11 | `listing-posted-date.test.ts` | 9 | Domain logic (date parsing) | Domain (services) |
+| 12 | `logger-redaction.test.ts` | 10 | Security (PII redaction) | Infrastructure (logging) |
+| 13 | `middleware-auth.test.ts` | 38 | Auth / authorization | Presentation (middleware) |
+| 14 | `notifications-route-auth.test.ts` | 16 | Auth / authorization | Presentation (API routes) |
+| 15 | `scoring.test.ts` | 13 | Domain logic | Domain (services) |
+| 16 | `text-extraction.test.ts` | 10 | Infrastructure | Infrastructure (extraction) |
+| 17 | `upload-use-cases.test.ts` | 18 | Use case orchestration | Application |
 
-**Total: 6 files, 101 test cases, all passing.**
+**Total: 17 files, 258 test cases, all passing.**
 
 ---
 
 ### 8.2.2 Test Coverage by Category
 
-#### CV Validation Tests (15 tests)
+#### CV Validation Tests (19 tests)
 Tests the `CvExtractionSchema` Zod schema that validates AI-parsed CV data:
 
 - Valid complete payload acceptance
@@ -76,7 +88,7 @@ Tests the `CvExtractionSchema` Zod schema that validates AI-parsed CV data:
 - Education level enum validation
 - Domain constants: `MAX_FILE_SIZE_MB`, `ALLOWED_CV_MIME_TYPES`, `ALLOWED_CV_EXTENSIONS`
 
-#### Scoring Tests (9 tests)
+#### Scoring Tests (13 tests)
 Tests the scoring engine across all four components:
 
 | Function | What's Tested |
@@ -86,15 +98,26 @@ Tests the scoring engine across all four components:
 | `estimateCefrLevel` | Keyword-to-CEFR mapping accuracy |
 | `isBorderline` | Threshold detection (score 50-65 = borderline) |
 
-#### Matching Tests (4 tests)
-Tests the `matchCandidateToJob` function:
+#### Job Fit Tests (25 tests)
+Tests the `computeJobFit()` pure function (job-anchored matching engine):
 
 - Perfect match: all criteria satisfied → high score
 - Poor match: no criteria satisfied → low score
-- No requirements: job without criteria → generous scoring
-- Partial language match: candidate's language partially matches → partial credit
+- No requirements: job without criteria → applicable-criteria-only scoring
+- Partial language match: partial credit
+- `isEligible` flag reflects AND of applicable `met` fields
+- Per-criterion: field, experience-in-field, seniority, required/preferred skills, languages, education
+- Edge cases: missing parsed requirements, empty experience lists
 
-#### Text Extraction Tests (8 tests)
+#### Job Requirements Schema Tests (9 tests)
+Tests the `JDRequirementsSchema` Zod schema used to validate LLM output from the JD parser:
+
+- Valid full payload acceptance
+- Graceful handling of missing optional sections
+- Unknown LLM-invented field tolerance
+- Required fields rejection
+
+#### Text Extraction Tests (10 tests)
 Tests `TextExtractionService` with mocked parsers:
 
 - TXT plain text extraction
@@ -105,7 +128,7 @@ Tests `TextExtractionService` with mocked parsers:
 - Insufficient text rejection
 - Unsupported MIME type rejection
 
-#### Upload Use Cases Tests (16 tests)
+#### Upload Use Cases Tests (18 tests)
 Tests the complete CV upload pipeline with all dependencies mocked:
 
 - File validation: type checking, size limits
@@ -120,7 +143,7 @@ Tests the complete CV upload pipeline with all dependencies mocked:
 #### Vercel Blob Storage Tests (removed)
 The original `vercel-blob-storage.test.ts` suite was deleted alongside the Vercel Blob dependency when the project consolidated on Supabase Storage. Storage is thin, I/O-dominated, and covered indirectly through the upload use-case tests.
 
-#### Interview Runtime Tests (49 tests)
+#### Interview Runtime Tests (37 tests)
 Tests the AI Interviewer integration layer that proxies to the FastAPI backend:
 
 - Session creation persists the correct `assessment_mode = INTERVIEW`
@@ -129,6 +152,70 @@ Tests the AI Interviewer integration layer that proxies to the FastAPI backend:
 - Empty-evidence FAIL verdicts are auto-reverted to PASS (mirrors the Python `evaluator.py` guardrail)
 - `max_tokens=500` cap is honoured in prompts
 - Completion endpoint finalizes the assessment status to `SCORED`
+
+#### Interview Token Tests (6 tests)
+Tests HMAC-SHA256 JWT generation and verification (`src/lib/interview-utils.ts`):
+
+- Round-trip sign → verify (valid payload returned)
+- Tampered signature rejection
+- Expired token rejection
+- `verifyForUser()` binds token to a specific `session_id`
+
+#### Middleware Auth Tests (38 tests)
+Tests `middleware.ts` route-gating logic end-to-end:
+
+- Unauthenticated callers receive `401` on protected routes
+- Non-HR callers receive `403` on `HR_ONLY_API_PREFIXES`
+- Authenticated HR callers pass through
+- Public routes (landing page, auth callbacks) are not gated
+
+#### Notifications Route Auth Tests (16 tests)
+Tests authentication enforcement on notification API routes:
+
+- `GET`, `PATCH`, `DELETE` on `/api/notifications` return 401/403 for unauthenticated/wrong-role callers
+- `markAllRead` and bulk-archive endpoints enforce auth
+
+#### Analytics Catalog Tests (16 tests)
+Tests the analytics constraint-builder catalog (`src/server/domain/services/analytics-catalog.ts`):
+
+- Valid `metric × dimension × chartType` combinations are accepted
+- Invalid combinations are rejected
+- Unknown filter keys are rejected (injection-prevention)
+- `limit` bounds enforced
+- `WidgetSpecSchema.strict()` rejects injected top-level keys
+
+#### Escape-OrTerm Tests (9 tests)
+Tests `escapeOrTerm()` utility (`src/server/infrastructure/database/db-utils.ts`) which prevents PostgREST `.or()` filter injection:
+
+- Special characters in search strings are safely escaped
+- Unescaped values would produce invalid PostgREST syntax (documented)
+
+#### Logger Redaction Tests (10 tests)
+Tests `createLogger()` PII redaction to ensure structured logs don't leak sensitive data:
+
+- Email addresses are redacted in log payloads
+- Tokens / API keys are masked
+- Non-PII values are logged verbatim
+
+#### Job Shortlist Use-Case Tests (8 tests)
+Tests `ShortlistUseCases` through the port interface:
+
+- Idempotent add (second add returns 200, not a duplicate)
+- `fitScoreAtAdd` snapshot captured from `job_matches.match_score` at add time
+- `NotFoundError` thrown when job or candidate not found
+
+#### CV Fields of Work Tests (5 tests)
+Tests the `fields_of_work` tolerant Zod preprocess that silently drops LLM-invented values outside the canonical 16 Fields of Work.
+
+#### Adidas Job Scraper Tests (10 tests)
+Tests the adidas careers-portal scraper logic (`scripts/` + `JobScraper`):
+
+- URL construction for paginated search
+- Parsing of job cards into structured records
+- Dedup logic (`externalId` uniqueness)
+
+#### Listing Posted-Date Tests (9 tests)
+Tests the fuzzy posted-date parsing for scraped jobs (e.g., "3 days ago", "1 month ago" → ISO date).
 
 ---
 
@@ -139,26 +226,37 @@ Tests the AI Interviewer integration layer that proxies to the FastAPI backend:
 The test suite follows the application's **Onion Architecture** boundary:
 
 ```
-┌──────────────────────────────────────────────────┐
-│ Tests Target These Layers:                       │
-│                                                  │
-│  ┌──────────────────────────────────────────┐    │
-│  │ Application Layer                        │    │
-│  │  ✅ Upload use cases (full pipeline)     │    │
-│  │  ✅ CV validation schemas (DTOs)         │    │
-│  └──────────────────────────────────────────┘    │
-│  ┌──────────────────────────────────────────┐    │
-│  │ Domain Layer                             │    │
-│  │  ✅ Scoring service                      │    │
-│  │  ✅ Matching service                     │    │
-│  │  ✅ Value objects (constants)            │    │
-│  └──────────────────────────────────────────┘    │
-│  ┌──────────────────────────────────────────┐    │
-│  │ Infrastructure Layer (mocked boundary)   │    │
-│  │  ✅ Text extraction service              │    │
-│  │  ✅ Blob storage service                 │    │
-│  └──────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ Tests Target These Layers:                               │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │ Application Layer                                │    │
+│  │  ✅ Upload use cases (full pipeline)             │    │
+│  │  ✅ CV validation schemas (DTOs)                 │    │
+│  │  ✅ Job requirements schema (DTOs)               │    │
+│  │  ✅ CV fields-of-work schema (DTOs)              │    │
+│  │  ✅ Job shortlist use cases                      │    │
+│  └──────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │ Domain Layer                                     │    │
+│  │  ✅ Scoring service                              │    │
+│  │  ✅ Job-fit matching engine                      │    │
+│  │  ✅ Analytics catalog + security constraints     │    │
+│  │  ✅ Posted-date parsing                          │    │
+│  └──────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │ Infrastructure Layer                             │    │
+│  │  ✅ Text extraction service                      │    │
+│  │  ✅ Interview token (HMAC auth)                  │    │
+│  │  ✅ Logger PII redaction                         │    │
+│  │  ✅ escapeOrTerm (injection prevention)          │    │
+│  └──────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │ Presentation Layer                               │    │
+│  │  ✅ Middleware auth gating (401/403)             │    │
+│  │  ✅ Notifications route auth                     │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### 8.3.2 Mocking Strategy
@@ -207,11 +305,18 @@ Each test file is **self-contained** — no shared test utilities, no global fix
 |------|---------------|-----------|
 | CV upload pipeline | **High** | Most complex feature; multi-step orchestration with retry logic |
 | Scoring algorithms | **High** | Core business logic; deterministic, pure functions |
-| Matching engine | **Medium** | Core business logic; formula-based |
-| Schema validation | **High** | Data integrity at system boundary (AI → application) |
-| Text extraction | **Medium** | Integration point; parser behavior with edge cases |
-| Interview runtime | **High** | Rubric enforcement + evidence persistence on every turn |
-| Storage | **Low** | Thin wrapper; verified indirectly through upload use-case tests |
+| Job-fit matching engine | **High** | Core business logic; 7 criteria, pure function |
+| Schema validation (CV, JD, fields-of-work) | **High** | Data integrity at LLM → application boundaries |
+| Analytics catalog constraints | **High** | Security-sensitive; prevents malformed/injected specs |
+| Middleware auth gating | **High** | 401/403 enforcement across all route groups |
+| Interview runtime | **High** | Rubric enforcement + evidence persistence |
+| Interview auth tokens | **Medium** | HMAC sign/verify + expiry |
+| Logger PII redaction | **Medium** | Security — prevents credential leakage in logs |
+| PostgREST injection prevention | **Medium** | `escapeOrTerm` unit-tested |
+| Notifications auth | **Medium** | Route-level 401/403 checks |
+| Per-job shortlist use cases | **Medium** | Idempotency + fit snapshot |
+| Text extraction | **Medium** | Integration point with `unpdf` / `mammoth` |
+| Storage | **Low** | Thin wrapper; verified indirectly through upload tests |
 
 ### Not Tested (with Justification)
 
@@ -248,15 +353,26 @@ The testing strategy prioritizes the **CV upload pipeline** because it is:
 ### Results
 
 ```
-✓ tests/cv-validation.test.ts (15 tests)
-✓ tests/scoring.test.ts (9 tests)
-✓ tests/matching.test.ts (4 tests)
-✓ tests/text-extraction.test.ts (8 tests)
-✓ tests/upload-use-cases.test.ts (16 tests)
-✓ tests/interview-runtime.test.ts (49 tests)
+✓ tests/adidas-job-scraper.test.ts        (10 tests)
+✓ tests/analytics-catalog.test.ts         (16 tests)
+✓ tests/cv-fields-of-work.test.ts         ( 5 tests)
+✓ tests/cv-validation.test.ts             (19 tests)
+✓ tests/escape-or-term.test.ts            ( 9 tests)
+✓ tests/interview-runtime.test.ts         (37 tests)
+✓ tests/interview-token.test.ts           ( 6 tests)
+✓ tests/job-fit.test.ts                   (25 tests)
+✓ tests/job-requirements-schema.test.ts   ( 9 tests)
+✓ tests/job-shortlist-use-cases.test.ts   ( 8 tests)
+✓ tests/listing-posted-date.test.ts       ( 9 tests)
+✓ tests/logger-redaction.test.ts          (10 tests)
+✓ tests/middleware-auth.test.ts           (38 tests)
+✓ tests/notifications-route-auth.test.ts  (16 tests)
+✓ tests/scoring.test.ts                   (13 tests)
+✓ tests/text-extraction.test.ts           (10 tests)
+✓ tests/upload-use-cases.test.ts          (18 tests)
 
-Test Files  6 passed (6)
-Tests       101 passed (101)
+Test Files  17 passed (17)
+Tests       258 passed (258)
 ```
 
 ---

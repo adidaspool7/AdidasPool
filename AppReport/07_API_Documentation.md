@@ -92,6 +92,13 @@
 | 57 | GET / POST | `/api/analytics/widgets` | List / create the current HR user's saved analytics widgets |
 | 58 | PATCH / DELETE | `/api/analytics/widgets/[id]` | Update or delete a saved widget |
 | 59 | GET | `/api/me/export` | GDPR data-export bundle for the current candidate |
+| 60 | GET | `/api/ambassador` | List ambassador programs (public) |
+| 61 | POST | `/api/ambassador` | Create ambassador program (HR-only) |
+| 62 | GET | `/api/ambassador/[id]` | Program detail + applicant list (HR-only) |
+| 63 | PATCH | `/api/ambassador/[id]` | Edit program (HR-only) |
+| 64 | DELETE | `/api/ambassador/[id]` | Delete program (HR-only) |
+| 65 | POST | `/api/ambassador/[id]/apply` | Submit application (candidate) |
+| 66 | PATCH | `/api/ambassador/[id]/applications/[appId]` | Update application status (HR-only) |
 
 ### Middleware-Level Authorization
 
@@ -762,3 +769,78 @@ Marks an in-progress session as terminated and prevents further turns. Used when
 #### `GET /api/me/export`
 
 Returns a JSON bundle of the current candidate's data (profile, experiences, education, languages, skills, applications, assessments, notifications). Used for the GDPR self-service export on the candidate dashboard.
+
+---
+
+### 7.3.X Ambassador Program Endpoints
+
+#### `GET /api/ambassador`
+
+List ambassador programs. No authentication required — candidates can browse without signing in.
+
+**Response:** array of program objects (`id`, `title`, `description`, `cohort`, `applicationDeadline`, `location`, `country`, `requirements`, `perks`, `status`, `maxApplicants`, `createdAt`).
+
+#### `POST /api/ambassador`
+
+Create a new ambassador program. HR-only.
+
+**Body (JSON):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | ✅ | Program title |
+| `description` | string | — | Full description |
+| `cohort` | string | — | Cohort identifier (e.g., "Summer 2026") |
+| `applicationDeadline` | string (ISO date) | — | Application close date |
+| `location` | string | — | Location label |
+| `country` | string | — | Country name/code |
+| `requirements` | string | — | Freeform requirements text |
+| `perks` | string | — | Freeform perks text |
+| `status` | `DRAFT` \| `OPEN` \| `CLOSED` | — | Default: `DRAFT` |
+| `maxApplicants` | number | — | Optional cap |
+
+**Responses:** `201 Created` with program object. `400` on validation error.
+
+#### `GET /api/ambassador/[id]`
+
+Get program detail and all applications. HR-only. Returns program object + `applications` array (each entry includes candidate `firstName`, `lastName`, `email`).
+
+**Responses:** `200`. `404` if program not found.
+
+#### `PATCH /api/ambassador/[id]`
+
+Partial update of a program. HR-only. Accepts any subset of the fields listed for `POST`.
+
+**Responses:** `200` with updated program. `404` if not found. `400` on validation error.
+
+#### `DELETE /api/ambassador/[id]`
+
+Delete a program and all its applications (cascade). HR-only.
+
+**Responses:** `200`. `404` if not found.
+
+#### `POST /api/ambassador/[id]/apply`
+
+Submit an application to a program. Candidate-only.
+
+**Body (JSON):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `motivation` | string | — | Motivation statement |
+| `university` | string | — | Current university |
+| `yearOfStudy` | number | — | Year of study |
+| `previousExperience` | string | — | Prior ambassador/volunteer experience |
+| `pitchVideoUrl` | string (URL) | — | Optional video pitch link |
+
+**Side effect:** candidate is auto-tagged with `"brand-ambassador"` (idempotent upsert on `candidate_tags`).
+
+**Responses:** `201` on success. `409 Conflict` if already applied. `404` if program not found.
+
+#### `PATCH /api/ambassador/[id]/applications/[appId]`
+
+Update an application's status. HR-only.
+
+**Body:** `{ "status": "UNDER_REVIEW" | "ACCEPTED" | "REJECTED" }`
+
+**Responses:** `200`. `404` if application not found.

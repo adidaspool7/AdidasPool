@@ -30,6 +30,7 @@
 | 20 | AI Interviewer (real-time voice) | ✅ Complete | High |
 | 21 | Per-Skill Verification | ✅ Complete | Medium |
 | 22 | Authentication & RBAC (Supabase + middleware) | ✅ Complete | Medium |
+| 23 | Ambassador Program | ✅ Complete | Medium |
 
 ---
 
@@ -859,7 +860,51 @@ All other authenticated endpoints are accessible to both roles; per-row RLS poli
 
 ---
 
-## 6.23 Cross-Cutting Feature: Dual-Role System
+## 6.24 Feature 23: Ambassador Program
+
+### Overview
+
+A dedicated brand-ambassador recruitment flow, fully contained within the platform. HR creates and manages programs; candidates browse open programs and submit structured applications. Successful applicants are auto-tagged in the talent pool.
+
+### Data Model
+
+- `ambassador_programs` — program definition (title, cohort, deadline, location, requirements, perks, `DRAFT`/`OPEN`/`CLOSED` status, optional max-applicant cap).
+- `ambassador_applications` — one row per candidate × program pair (unique constraint). Status lifecycle: `SUBMITTED` → `UNDER_REVIEW` → `ACCEPTED` / `REJECTED`.
+
+### Use-Case Layer (`AmbassadorUseCases`)
+
+| Method | Actor | Behaviour |
+|--------|-------|----------|
+| `listPrograms()` | Any | Returns all non-archived programs |
+| `getProgram(id)` | HR | Returns program + application list |
+| `createProgram(data)` | HR | Validates & inserts |
+| `updateProgram(id, data)` | HR | Partial update (Zod `.partial()`) |
+| `deleteProgram(id)` | HR | Hard delete (cascade removes applications) |
+| `submitApplication(opts)` | Candidate | Idempotent insert + auto-tags candidate with `"brand-ambassador"` |
+| `listApplications(programId)` | HR | Joins application + candidate basic data |
+| `updateApplicationStatus(appId, status)` | HR | Status transition |
+
+**Auto-tagging:** `submitApplication` calls `ICandidateRepository.addTag(candidateId, "brand-ambassador")` — an idempotent upsert on `candidate_tags`. The tag is visible in the HR candidates filter panel immediately.
+
+### API Routes (`/api/ambassador/`)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/ambassador` | Public | List programs |
+| `POST` | `/api/ambassador` | HR | Create program |
+| `GET` | `/api/ambassador/[id]` | HR | Program detail + applications |
+| `PATCH` | `/api/ambassador/[id]` | HR | Edit program |
+| `DELETE` | `/api/ambassador/[id]` | HR | Delete program |
+| `POST` | `/api/ambassador/[id]/apply` | Candidate | Submit application |
+| `PATCH` | `/api/ambassador/[id]/applications/[appId]` | HR | Update application status |
+
+### UI
+
+- `/dashboard/ambassador` (HR) — Programs list with `+ Create` action, program cards showing status/deadline/applicant count.
+- `/dashboard/ambassador/[id]` (HR) — Program detail: info summary, edit dialog (slide-over), delete button with `window.confirm`, applicants table with inline status update.
+- `/dashboard/ambassador/apply` (Candidate) — Program browser for `OPEN` programs; application form modal with motivation, university, year of study, pitch video URL.
+
+---
 
 The entire application serves two user personas through a single codebase:
 

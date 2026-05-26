@@ -2,7 +2,20 @@
 
 > Tracks all planned work. Status legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ❌ Blocked
 > Keep this file updated after every session. Do not delete completed items — move them to the bottom "Completed" section.
-> Last audited: 2026-05-06 — synced with per-job shortlist, HR custom analytics widgets, and Option B contact-email plan.
+> Last audited: 2026-05-25 — synced with ambassador program feature and code quality audit.
+
+---
+
+## Recent Work (2026-05-07 → 2026-05-25)
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| R.10 | Ambassador Program feature — HR CRUD (create, list, detail, edit, delete), candidate application flow, auto-tag `"brand-ambassador"` on submission | ✅ | Tables `ambassador_programs` + `ambassador_applications`; `AmbassadorUseCases`; `ICandidateRepository.addTag()` port + idempotent repo impl; API routes under `/api/ambassador/**`; UI pages `/dashboard/ambassador/**` |
+| R.11 | Code audit: consolidate error classes into `src/server/application/errors.ts` | ✅ | Removed 4 local class defs; fixed import paths in 5 use-case files + `index.ts`; re-exports kept for backward compat |
+| R.12 | Code audit: `createLogger` added to last unlogged API route (`candidates/[id]/interviews/route.ts`) | ✅ | All 17 API routes now use structured logging |
+| R.13 | Code audit fix: `escapeOrTerm()` applied in `candidate.repository.ts` and `job.repository.ts` — PostgREST `.or()` injection closed (#4 in `audit-6-5-2026.md`) | ✅ | Unit test in `tests/escape-or-term.test.ts` |
+| R.14 | Fix: `tests/upload-use-cases.test.ts` import path for `ValidationError` updated to `@server/application/errors` | ✅ | 258/258 tests passing |
+| R.15 | Jobs picker filter: only `OPEN` jobs returned (removed stale `CANCELLED`/`FILLED` enum values from filter) | ✅ | commit `fix: filter picker to OPEN jobs only` |
 
 ---
 
@@ -183,3 +196,7 @@
 | C.23 | Job-Anchored Matching initiative (Phases 0–5) — lazy JD parsing, fields-of-work CV tagging, `computeJobFit` pure function, `/jobs/[id]/match-candidates` page, Quality vs Fit UI | 2026-04-27 |
 | C.24 | Fix experience double-counting in `job-fit.service.ts` — `rawExperiences` approach; 2 regression tests added, 155/155 passing (`fe89cf4`) | 2026-04-27 |
 | C.25 | Candidates page redesign — compact language pills (`EN C1`), new Assessments column (scored assessment CEFR, language interview CEFR, technical interview PASS/FAIL) | 2026-04-27 |
+| C.26 | Per-Job Shortlist (`job_shortlists`) | 2026-04-30 |
+| C.27 | HR Custom Analytics Widgets — catalog + builder + saved widgets | 2026-05-06 |
+| C.28 | Ambassador Program feature (create/edit/delete programs, candidate apply, auto-tag) | 2026-05-25 |
+| C.29 | Code audit: `errors.ts` consolidation, import path fixes, `escapeOrTerm` injection fix, `createLogger` completion | 2026-05-25 |

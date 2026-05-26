@@ -59,6 +59,8 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 
 **Dependency rule is enforced.** If you find a use case importing from infrastructure, that is a violation.
 
+**Canonical application-layer errors**: `src/server/application/errors.ts` is the single source of truth for `NotFoundError`, `ValidationError`, `DuplicateSkipError`, and `WidgetSpecValidationError`. Use-case files import from there; they do NOT define local error classes. `console.*` inside use-case catch blocks is intentional (use cases cannot import `createLogger` from infrastructure).
+
 ---
 
 ## Database
@@ -77,8 +79,8 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - `updated_at`: handled by PostgreSQL trigger `set_updated_at()` — no app-level timestamp management
 - Migration file: `supabase/migrations/00000000000000_schema.sql` — single canonical schema file. Consolidated 2026-04-26: every prior per-feature delta has been inlined. Run once in Supabase SQL Editor for fresh databases.
 
-### Key Tables
-`candidates`, `experiences`, `education`, `candidate_languages`, `skills`, `candidate_tags`, `candidate_notes`, `jobs`, `job_applications`, `job_matches`, `job_shortlists`, `assessment_templates`, `assessments`, `assessment_results`, `interview_sessions`, `interview_transcript_turns`, `interview_proctoring_events`, `improvement_tracks`, `improvement_progress`, `notifications`, `notification_preferences`, `promo_campaigns`, `parsing_jobs`, `scoring_weights`, `scoring_presets`, `sync_jobs`
+### Key Tables (33 total)
+`candidates`, `experiences`, `education`, `candidate_languages`, `skills`, `candidate_tags`, `candidate_notes`, `jobs`, `job_applications`, `job_matches`, `job_shortlists`, `assessment_templates`, `assessments`, `assessment_results`, `interview_sessions`, `interview_transcript_turns`, `interview_proctoring_events`, `improvement_tracks`, `improvement_progress`, `notifications`, `notification_preferences`, `promo_campaigns`, `parsing_jobs`, `scoring_weights`, `scoring_presets`, `sync_jobs`, `jd_parsing_telemetry`, `hr_dashboard_widgets`, `candidate_segments`, `candidate_segment_members`, `ambassador_programs`, `ambassador_applications`, `hr_profiles`
 
 ---
 
@@ -275,6 +277,39 @@ default charts stay pinned on top; HR can add saved custom charts below.
 - `tests/analytics-catalog.test.ts` — 16 tests covering valid combos,
   invalid metric/dimension/chartType combos, unknown filter keys,
   limit bounds, strict mode rejecting injected keys.
+
+---
+
+## Ambassador Program (as of 2026-05-25)
+
+Brand ambassador recruitment managed entirely within the platform. HR creates programs; candidates apply through their dashboard portal.
+
+### Schema
+- `ambassador_programs`: `id`, `title`, `description`, `cohort`, `application_deadline`, `location`, `country`, `requirements`, `perks`, `status` (`DRAFT`/`OPEN`/`CLOSED`), `max_applicants`, timestamps.
+- `ambassador_applications`: `(program_id, candidate_id)` UNIQUE, `status` (`SUBMITTED`/`UNDER_REVIEW`/`ACCEPTED`/`REJECTED`), `motivation`, `university`, `year_of_study`, `previous_experience`, `pitch_video_url`, `applied_at`. Cascade-deletes with program.
+- Enum value `AMBASSADOR` added to `candidate.source_type`.
+
+### API Routes (all under `/api/ambassador/`)
+- `GET /api/ambassador` — list programs (public, no auth required for candidates to browse)
+- `POST /api/ambassador` — create program (HR-only)
+- `GET /api/ambassador/[id]` — program detail + applications (HR-only)
+- `PATCH /api/ambassador/[id]` — edit program (HR-only)
+- `DELETE /api/ambassador/[id]` — delete program (HR-only)
+- `POST /api/ambassador/[id]/apply` — submit application (candidate)
+- `PATCH /api/ambassador/[id]/applications/[appId]` — update application status (HR-only)
+
+### Use Cases (`AmbassadorUseCases`)
+- `listPrograms()`, `getProgram(id)`, `createProgram(data)`, `updateProgram(id, data)`, `deleteProgram(id)`
+- `submitApplication(opts)` — creates application + calls `candidateRepo.addTag(candidateId, "brand-ambassador")` (idempotent upsert)
+- `listApplications(programId)`, `updateApplicationStatus(appId, status)`
+
+### New port method
+- `ICandidateRepository.addTag(candidateId: string, tag: string): Promise<void>` — idempotent upsert on `candidate_tags`
+
+### UI
+- `/dashboard/ambassador` — HR list page (create, edit, delete programs)
+- `/dashboard/ambassador/[id]` — HR detail page (program info + applications table, edit dialog, delete button with `window.confirm`)
+- `/dashboard/ambassador/apply` — Candidate application portal (browse open programs, submit application form)
 
 ---
 

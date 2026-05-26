@@ -1,6 +1,6 @@
 # adidas Talent Intelligence Platform — Candidate User Guide
 
-> **Version:** 1.2 — May 2026
+> **Version:** 1.3 — May 2026
 > **Platform URL:** [adidas-pool.vercel.app](https://adidas-pool.vercel.app)
 > **Audience:** Candidates (job seekers, internship applicants).
 > **HR counterpart:** [USER_GUIDE_HR.md](USER_GUIDE_HR.md)
@@ -17,10 +17,11 @@
 6. [Browsing & Applying to Internships](#6-browsing--applying-to-internships)
 7. [Tracking Your Applications](#7-tracking-your-applications)
 8. [Language Assessments](#8-language-assessments)
-9. [Notifications](#9-notifications)
-10. [Profile & Settings](#10-profile--settings)
-11. [Privacy & Data Control](#11-privacy--data-control)
-12. [Troubleshooting](#12-troubleshooting)
+9. [Ambassador Program Applications](#9-ambassador-program-applications)
+10. [Notifications](#10-notifications)
+11. [Profile & Settings](#11-profile--settings)
+12. [Privacy & Data Control](#12-privacy--data-control)
+13. [Troubleshooting](#13-troubleshooting)
 
 ---
 
@@ -341,7 +342,61 @@ After scoring, your assessment results page shows:
 
 ---
 
-## 9. Notifications
+## 9. Ambassador Program Applications
+
+### What is the Ambassador Program?
+
+Brand ambassador programs let you represent adidas on your campus or in your community. Accepted ambassadors gain early access to recruitment events, exclusive perks, and direct HR contacts.
+
+**URL:** `/dashboard/ambassador/apply`
+
+---
+
+### Browsing Open Programs
+
+1. Click **Ambassador** in the sidebar (or navigate directly to the URL above).
+2. The page lists all **OPEN** programs with their title, cohort, location, deadline, and a short description.
+3. Read through the requirements and perks for each program before applying.
+
+> **Note:** Programs in `DRAFT` or `CLOSED` status are not shown to candidates.
+
+---
+
+### Submitting an Application
+
+1. Click **Apply** on any open program card.
+2. Complete the application form:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| Motivation | Yes | Why do you want to be a brand ambassador? |
+| University | Yes | Your current institution |
+| Year of study | Yes | e.g. 1st, 2nd, 3rd... |
+| Previous experience | No | Any prior ambassador or leadership roles |
+| Pitch video URL | No | Link to a short self-introduction video |
+
+3. Click **Submit Application**.
+
+You'll receive a confirmation and the application status will be set to **SUBMITTED**.
+
+---
+
+### Application Status
+
+You can re-visit the ambassador portal to check your application status:
+
+| Status | Meaning |
+|--------|---------|
+| `SUBMITTED` | Received, awaiting HR review |
+| `UNDER_REVIEW` | HR is actively reviewing your application |
+| `ACCEPTED` | Congratulations! You've been accepted |
+| `REJECTED` | Application not selected for this cohort |
+
+> **Tip:** If accepted, the tag **"brand-ambassador"** is added to your candidate profile, which may be visible to HR when reviewing your CV for other roles.
+
+---
+
+## 10. Notifications
 
 ### Notification Center
 
@@ -374,7 +429,7 @@ Notifications respect your preferences (see Settings). If you've opted out of jo
 
 ---
 
-## 10. Profile & Settings
+## 11. Profile & Settings
 
 ### Editing Your Profile
 
@@ -417,7 +472,7 @@ Changes are saved automatically when you toggle a preference.
 
 ---
 
-## 11. Privacy & Data Control
+## 12. Privacy & Data Control
 
 - The platform stores only the data you upload (CV, documents, profile fields) plus a record of your applications, assessments, and notifications.
 - Your CV is stored in Supabase Storage; structured data extracted by the AI pipeline lives in Postgres.
@@ -427,7 +482,7 @@ Changes are saved automatically when you toggle a preference.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Problem | What to do |
 |---------|------------|
