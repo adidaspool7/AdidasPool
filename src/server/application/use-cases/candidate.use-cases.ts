@@ -11,6 +11,8 @@
 import type { ICandidateRepository, CandidateRelationsInput, INotificationRepository } from "@server/domain/ports/repositories";
 import type { IStorageService } from "@server/domain/ports/services";
 import type { CandidateFilter } from "@server/application/dtos";
+import { NotFoundError, ValidationError } from "@server/application/errors";
+export { NotFoundError, ValidationError };
 
 // Status messages sent to candidates when HR manually changes their status.
 // Only statuses that HR assigns via the candidates table are listed here.
@@ -193,20 +195,4 @@ export class CandidateUseCases {
   }
 }
 
-// ============================================
-// APPLICATION ERRORS
-// ============================================
 
-export class NotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotFoundError";
-  }
-}
-
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}

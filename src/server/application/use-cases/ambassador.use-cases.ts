@@ -17,20 +17,7 @@ import type {
   AmbassadorProgramRow,
   AmbassadorApplicationRow,
 } from "@server/domain/ports/repositories";
-
-export class NotFoundError extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = "NotFoundError";
-  }
-}
-
-export class ValidationError extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = "ValidationError";
-  }
-}
+import { NotFoundError, ValidationError } from "@server/application/errors";
 
 export class AmbassadorUseCases {
   constructor(

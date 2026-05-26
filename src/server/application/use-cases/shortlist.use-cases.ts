@@ -17,7 +17,7 @@ import type {
   ShortlistEntryWithCandidate,
   ShortlistEntryWithJob,
 } from "@server/domain/ports/repositories";
-import { NotFoundError } from "@server/application/use-cases/candidate.use-cases";
+import { NotFoundError } from "@server/application/errors";
 
 export class ShortlistUseCases {
   constructor(

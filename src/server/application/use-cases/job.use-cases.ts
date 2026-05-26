@@ -19,7 +19,7 @@ import type {
 import type { IJobScraperService } from "@server/domain/ports/services";
 import type { CreateJobInput } from "@server/application/dtos";
 import type { UpdateJobInput } from "@server/application/dtos";
-import { NotFoundError } from "./candidate.use-cases";
+import { NotFoundError } from "@server/application/errors";
 
 /**
  * Thrown when a job’s source posting has been taken down by adidas

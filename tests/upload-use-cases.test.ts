@@ -7,10 +7,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  UploadUseCases,
-  ValidationError,
-} from "@server/application/use-cases/upload.use-cases";
+import { UploadUseCases } from "@server/application/use-cases/upload.use-cases";
+import { ValidationError } from "@server/application/errors";
 import type { ICandidateRepository, IDeduplicationRepository, IParsingJobRepository } from "@server/domain/ports/repositories";
 import type {
   ICvParserService,

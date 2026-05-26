@@ -20,13 +20,8 @@ import type {
   IDashboardWidgetRepository,
   DashboardWidget,
 } from "@server/domain/ports/repositories";
-
-export class WidgetSpecValidationError extends Error {
-  constructor(public readonly issues: unknown) {
-    super("Invalid widget spec");
-    this.name = "WidgetSpecValidationError";
-  }
-}
+import { WidgetSpecValidationError } from "@server/application/errors";
+export { WidgetSpecValidationError };
 
 export class DashboardWidgetUseCases {
   constructor(

@@ -28,6 +28,7 @@ import {
   ALLOWED_CV_EXTENSIONS,
 } from "@server/domain/value-objects";
 import { calculateCvScore } from "@server/domain/services/scoring.service";
+import { ValidationError, DuplicateSkipError } from "@server/application/errors";
 import JSZip from "jszip";
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -853,17 +854,5 @@ export class UploadUseCases {
 
 // ─── Error Classes ─────────────────────────────────────────────
 
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
 
-export class DuplicateSkipError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DuplicateSkipError";
-  }
-}
 

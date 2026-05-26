@@ -13,7 +13,7 @@ import type {
   INotificationRepository,
 } from "@server/domain/ports/repositories";
 import type { UpdateProfileInput } from "@server/application/dtos";
-import { NotFoundError } from "@server/application/use-cases/candidate.use-cases";
+import { NotFoundError } from "@server/application/errors";
 import type { IStorageService } from "@server/domain/ports/services";
 
 const PROFILE_SELECT = {

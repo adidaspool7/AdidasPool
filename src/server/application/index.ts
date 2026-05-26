@@ -33,11 +33,8 @@ import {
   textExtractionService,
 } from "@server/container";
 
-import {
-  CandidateUseCases,
-  NotFoundError,
-  ValidationError,
-} from "@server/application/use-cases/candidate.use-cases";
+import { CandidateUseCases } from "@server/application/use-cases/candidate.use-cases";
+import { NotFoundError, ValidationError } from "@server/application/errors";
 import { JobUseCases, JobClosedError } from "@server/application/use-cases/job.use-cases";
 import { AssessmentUseCases } from "@server/application/use-cases/assessment.use-cases";
 import { UploadUseCases } from "@server/application/use-cases/upload.use-cases";

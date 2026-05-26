@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@server/infrastructure/database/supabase-client";
 import { camelizeKeys } from "@server/infrastructure/database/db-utils";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@server/infrastructure/logging/logger";
+
+const log = createLogger("api/candidates/[id]/interviews");
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +55,7 @@ export async function GET(
       .order("created_at", { ascending: false });
 
     if (sessionsError) {
-      console.error("Error fetching interview sessions:", sessionsError);
+      log.error("Error fetching interview sessions:", sessionsError);
       return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
     }
 
@@ -92,7 +95,7 @@ export async function GET(
 
     return NextResponse.json({ interviews });
   } catch (error) {
-    console.error("Error fetching candidate interviews:", error);
+    log.error("Error fetching candidate interviews:", error);
     return NextResponse.json(
       { error: "Failed to fetch interviews" },
       { status: 500 }
