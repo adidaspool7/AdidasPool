@@ -103,10 +103,10 @@ The AI interview supports browser-native speech recognition (STT) and text-to-sp
 - **Authentication:** Supabase Auth + Google OAuth (only IdP); role stored in `app_metadata.role`
 - **Authorization:** `middleware.ts` gates `/api/*` with `PUBLIC_API_PREFIXES` + `HR_ONLY_API_PREFIXES` — 401/403 enforced at the edge; HR-only mutations also re-checked in-route via `requireHr()`
 - **Row-Level Security:** Currently disabled at table level; all DB access is server-side via the service-role admin client
-- **Data layer:** 27 tables in the canonical `supabase/migrations/00000000000000_schema.sql` (consolidated; per-feature deltas inlined)
+- **Data layer:** 33 tables in the canonical `supabase/migrations/00000000000000_schema.sql` (consolidated; per-feature deltas inlined)
 - **Dual-mode storage:** `SupabaseStorageService` (prod) / `LocalStorageService` (dev)
 - **Async processing:** Next.js `after()` (no Redis/BullMQ)
-- **Testing:** **179 unit tests** across 12 files (Vitest)
+- **Testing:** **258 unit tests** across 17 files (Vitest)
 - **Deployed on:** Vercel (Next.js) + Supabase (DB/Auth/Storage) + separate host for the FastAPI sidecar
 
 ---
@@ -115,7 +115,7 @@ The AI interview supports browser-native speech recognition (STT) and text-to-sp
 
 | Technology | Purpose |
 |------------|---------|
-| **Next.js 16.1** (App Router) | Full-stack React framework |
+| **Next.js 16.2** (App Router) | Full-stack React framework |
 | **React 19.2** + **TypeScript 5** | UI + type safety across all layers |
 | **Supabase** (PostgreSQL + Auth + Storage) | Managed backend platform |
 | **@supabase/supabase-js** + **@supabase/ssr** | Server-side + cookie-aware data access (no ORM) |
@@ -129,7 +129,7 @@ The AI interview supports browser-native speech recognition (STT) and text-to-sp
 | **Recharts 3.7** | Analytics visualisations |
 | **Resend** | Transactional email (magic links, with copy-link fallback) |
 | **Vercel** | Hosting & serverless deployment |
-| **Vitest 4.0** | Unit testing (179 tests across 12 files) |
+| **Vitest 4.0** | Unit testing (258 tests across 17 files) |
 
 See [AppReport/03_Technology_Stack.md](AppReport/03_Technology_Stack.md) for the full technology write-up.
 
@@ -212,7 +212,7 @@ The FastAPI sidecar (`ai_interviewer_backend/`) is deployed separately (e.g. Ren
 npm test
 ```
 
-179 unit tests across 12 files (run `npm test` for the full breakdown). Coverage includes: Zod schemas + LLM output guards, CV scoring + text extraction (unpdf/mammoth), upload pipeline, scraper + listing posted-date, interview runtime (session, turn persistence, evidence guardrails, completion), job-fit engine, fields-of-work tagging, JD requirements schema, per-job shortlist use cases, and the analytics-catalog spec validator.
+258 unit tests across 17 files (run `npm test` for the full breakdown). Coverage includes: Zod schemas + LLM output guards, CV scoring + text extraction (unpdf/mammoth), upload pipeline, scraper + listing posted-date, interview runtime (session, turn persistence, evidence guardrails, completion), job-fit engine, fields-of-work tagging, JD requirements schema, per-job shortlist use cases, middleware + notification-route authorization, PostgREST `.or()` escaping, logger redaction, and the analytics-catalog spec validator.
 
 ---
 
@@ -224,7 +224,7 @@ npm test
 | [AppReport/02_Requirements_Analysis.md](AppReport/02_Requirements_Analysis.md) | Functional + non-functional requirements |
 | [AppReport/03_Technology_Stack.md](AppReport/03_Technology_Stack.md) | Tech stack write-up |
 | [AppReport/04_Architecture_Design.md](AppReport/04_Architecture_Design.md) | Onion architecture, DI bindings, data flow |
-| [AppReport/05_Database_Design.md](AppReport/05_Database_Design.md) | 23-table schema, migrations, RLS |
+| [AppReport/05_Database_Design.md](AppReport/05_Database_Design.md) | Database schema, migrations, RLS |
 | [AppReport/06_Features_Implementation.md](AppReport/06_Features_Implementation.md) | Feature-by-feature implementation detail |
 | [AppReport/07_API_Documentation.md](AppReport/07_API_Documentation.md) | API endpoints + middleware RBAC |
 | [AppReport/08_Testing_Strategy.md](AppReport/08_Testing_Strategy.md) | Test inventory + coverage |
@@ -233,10 +233,11 @@ npm test
 | [docs/USER_GUIDE_HR.md](docs/USER_GUIDE_HR.md) | End-user guide — HR managers |
 | [docs/USER_GUIDE_CANDIDATE.md](docs/USER_GUIDE_CANDIDATE.md) | End-user guide — candidates |
 | [docs/talent_intelligence_...spec.md](docs/talent_intelligence_language_verification_platform_spec.md) | Original project specification |
-| [docs/JOB_ANCHORED_MATCHING_PLAN.md](docs/JOB_ANCHORED_MATCHING_PLAN.md) | Job-anchored matching design + rollout |
-| [docs/PER_JOB_SHORTLIST_PLAN.md](docs/PER_JOB_SHORTLIST_PLAN.md) | Per-job shortlist feature plan |
+| [docs/archive/JOB_ANCHORED_MATCHING_PLAN.md](docs/archive/JOB_ANCHORED_MATCHING_PLAN.md) | Job-anchored matching design + rollout (archived — shipped) |
+| [docs/archive/PER_JOB_SHORTLIST_PLAN.md](docs/archive/PER_JOB_SHORTLIST_PLAN.md) | Per-job shortlist feature plan (archived — shipped) |
 | [docs/CONTACT_EMAIL_OPTION_B_SETUP.md](docs/CONTACT_EMAIL_OPTION_B_SETUP.md) | Resend verified-domain setup for HR contact emails |
 | [docs/TODO.md](docs/TODO.md) | Active work tracker (status legend + manual ops items) |
+| [docs/DOCUMENTATION_MAP.md](docs/DOCUMENTATION_MAP.md) | Index of all project documentation |
 | [CLAUDE.md](CLAUDE.md) | Project memory — stack, architecture, current decisions |
 
 ---

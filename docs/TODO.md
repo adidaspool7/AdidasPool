@@ -2,7 +2,17 @@
 
 > Tracks all planned work. Status legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ❌ Blocked
 > Keep this file updated after every session. Do not delete completed items — move them to the bottom "Completed" section.
-> Last audited: 2026-05-25 — synced with ambassador program feature and code quality audit.
+> Last audited: 2026-06-06 — documentation sweep (map + stale-fact fixes) and UI/UX backlog added.
+
+---
+
+## Recent Work (2026-05-26 → 2026-06-06)
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| R.16 | UI/UX improvement analysis | ✅ | [UIUX_improvements.md](UIUX_improvements.md) — prioritized backlog (effort/impact tagged); presentation-layer only |
+| R.17 | Remove unused Bebas Neue font | ✅ | Dropped from `src/app/layout.tsx` (import, constant, `<body>` variable); brand fonts (Adineue/Adihaus) self-hosted via `@font-face` and unaffected |
+| R.18 | Documentation map + stale-fact sweep | ✅ | New [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md); README/CLAUDE corrected to 33 tables, 258 tests / 17 files, Next.js 16.2; fixed broken `PER_JOB_SHORTLIST_PLAN` link |
 
 ---
 

@@ -159,7 +159,7 @@ Drop the "Match Jobs" flow paths that are no longer reachable. Clean up `experie
 
 - [`docs/talent_intelligence_language_verification_platform_spec.md`](talent_intelligence_language_verification_platform_spec.md) — original spec
 - [`docs/CV_PARSING_IMPROVEMENT_PLAN.md`](CV_PARSING_IMPROVEMENT_PLAN.md) — CV parser strategy
-- [`TODO_JOB_ANCHORED_MATCHING.md`](../TODO_JOB_ANCHORED_MATCHING.md) — checklist of concrete tasks
+- [`docs/archive/TODO_JOB_ANCHORED_MATCHING.md`](archive/TODO_JOB_ANCHORED_MATCHING.md) — checklist of concrete tasks (archived — shipped)
 
 ---
 
