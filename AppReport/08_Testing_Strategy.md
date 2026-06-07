@@ -58,18 +58,19 @@ export default defineConfig({
 | 5 | `escape-or-term.test.ts` | 9 | Security (injection prevention) | Infrastructure (db-utils) |
 | 6 | `interview-runtime.test.ts` | 37 | Interview rubric + evidence persistence | Application + Infrastructure |
 | 7 | `interview-token.test.ts` | 6 | Auth token round-trips + expiry | Infrastructure (auth) |
-| 8 | `job-fit.test.ts` | 25 | Domain logic (matching engine) | Domain (services) |
-| 9 | `job-requirements-schema.test.ts` | 9 | Schema validation | Application (DTOs) |
-| 10 | `job-shortlist-use-cases.test.ts` | 8 | Use case orchestration | Application |
-| 11 | `listing-posted-date.test.ts` | 9 | Domain logic (date parsing) | Domain (services) |
-| 12 | `logger-redaction.test.ts` | 10 | Security (PII redaction) | Infrastructure (logging) |
-| 13 | `middleware-auth.test.ts` | 38 | Auth / authorization | Presentation (middleware) |
-| 14 | `notifications-route-auth.test.ts` | 16 | Auth / authorization | Presentation (API routes) |
-| 15 | `scoring.test.ts` | 13 | Domain logic | Domain (services) |
-| 16 | `text-extraction.test.ts` | 10 | Infrastructure | Infrastructure (extraction) |
-| 17 | `upload-use-cases.test.ts` | 18 | Use case orchestration | Application |
+| 8 | `job-fit.test.ts` | 47 | Domain logic (matching engine) | Domain (services) |
+| 9 | `job-matching-bridge.test.ts` | 25 | DB-row → matcher bridge | Application |
+| 10 | `job-requirements-schema.test.ts` | 9 | Schema validation | Application (DTOs) |
+| 11 | `job-shortlist-use-cases.test.ts` | 8 | Use case orchestration | Application |
+| 12 | `listing-posted-date.test.ts` | 9 | Domain logic (date parsing) | Domain (services) |
+| 13 | `logger-redaction.test.ts` | 10 | Security (PII redaction) | Infrastructure (logging) |
+| 14 | `middleware-auth.test.ts` | 38 | Auth / authorization | Presentation (middleware) |
+| 15 | `notifications-route-auth.test.ts` | 16 | Auth / authorization | Presentation (API routes) |
+| 16 | `scoring.test.ts` | 13 | Domain logic | Domain (services) |
+| 17 | `text-extraction.test.ts` | 10 | Infrastructure | Infrastructure (extraction) |
+| 18 | `upload-use-cases.test.ts` | 18 | Use case orchestration | Application |
 
-**Total: 17 files, 258 test cases, all passing.**
+**Total: 18 files, 305 test cases, all passing.**
 
 ---
 
@@ -98,7 +99,7 @@ Tests the scoring engine across all four components:
 | `estimateCefrLevel` | Keyword-to-CEFR mapping accuracy |
 | `isBorderline` | Threshold detection (score 50-65 = borderline) |
 
-#### Job Fit Tests (25 tests)
+#### Job Fit Tests (47 tests)
 Tests the `computeJobFit()` pure function (job-anchored matching engine):
 
 - Perfect match: all criteria satisfied → high score
@@ -108,6 +109,15 @@ Tests the `computeJobFit()` pure function (job-anchored matching engine):
 - `isEligible` flag reflects AND of applicable `met` fields
 - Per-criterion: field, experience-in-field, seniority, required/preferred skills, languages, education
 - Edge cases: missing parsed requirements, empty experience lists
+- **Golden skill-match corpus**: curated match/no-match pairs that lock in the technical synonym groups (e.g. `js`↔`javascript`, `k8s`↔`kubernetes`, `postgres`↔`postgresql`) and phrase aliases (e.g. "machine learning"→`ml`, "power bi"→`powerbi`) while keeping distinct products apart (AWS≠Azure, Java≠JavaScript)
+
+#### Job Matching Bridge Tests (25 tests)
+Tests the glue in `JobUseCases` that converts persisted database rows into the pure matcher's input — the layer that a real production bug had silently broken:
+
+- `parseLooseDate`: ISO, `YYYY-MM`, year-only, and unparseable inputs
+- `experienceDurationYears`: duration arithmetic across date formats and open-ended (current) roles
+- `buildCandidateFitInput`: maps experiences/languages/education/skills into the matcher shape, including an explicit regression case asserting `jobTitle` is carried into `evidenceTexts` (the field that was previously read as `title` and always empty)
+- `buildManualRequirements`: requirement assembly from job fields when no parsed JD is available
 
 #### Job Requirements Schema Tests (9 tests)
 Tests the `JDRequirementsSchema` Zod schema used to validate LLM output from the JD parser:
@@ -235,6 +245,7 @@ The test suite follows the application's **Onion Architecture** boundary:
 │  │  ✅ CV validation schemas (DTOs)                 │    │
 │  │  ✅ Job requirements schema (DTOs)               │    │
 │  │  ✅ CV fields-of-work schema (DTOs)              │    │
+│  │  ✅ Job-matching bridge (row → matcher input)    │    │
 │  │  ✅ Job shortlist use cases                      │    │
 │  └──────────────────────────────────────────────────┘    │
 │  ┌──────────────────────────────────────────────────┐    │
@@ -306,6 +317,7 @@ Each test file is **self-contained** — no shared test utilities, no global fix
 | CV upload pipeline | **High** | Most complex feature; multi-step orchestration with retry logic |
 | Scoring algorithms | **High** | Core business logic; deterministic, pure functions |
 | Job-fit matching engine | **High** | Core business logic; 7 criteria, pure function |
+| Job-matching bridge | **High** | Row→matcher glue; locked after a production `jobTitle` defect |
 | Schema validation (CV, JD, fields-of-work) | **High** | Data integrity at LLM → application boundaries |
 | Analytics catalog constraints | **High** | Security-sensitive; prevents malformed/injected specs |
 | Middleware auth gating | **High** | 401/403 enforcement across all route groups |

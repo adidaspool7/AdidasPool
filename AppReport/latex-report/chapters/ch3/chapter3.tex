@@ -1,72 +1,298 @@
 \chapter{Analysis and Methodology}
 \label{cap:analysis}
 
-% TARGET LENGTH: ~10 pages.
-% Sources: AppReport/01_Project_Overview.md, 02_Requirements_Analysis.md,
-% client-pain-points/TalentPool-client_pain_points.md, ata-de-reuniao.
+This chapter turns the problem stated in Chapter~\ref{cap:introduction} into
+an analysed, prioritised body of work. It first characterises the
+stakeholders and the two personas the platform serves, then revisits the
+client pain points and the instrument used to validate them, derives the
+functional and non-functional requirements that follow from those pains,
+and finally describes the project-management method --- an adaptation of
+Scrum to a two-person team in which the author acted as Product Owner.
+
+%----------------------------------------------------------------------------------------
 
 \section{Stakeholders and Personas}
 \label{sec:analysis-stakeholders}
 
-% HR persona ("Carla"): recruiter at adidas GBS, owns ~20 open roles,
-% screens ~200 CVs/week.
-% Candidate persona ("Tiago"): jobseeker, applies via the public portal.
-% Internal stakeholders: client (adidas GBS HR), supervisor (Prof. Nuno
-% Escudeiro), team.
+Four groups of stakeholders shaped the work. The \textbf{client} --- the HR
+and Talent Acquisition team at adidas GBS Porto --- supplied the problem,
+validated the pain points, and acted as acceptance tester through recurring
+review sessions. The \textbf{end users} fall into two roles that the
+application treats as first-class personas. The \textbf{academic
+supervisor}, Prof.\ Nuno Escudeiro, provided methodological guidance and
+assessed the work in its academic context. The \textbf{development team} of
+two (Section~\ref{sec:team}) carried both engineering and, in the author's
+case, product ownership.
+
+Two personas were used to keep design decisions grounded:
+
+\begin{description}
+	\item[Carla, the recruiter (HR persona).] An HR specialist at adidas
+	GBS Porto who simultaneously owns a number of open roles and triages a
+	high weekly volume of CVs. She needs to find, compare and contact
+	candidates quickly, to know whether someone has applied before, and to
+	justify shortlisting decisions to colleagues. She is the primary user
+	of the HR dashboard, the matching screens, the notification tools and
+	the analytics.
+
+	\item[Tiago, the candidate (candidate persona).] A multilingual
+	jobseeker who applies through the public portal, uploads his own CV,
+	completes language or skill assessments when invited, and wishes to be
+	kept informed of status changes rather than disappearing into a black
+	hole. He is the primary user of the candidate self-service portal.
+\end{description}
+
+The two personas justify the role-based split that runs through the whole
+system: the same application exposes different navigation, permissions and
+screens depending on whether the authenticated user holds the HR or the
+candidate role.
+
+%----------------------------------------------------------------------------------------
 
 \section{Pain Points and Survey Validation}
 \label{sec:analysis-pains}
 
-% Reproduce table of pain points (see Chapter 1) with deeper discussion.
-% Insert survey questions table from TalentPool-client_pain_points.md.
-% Discuss recommended shortlist (Q5, Q3, Q9, Q2).
+The nine pain points introduced in Table~\ref{tab:pain-points-overview} were
+not assumed; they were elicited in discovery sessions, written up in a
+client-facing document, and then validated through a survey distributed to
+adidas GBS Porto employees and HR stakeholders. The survey was designed so
+that \emph{each pain point maps to exactly one question}, which makes the
+later validation in Chapter~\ref{cap:validation} traceable: a question that
+scores well is direct evidence that the corresponding pain is real and that
+the feature built to address it is wanted. Table~\ref{tab:survey-mapping}
+shows the mapping for the questions most relevant to the platform's core.
+
+\begin{table}[h]
+\centering
+\caption[Survey questions mapped to pain points and features]{Representative
+survey questions, each mapped to a pain point and to the feature it
+validates.}
+\label{tab:survey-mapping}
+\small
+\begin{tabular}{p{0.30\linewidth}p{0.30\linewidth}p{0.30\linewidth}}
+\toprule
+\textbf{Survey question (theme)} & \textbf{Pain point} & \textbf{Feature validated} \\
+\midrule
+Hours/week spent reviewing CVs manually & \#5 manual CV extraction & AI CV parsing + job-fit scoring \\
+Confidence in verifying language proficiency before interview & \#3 no first-pass screening & CEFR language assessment \\
+Frequency of inconsistent candidate scoring across the team & \#7 no data-driven focus & Structured scoring + templates \\
+Ease of retrieving full interaction history for a candidate & \#4 no structured contact channel & Interaction-history panel \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On the basis of discovery, four pain points were treated as the priority
+core for the first releases: manual CV extraction (\#5), the absence of a
+first-pass language and skill screen (\#3), keeping promising-but-rejected
+candidates engaged (\#9), and recognising repeat applicants under the GDPR
+retention rule (\#2). These four drove the ordering of the product backlog
+(Section~\ref{sec:analysis-pm}). The full survey instrument and its raw
+responses are reproduced in Appendix~\ref{app:survey}, and the analysis of
+the results is presented as part of validation in
+Section~\ref{sec:val-survey}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Functional Requirements}
 \label{sec:analysis-fr}
 
-% Itemised list (RF1..RFn). Suggested groupings:
-% - RF Talent Pool (CRUD, search, filters, tags, notes)
-% - RF CV Parsing (upload, parse, edit overrides, re-parse)
-% - RF Jobs (CRUD, JD parsing, matching, shortlist)
-% - RF Assessment (interview session, results, improvement track)
-% - RF Notifications & Campaigns
-% - RF Analytics (built-in + custom widgets)
-% - RF Auth & Roles (HR vs Candidate)
+The functional requirements were captured from the client brief and refined
+across sprints; several emerged only once the platform was in real use.
+Table~\ref{tab:functional-requirements} lists them grouped by the module
+that satisfies them, together with a MoSCoW priority and the delivery
+status at submission. The grouping mirrors the architecture of
+Chapter~\ref{cap:design}, so that each requirement family corresponds to a
+coherent slice of the system.
+
+\begin{table}[h]
+\centering
+\caption[Functional requirements]{Functional requirements grouped by module,
+with MoSCoW priority and delivery status.}
+\label{tab:functional-requirements}
+\small
+\begin{tabular}{p{0.07\linewidth}p{0.58\linewidth}p{0.13\linewidth}p{0.10\linewidth}}
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Priority} & \textbf{Status} \\
+\midrule
+\multicolumn{4}{l}{\textit{Talent Pool}} \\
+FR-02 & Persistent, searchable talent pool across campaigns & Must & Done \\
+FR-07 & Deduplication of candidate records & Must & Done \\
+FR-08 & CSV export of candidate data & Should & Done \\
+\midrule
+\multicolumn{4}{l}{\textit{CV Parsing}} \\
+FR-01 & Bulk CV upload with automated structured parsing & Must & Done \\
+\midrule
+\multicolumn{4}{l}{\textit{Jobs and Matching}} \\
+FR-04 & Job configuration with language/experience requirements & Must & Done \\
+FR-05 & Automated candidate-to-job matching engine & Must & Done \\
+FR-03 & Deterministic, explainable candidate scoring & Must & Done \\
+FR-10 & Borderline candidate identification & Should & Done \\
+\midrule
+\multicolumn{4}{l}{\textit{Assessment}} \\
+FR-06 & CEFR-based language assessment & Must & Done \\
+FR-16 & Per-skill verification & Emerged & Done \\
+FR-11 & Improvement tracks for borderline candidates & Could & Partial \\
+\midrule
+\multicolumn{4}{l}{\textit{Notifications and Campaigns}} \\
+FR-09 & HR notification system for pipeline events & Should & Done \\
+\midrule
+\multicolumn{4}{l}{\textit{Analytics}} \\
+FR-12 & Analytics dashboard with recruitment metrics & Could & Done \\
+\midrule
+\multicolumn{4}{l}{\textit{Auth and Roles}} \\
+FR-17 & Authentication and role-based access control & Emerged & Done \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A small number of requirements were deliberately deferred: bias-detection
+(FR-13) and internal-mobility matching (FR-14) were scoped out of the first
+version, and a PDF export (part of FR-08) and the full improvement-track
+workflow (FR-11) remain partial. These choices, and the reasoning behind
+them, are revisited in the limitations of Chapter~\ref{cap:conclusions}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Non-Functional Requirements}
 \label{sec:analysis-nfr}
 
-% Performance budgets, security (GDPR alignment, RLS rationale,
-% service-role boundaries), reliability (CI gating), maintainability
-% (onion architecture, type safety), accessibility (WCAG considerations
-% for the candidate portal), portability (browser support for STT/TTS).
+Beyond what the system does, several quality attributes constrained how it
+had to be built:
+
+\begin{description}
+	\item[Transparency.] All scoring and matching must be explainable.
+	Decisions are produced by deterministic formulas with per-component
+	breakdowns rather than opaque models, and the system only ranks ---
+	it never auto-rejects a candidate without human review.
+	\item[Security and compliance.] The platform handles personal data
+	under \gls{gdpr}. Access control is enforced server-side; the data
+	model is deletion-aware to support the six-month retention rule; and
+	authorisation for HR-only operations is gated in middleware rather
+	than in the client.
+	\item[Reliability.] Correctness is protected by continuous integration
+	that type-checks and runs the full test suite on every change
+	(Chapter~\ref{cap:validation}).
+	\item[Maintainability.] The codebase follows an onion architecture
+	with a strict dependency rule and end-to-end type safety, so that a
+	two-person team can keep changing it safely.
+	\item[Cost and portability.] The system must run on free service
+	tiers (Groq as the primary \gls{llm} with an OpenAI fallback, Supabase
+	for database, authentication and storage) and deploy to a serverless
+	host. The only hard portability limit is the browser-native
+	speech recognition and synthesis used in assessments, which is
+	available on Chromium-based browsers.
+\end{description}
+
+%----------------------------------------------------------------------------------------
 
 \section{Project Management}
 \label{sec:analysis-pm}
 
+The project was managed with an adaptation of Scrum to the realities of a
+two-person academic team working over the February--June~2026 internship.
+Acting as Product Owner, the author owned the product vision, the backlog
+and its prioritisation, and the relationship with the client; both members
+acted as developers. This section describes how the framework was adapted
+and how the backlog was ordered.
+
 \subsection{Scrum Adaptation for a Two-Person Team}
-% Roles: PO (author), Dev (both members). No dedicated Scrum Master ---
-% facilitation rotated. Cadence: 2-week sprints. Ceremonies: planning,
-% review, retro. Tools: GitHub Issues + Project board.
+\label{sec:method-scrum}
+
+A by-the-book Scrum team assigns three distinct accountabilities --- Product
+Owner, Scrum Master and Developers --- which does not fit two people. The
+adaptation kept the parts that add value at this scale and dropped the
+ceremony that does not:
+
+\begin{itemize}
+	\item \textbf{Roles.} The author held the Product Owner
+	accountability: gathering requirements from the client, maintaining the
+	backlog, deciding priority, and accepting or rejecting completed work.
+	Both members were Developers. No dedicated Scrum Master was appointed;
+	facilitation of the ceremonies was rotated and kept lightweight.
+	\item \textbf{Cadence.} Work was organised in short iterations aligned
+	with the academic calendar, each delivering a demonstrable increment
+	of the deployed application.
+	\item \textbf{Ceremonies.} Sprint \emph{planning} selected backlog
+	items for the iteration; an informal \emph{daily} sync kept the two
+	developers aligned; the sprint \emph{review} was, in practice, merged
+	with the client acceptance sessions (Section~\ref{sec:val-manual}), so
+	that the people who reported the pain points also signed off the
+	increments that addressed them; and a brief \emph{retrospective}
+	adjusted the process.
+	\item \textbf{Tooling.} The product increment was always the live
+	Vercel deployment. Source control on GitHub, a conventional-commit
+	history (\texttt{feat}, \texttt{fix}, \texttt{docs}, \texttt{refactor})
+	and continuous integration gave each increment an auditable trail, and
+	the meeting minutes (Appendix~\ref{app:survey}) record the ceremonies.
+\end{itemize}
+
+The clearest benefit of the adaptation was the fusion of sprint review with
+client acceptance: because the client validated each increment directly
+against the originating pain point, the feedback loop that Scrum prescribes
+was both real and short. The clearest tension --- one person holding both
+the Product Owner and lead-developer roles --- is examined as a lesson in
+Chapter~\ref{cap:conclusions}.
 
 \subsection{Product Backlog and Prioritisation}
-% Discuss MoSCoW prioritisation, dependency mapping between modules.
-% Show backlog snapshot (figure / appendix).
+\label{sec:method-backlog}
+
+The backlog was kept deliberately client-driven: every item traced back to a
+pain point, and priority was assigned with \textbf{MoSCoW}
+(Must / Should / Could / Won't) as shown in
+Table~\ref{tab:functional-requirements}. The \emph{Must} items formed the
+core that had to ship for the platform to be useful at all --- the talent
+pool, CV parsing, job-anchored matching and the CEFR assessment --- and they
+map onto the four priority pain points (\#5, \#3, \#9, \#2) identified in
+Section~\ref{sec:analysis-pains}.
+
+Ordering was also constrained by dependencies between modules rather than by
+priority alone. The talent pool and the candidate data model had to exist
+before CV parsing could populate them; CV parsing had to produce
+field-of-work tags before job-anchored matching could consume them; and
+matching had to exist before shortlisting and analytics could build on its
+output. The backlog therefore advanced in dependency order within each
+priority band, which is why some \emph{Should} and \emph{Could} items (for
+example analytics) were delivered only once their \emph{Must} prerequisites
+were in place. Requirements that emerged during development --- notably
+authentication and role-based access control (FR-17) and per-skill
+verification (FR-16) --- were folded into the backlog and re-prioritised in
+the same way rather than handled out of band.
 
 \subsection{Module Boundary with the AI Interviewer}
-% Explain the contract between the Next.js core and the Python FastAPI
-% sidecar. Why this boundary made the team-of-two division of labour
-% workable.
+\label{sec:method-boundary}
 
-\subsection{Risks, Issues and Decision Log}
-% Top risks mitigated: LLM provider outage (Groq -> OpenAI fallback),
-% GDPR misalignment, scope creep, integration drift between core and
-% sidecar.
+The single most important organisational decision was where to draw the line
+between the two developers. The conversational AI Interviewer was carved out
+as a separate Python \textit{FastAPI} service with a narrow, explicit
+contract to the Next.js core: the core creates a session and issues a
+short-lived HMAC-signed token, the sidecar runs the interview and returns a
+structured evaluation, and the core persists the result. Because the
+interface was small and well defined, the two members could work in parallel
+with minimal coordination, and the sidecar could be developed, deployed and
+tested independently. This clean seam is also what made the onion
+architecture pay off in practice (Chapter~\ref{cap:conclusions}).
 
-\subsection{Sprint-by-Sprint Summary}
-% Compact table: sprint goal, key deliverables, demo notes, retro deltas.
+\subsection{Risks and Decision Log}
+\label{sec:method-risks}
 
-\section{Conclusion of the Analysis}
+The main risks were tracked and mitigated rather than left implicit. The
+dependence on a hosted \gls{llm} was mitigated by a provider fallback (Groq
+as primary, OpenAI as secondary) so that a single outage could not stop CV
+parsing. The risk of \gls{gdpr} misalignment was mitigated by a
+deletion-aware data model and by storing only the inferences actually
+needed. The risk of \textbf{scope creep} --- amplified by the same person
+holding the Product Owner and lead-developer roles --- was contained by the
+MoSCoW discipline and by deferring whole feature families (bias detection,
+internal mobility) explicitly rather than silently. Finally, the risk of
+integration drift between core and sidecar was contained by the small, typed
+token contract described above.
+
+%----------------------------------------------------------------------------------------
+
+\section{Conclusion}
 \label{sec:analysis-conclusion}
 
-% Bridge to the design chapter.
+The analysis produced a prioritised, traceable set of requirements anchored
+in validated client pain points, together with the quality attributes that
+constrain the solution and the Scrum-based method used to deliver it. The
+next chapter translates these requirements into a concrete software design.
