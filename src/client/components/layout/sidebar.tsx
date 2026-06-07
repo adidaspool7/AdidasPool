@@ -51,7 +51,7 @@ const candidateNavigationSections: NavSection[] = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { name: "Profile Settings", href: "/dashboard/settings", icon: Settings },
-      { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
+      { name: "Messages & Notifications", href: "/dashboard/notifications", icon: Bell },
       { name: "Documents Upload", href: "/dashboard/upload", icon: Upload },
     ],
   },
@@ -75,7 +75,7 @@ const hrNavigationSections: NavSection[] = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { name: "Profile Settings", href: "/dashboard/settings", icon: Settings },
-      { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
+      { name: "Messages & Notifications", href: "/dashboard/notifications", icon: Bell },
     ],
   },
   {
