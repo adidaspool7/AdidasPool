@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, Briefcase, BarChart3, UserCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,17 @@ import { CookieConsent } from "@client/components/ui/cookie-consent";
 export default function HomePage() {
   const [loading, setLoading] = useState<"candidate" | "hr" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // When the user navigates to the Google OAuth page and then presses the
+  // browser Back button, this page is restored from the back-forward cache
+  // (bfcache) with the previous React state — leaving `loading` set and both
+  // role buttons disabled until a manual refresh. Reset it on pageshow so the
+  // buttons become clickable again.
+  useEffect(() => {
+    const handlePageShow = () => setLoading(null);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const handleSignIn = async (role: "candidate" | "hr") => {
     setLoading(role);
