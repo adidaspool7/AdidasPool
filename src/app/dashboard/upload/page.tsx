@@ -558,8 +558,8 @@ export default function UploadPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Button variant="ghost" size="sm" className="mb-2" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        <Button variant="ghost" size="sm" className="mb-2" onClick={() => router.push("/dashboard")}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
         </Button>
         <h1 className="text-3xl font-bold tracking-tight">Documents Upload</h1>
         <p className="text-muted-foreground">
