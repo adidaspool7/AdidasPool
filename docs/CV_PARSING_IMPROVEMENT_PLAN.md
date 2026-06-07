@@ -1,9 +1,16 @@
 # CV Parsing Improvement Plan
 
 > **Status**: Proposal — awaiting approval before implementation
-> **Scope**: Candidate single-upload, HR single-upload, and HR bulk upload flows
+> **Scope**: Candidate single-upload, HR single-upload, HR bulk upload, **JD parsing, and job-anchored matching/fit**
 > **Owner**: Fernando
-> **Last updated**: 2026-04-30
+> **Last updated**: 2026-06-07
+>
+> **2026-06-07 revision**: The plan now spans the *entire* accuracy-critical
+> chain — not just CV ingestion. Because matching quality is only ever as good
+> as (a) the structured CV data, (b) the structured JD data, and (c) the fit
+> algorithm that compares them, this revision adds two new risk sections
+> (§1.6 JD parsing, §1.7 job matching/fit) and a new recommendation block
+> (Sprint 5). Findings were verified against the live code on 2026-06-07.
 
 ---
 
@@ -52,6 +59,45 @@ See the companion document [GDPR_COMPLIANCE_PLAN.md](GDPR_COMPLIANCE_PLAN.md) �
 
 - No fixture-based integration test that runs the full pipeline (ZIP → extract → LLM → Zod → DB). Current 101 tests mock the LLM.
 - No CV corpus (scanned, multi-column, non-Latin, tables-heavy) committed under `tests/fixtures/`.
+- **No golden matching corpus.** `tests/job-fit.test.ts` unit-tests the pure function with synthetic inputs, but there is no end-to-end fixture that pins *(real JD text → parsed requirements → candidate → expected eligibility/score)*. A prompt tweak can silently shift rankings with no test to catch it.
+
+---
+
+### 1.6 JD Parsing Risks (F)
+
+> The matcher is **job-anchored**: every Fit score is `computeJobFit(job, candidate)`.
+> If the JD is parsed wrong, *every* candidate is ranked against the wrong target.
+> JD parsing is therefore exactly as accuracy-critical as CV parsing, yet it was
+> out of the original plan's scope.
+> Files: `src/server/infrastructure/ai/job-requirements-extractor.service.ts`,
+> `src/server/domain/services/job-requirements.schema.ts` (`JOB_REQUIREMENTS_SCHEMA_VERSION = 2`).
+
+| # | Issue | Impact |
+|---|---|---|
+| F1 | **Lazy-parse has no concurrency lock.** `JobUseCases.matchCandidatesToJob()` lazy-parses the JD on first HR open. Two HR users (or a double-click) hitting "Rank candidates" for the same un-parsed job both call the LLM extractor. Writes are idempotent, but it burns duplicate LLM quota and can briefly persist two different parses (LLM is non-deterministic at the same temperature). | Wasted tokens; transient ranking flip-flop between the two parses. |
+| F2 | **Boilerplate stripping is position-based, not phrase-based.** The pre-LLM regex cuts everything after an EEO/agency marker once the block exceeds ~200 chars. A genuine requirement that happens to sit *after* an "At adidas we believe…" sentence is discarded before the LLM ever sees it. | Silent loss of real requirements → under-specified JD → everyone looks "eligible". |
+| F3 | **12k-char input truncation.** Long JDs (or scraped pages with nav/footer noise) are cut at 12,000 chars. Requirements near the end of a verbose posting are dropped. | Missing required skills/education → false-positive matches. |
+| F4 | **Title-based seniority inference is ambiguous & non-deterministic.** When the JD body is silent, seniority is inferred from the title. "Senior Manager" can map to `SENIOR` or `DIRECTOR` across runs; "Junior Analyst" vs "Analyst Junior" can parse differently. | Seniority criterion mis-scores; re-parse changes rankings. |
+| F5 | **Local-language suppression depends on the LLM knowing the posting's country.** The prompt says "don't list the local language as a requirement", but the LLM must *infer* the country. A Portugal posting that should not require Portuguese may still list it (or vice-versa). | Language criterion penalises locals or ignores a real requirement. |
+| F6 | **Manual jobs synthesise requirements by exact canonical match.** `buildManualRequirements()` maps the HR-typed department/field to the canonical 16 via exact (normalised) match. "Designer" or "Design dept" won't resolve to the `Design` field; the field criterion then silently becomes non-applicable. | Manually-created jobs match on fewer criteria → weaker, noisier rankings. |
+| F7 | **No JD-text cache.** Caching is keyed on `(job row, schema version)`. Two jobs that paste the *same* JD, or a re-scrape with identical text, each re-run the LLM. | Avoidable cost; not a correctness bug. |
+
+### 1.7 Job Matching / Fit Risks (G)
+
+> File: `src/server/domain/services/job-fit.service.ts` (pure function),
+> orchestrated by `JobUseCases.matchCandidatesToJob()`.
+
+| # | Issue | Impact |
+|---|---|---|
+| G1 | **Skill synonym table is 9 groups and almost entirely *soft skills*** (office suite, leadership, coaching, training, analytical, communication, problem-solving, motivation, appraisal). There is **no technical-skill equivalence** — `python` ≠ `programming`, `js` ≠ `javascript`, `sql` ≠ `database`, `tableau`/`power bi` ≠ `bi tools`, `k8s` ≠ `kubernetes`. Matching falls back to token-subset/Jaccard ≥ 0.5, which misses most technical equivalences. | **Largest matching-accuracy gap for technical/Data/Technology roles.** Qualified engineers score low on Required Skills and drop out of the shortlist. |
+| G2 | **Skills are stored verbatim at parse time — no canonicalisation.** The CV parser extracts skills "as-is" (no normalisation), so the *entire* burden of reconciling "MS Excel" vs "excel" vs "Microsoft Office" lands on the fit function's tokenizer. | Inconsistent skill matching; the same candidate matches or misses depending on CV phrasing. |
+| G3 | **Skill evidence is job titles only.** `buildCandidateFitInput()` feeds candidate `skills[].name` + experience *titles* as evidence (company names excluded as noisy). A skill mentioned only in an experience's responsibility text — never promoted into `skills[]` — is invisible to the matcher. | Real, demonstrated skills don't count; under-scoring. |
+| G4 | **Experience double-counting on the fallback path.** `computeJobFit` avoids double-counting *only* when `rawExperiences` is supplied. The orchestrator does supply it, but any other caller (or a future one) using the per-field `experienceByField` map will count one experience tagged with 2 required fields as 2× the years. | Inflated experience score if the input contract is not honoured. |
+| G5 | **Seniority inferred from years alone.** When a candidate's seniority isn't pre-computed it's bucketed purely by `estimatedTotalYears` (<1 INTERN … ≥15 DIRECTOR), ignoring titles. A 15-year part-time individual contributor is mis-labelled `DIRECTOR`; a fast-tracked manager with 5 years is capped at `MID`. | Seniority criterion mis-scores both directions. |
+| G6 | **Language criterion is all-or-nothing.** If a JD requires English B2 + Spanish B1 and the candidate has only English C2, the *entire* language criterion is `met = false` — no partial credit for the language they do exceed. | Strong-but-imperfect language profiles are penalised harshly. |
+| G7 | **`requiredSkillThreshold = 0.5` semantics are invisible in the UI.** "Met" means "covers ≥ 50% of required skills", but HR sees a green/eligible flag with no indication that half the musts were missing. | HR over-trusts eligibility; borderline candidates look fully qualified. |
+| G8 | **Candidate prefilter is loose and unpaginated.** `findForMatching({ fieldsOfWork })` loads every candidate with ≥1 matching field; a broad field like `Retail` can load thousands into memory, and only the **top 100** are persisted to `job_matches`. | Memory pressure on big pools; candidates ranked 101+ are invisible without a re-run. |
+| G9 | **Silent `fieldsOfWork` drop feeds the field criterion.** (Cross-ref A-series.) When the CV parser's tolerant Zod preprocess drops an LLM-invented field, the candidate loses field-criterion credit with no flag — and the field criterion is weight-2. | Under-tagged experiences quietly lower Fit; no audit trail. |
 
 ---
 
@@ -98,6 +144,27 @@ Ranked by ROI. Items are tagged **[CORE]** (must-do), **[HARD]** (recommended), 
 | R18 | **End-to-end integration test** that runs the pipeline with a real (stubbed) LLM returning canned responses. | CORE |
 | R19 | **Observability**: log token usage, latency, retry counts, OCR-hit rate per CV into `parsing_jobs`. Surface a `/dashboard/admin/parsing-metrics` page. | HARD |
 | R20 | **Per-CV rate limit**: max 20 CVs/user/hour on self-upload. | HARD |
+
+### Sprint 5 — JD Parsing & Matching Accuracy (NEW — 2026-06-07)
+
+> This sprint exists because matching is only as good as the JD parse and the
+> fit algorithm. The CV-side sprints (1–4) raise *input* quality; this sprint
+> raises *comparison* quality. R22 is the single highest-ROI item for technical
+> roles.
+
+| # | Recommendation | Tag | Tech |
+|---|---|---|---|
+| R21 | **Normalise & validate dates at parse time.** Coerce all experience/education dates to ISO `YYYY-MM` (resolve "present"/"current" → today), reject/flag unparseable values, and **compute durations server-side** instead of trusting the LLM's `estimatedTotalYears`. Experience-in-field years drive criteria 1, 2 and seniority — they must be deterministic. | CORE | Schema preprocess + small date util; no new dep |
+| R22 | **Skill normalisation + expanded equivalence.** (1) Add a canonical-skill dictionary applied at *both* CV-parse time and match time. (2) Expand `SKILL_SYNONYM_GROUPS` to cover technical families (`programming`/python/java/js/typescript/go…, `database`/sql/postgres/mysql…, `bi`/tableau/powerbi/looker…, `cloud`/aws/azure/gcp…, `devops`/docker/kubernetes/k8s/ci-cd…). (3) Optional second pass: embeddings (pgvector) cosine ≥ 0.8 as a fallback before declaring "no match". | CORE | Dictionary file; optional `pgvector` + embeddings model |
+| R23 | **Concurrency-safe lazy JD parse.** Guard `getOrParseRequirements()` with a Postgres advisory lock (or a `parsed_requirements_status` column: `pending`/`ready`) so only one request parses; others wait/return cached. | CORE | Postgres advisory lock; no new dep |
+| R24 | **Surface dropped/low-confidence fields instead of silently dropping.** When the CV parser drops an invented `fieldOfWork`, or the JD parser returns null for a must-have numeric, record it on a `needs_review` flag + a per-field note so HR can correct it. | HARD | Schema edit; reuses Sprint-1 R4 triage queue |
+| R25 | **Partial-credit language matching + explicit threshold UI.** Score languages as the *average* per-language CEFR match (not all-or-nothing), keep eligibility strict only when HR opts in, and render the required-skill coverage % ("4/7 musts") next to the eligibility badge so `requiredSkillThreshold` is visible. | HARD | `job-fit.service.ts` + match-candidates UI |
+| R26 | **Title-aware seniority.** Blend an explicit title regex map (intern/junior/senior/lead/head/principal/director) with the years-based bucket instead of years alone — on both the JD side (F4) and candidate side (G5). | HARD | `job-fit.service.ts` + extractor prompt |
+| R27 | **Fuzzy manual-job requirement synthesis.** Map HR-typed department/field text to the canonical 16 with the same tokenizer/synonym logic as skills (so "Designer"/"Design dept" → `Design`) instead of exact match. | HARD | `buildManualRequirements()` |
+| R28 | **Safer JD boilerplate handling + smarter truncation.** Strip EEO/agency blocks by a *phrase allowlist* (only known boilerplate sentences), not by position; and chunk or raise the 12k-char cap so long JDs aren't truncated mid-requirements. | HARD | extractor pre-processing |
+| R29 | **Mine skills from experience descriptions.** Promote skills the LLM finds in responsibility/bullet text into the candidate's matchable evidence (not just `skills[]` + titles), so demonstrated-but-unlisted skills count (G3). | NICE | CV parser prompt + `buildCandidateFitInput()` |
+| R30 | **Matching observability.** Persist a `match_runs` log per ranking (job id, candidates considered, eligible count, avg/median score, weights + threshold used, duration). Lets us tune weights with data and detect prompt regressions. | HARD | New table + use-case hook (mirror `jd_parsing_telemetry`) |
+| R31 | **Golden matching + JD-parse corpus.** Commit (a) 10–15 real multilingual JDs with expected parsed requirements, and (b) a handful of *(JD, candidate) → expected eligibility/score* pairs. Run them in CI so prompt/algorithm changes can't silently move rankings. | CORE | `tests/fixtures/jds/`, `tests/fixtures/matches/` |
 
 ---
 
@@ -190,9 +257,13 @@ Sprint 1 (quality)     → R1, R2, R3, R4, R5, R6, R7, R17, R18
 Sprint 2 (throughput)  → R8, R9, R10, R12, R20, R19
 Sprint 3 (HR tools)    → R13, R14, R15, R16
 Sprint 4 (queue R11)   → Only if bulk volume > 50 CVs/job regularly
+Sprint 5 (matching)    → R21, R22, R23, R31 first (correctness + tests),
+                         then R24, R25, R26, R27, R28, R30, R29
 ```
 
 Sprint 1 delivers the biggest perceived quality jump (OCR + no more "Unknown Unknown" + dedup correctness) without any new infra. Everything else builds on it.
+
+**Sprint 5 is independent of Sprints 2–4** and can run in parallel with Sprint 1. If matching quality is the immediate business pain (it is, per the project brief), prioritise **R21 (dates) + R22 (skill equivalence) + R23 (lazy-parse lock) + R31 (golden tests)** alongside Sprint 1 — together they remove the largest *silent* sources of wrong rankings.
 
 ---
 
@@ -203,6 +274,9 @@ Sprint 1 delivers the biggest perceived quality jump (OCR + no more "Unknown Unk
 3. For R11 queue, do we prefer Upstash QStash (recommended) or stay on `after()` until volume forces the issue?
 4. For R15 triage queue — who reviews? HR team, or is there a designated "data quality" role?
 5. Do we retain raw extracted text after parsing? (Interacts with GDPR — see companion doc.)
+6. For R22, is a heavier semantic layer (pgvector + an embeddings model for skill/field similarity) in budget, or do we stay with a hand-maintained synonym dictionary for now?
+7. Should eligibility default to *strict* (all musts met) or stay at the current lenient 50% required-skill threshold once it's surfaced clearly in the UI (R25)?
+8. Who curates the canonical skill dictionary (R22) and the golden matching corpus (R31) — the same owner as the Fields-of-Work taxonomy?
 
 ---
 
@@ -213,3 +287,17 @@ Sprint 1 delivers the biggest perceived quality jump (OCR + no more "Unknown Unk
 - **Duplicate candidate rate** (same person, different accent): unmeasured → < 1%.
 - **HR bulk-upload cancel reliability**: ~70% → 100%.
 - **Orphaned storage blobs/week**: unmeasured → 0.
+
+### 7.1 Matching Metrics (post-Sprint 5)
+
+- **Technical-skill match recall**: measure on the golden corpus (R31) the % of
+  truly-equivalent skills the matcher links (`python`↔`programming`, etc.).
+  Target: from an estimated ~40% (soft-skills-only synonyms today) → ≥ 90%.
+- **Experience-years accuracy**: |LLM `estimatedTotalYears` − server-computed
+  years| on the golden corpus → ≤ 0.5 yr after R21.
+- **JD-parse stability**: same JD parsed twice yields identical requirements
+  (deterministic post R23/R26) → 100% on the corpus.
+- **Eligibility precision/recall** against a human-labelled (JD, candidate)
+  set (R31): establish a baseline, then track regressions in CI.
+- **Duplicate LLM JD parses/day** (from R30 `match_runs` / telemetry): → 0
+  after R23.

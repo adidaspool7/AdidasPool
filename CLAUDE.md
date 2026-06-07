@@ -18,17 +18,17 @@
 
 ---
 
-## Current Tech Stack (as of 2026-05-08)
+## Current Tech Stack (as of 2026-06-06)
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16.1.6 — App Router, TypeScript, Turbopack on Vercel |
+| Framework | Next.js 16.2.6 — App Router, TypeScript, Turbopack on Vercel |
 | UI | shadcn/ui + Tailwind CSS 4 |
 | Auth | Supabase Auth — Google OAuth only |
 | Database | Supabase PostgreSQL (migrated from Neon/Prisma) |
 | ORM | **None** — raw Supabase JS client with manual `camelizeKeys`/`snakeifyKeys` |
 | Storage | Supabase Storage — bucket: `talent-pool` |
-| Supabase client libs | `@supabase/ssr ^0.5.2`, `@supabase/supabase-js ^2.49.4` |
+| Supabase client libs | `@supabase/ssr 0.5.2`, `@supabase/supabase-js 2.103.0` |
 | LLM (primary) | Groq — Llama 3.3 70B via OpenAI SDK (`GROQ_API_KEY`) |
 | LLM (fallback) | OpenAI GPT-4o (`OPENAI_API_KEY`) |
 | AI Interview backend | FastAPI (Python) at `INTERVIEW_BACKEND_URL` |
@@ -148,7 +148,7 @@ The "universal candidate match score" was deleted. Matching is now always
 1. **JD parsing** (`JobRequirementsExtractorService` → Groq, fallback OpenAI).
    Stored in `jobs.parsed_requirements` JSONB + `parsed_requirements_version`.
    Schema: [src/server/domain/services/job-requirements.schema.ts](src/server/domain/services/job-requirements.schema.ts).
-   `JOB_REQUIREMENTS_SCHEMA_VERSION = 1`. **Lazy** — parsed on first HR open of
+   `JOB_REQUIREMENTS_SCHEMA_VERSION = 2`. **Lazy** — parsed on first HR open of
    "Rank candidates", not bulk. Cache invalidated when `bulkUpsertByExternalId`
    detects a `source_url` change.
 2. **CV parsing** tags every experience with one or more canonical Fields of Work
