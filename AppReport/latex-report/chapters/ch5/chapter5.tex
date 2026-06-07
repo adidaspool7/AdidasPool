@@ -1,79 +1,310 @@
 \chapter{Implementation}
 \label{cap:implementation}
 
-% TARGET LENGTH: ~14 pages.
-% Sources: AppReport/03_Technology_Stack.md, 06_Features_Implementation.md,
-% 07_API_Documentation.md (selectively), 10_UI_UX_Design.md.
+This chapter describes how the design of Chapter~\ref{cap:design} was built.
+It states the technology stack and its rationale, the layout of the
+codebase, and then walks through the principal modules --- the talent pool,
+the CV parsing pipeline, jobs and matching, the AI interviewer integration,
+notifications, analytics, authentication and observability --- before
+covering the continuous-integration pipeline and a small set of
+representative code excerpts.
+
+%----------------------------------------------------------------------------------------
 
 \section{Technology Stack}
 \label{sec:impl-stack}
 
-% Table form. For each row: layer, choice, version, rationale. Mirror
-% CLAUDE.md but condense to ~12 lines.
+Every technology was weighed against five criteria: fitness for purpose,
+developer experience, type-safety integration with TypeScript, compatibility
+with Vercel's serverless runtime, and the ability to run on free or student
+tiers. The stack deliberately avoids heavyweight enterprise infrastructure
+(Kubernetes, message queues, microservices) in favour of a right-sized
+single application. Table~\ref{tab:tech-stack} summarises the choices.
+
+\begin{table}[h]
+\centering
+\caption[Technology stack]{Principal technologies and their roles.}
+\label{tab:tech-stack}
+\small
+\begin{tabular}{p{0.22\linewidth}p{0.34\linewidth}p{0.32\linewidth}}
+\toprule
+\textbf{Concern} & \textbf{Technology} & \textbf{Rationale} \\
+\midrule
+Framework & Next.js 16 (App Router), TypeScript & One codebase for UI and API; file-based routing; Vercel-native \\
+UI & shadcn/ui + Tailwind CSS & Accessible primitives without a heavy framework \\
+Authentication & Supabase Auth (Google OAuth) & Managed identity; role claim in the JWT \\
+Database & Supabase PostgreSQL (no ORM) & Relational domain; direct typed client \\
+Storage & Supabase Storage & Uploaded CV files \\
+LLM & Groq Llama 3.3 70B (primary), OpenAI GPT-4o (fallback) & Free-tier primary with a reliability fallback \\
+Validation & Zod & Runtime validation of all external/LLM input \\
+Email & Resend & Assessment invitations and outreach \\
+Charts & Recharts & Analytics dashboards \\
+Testing & Vitest + V8 coverage & Fast, ESM-native unit testing \\
+Interviewer & Python FastAPI (sidecar) & Separate process for conversational AI \\
+CI & GitHub Actions & Type-check + test on every change \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The single most consequential choice was using \textbf{one framework for
+both frontend and backend}, which removes a separate server, shared-type
+generation and CORS handling. The alternatives --- a separate React/Express
+backend, Angular/NestJS, Vue/Fastify or Remix --- were rejected as either
+duplicative or a poor fit for the component ecosystem and the deployment
+target.
+
+%----------------------------------------------------------------------------------------
 
 \section{Repository Layout}
 \label{sec:impl-layout}
 
-% Tree of src/ with one-line annotation per top-level folder.
+The repository is organised so that the onion layers are visible in the
+folder structure. Under \texttt{src/}:
+
+\begin{description}
+	\item[\texttt{server/domain/}] value objects, pure domain services
+	(scoring, job fit) and the port interfaces --- zero external
+	dependencies.
+	\item[\texttt{server/application/}] use cases (one file per module),
+	DTOs and the canonical application-error types.
+	\item[\texttt{server/infrastructure/}] Supabase repositories, the AI
+	parsing services, storage, email and logging --- the only code that
+	imports external SDKs.
+	\item[\texttt{app/}] Next.js App Router: pages and the API route
+	handlers under \texttt{app/api/}.
+	\item[\texttt{client/}] React components, including the shadcn/ui
+	primitives and the analytics widgets.
+	\item[\texttt{lib/}] cross-cutting helpers, including the Supabase
+	browser/server clients and the \texttt{require-hr} authorisation
+	helper.
+\end{description}
+
+Outside \texttt{src/}, \texttt{tests/} holds the Vitest suite,
+\texttt{supabase/migrations/} the canonical schema, and \texttt{scripts/}
+the operational backfill utilities.
+
+%----------------------------------------------------------------------------------------
 
 \section{Talent Pool Module}
 \label{sec:impl-pool}
 
-% Candidate CRUD, search, filters, tags, notes. Code snippet of one
-% representative use case.
+The talent pool is the system of record for candidates. It supports creation
+and editing of candidate records, full-text-style search and filtering (by
+status, country, score range, language and source type), sorting, tagging and
+free-text recruiter notes. A use case in the Application layer orchestrates
+each operation and delegates persistence to a candidate repository through
+its port, so the route handlers stay thin and the business rules stay
+testable. Search terms supplied by the user are escaped before they reach the
+PostgREST \texttt{.or()} filter (Section~\ref{sec:impl-code}), closing the
+injection vector found during the audit.
+
+%----------------------------------------------------------------------------------------
 
 \section{CV Parsing Pipeline}
 \label{sec:impl-cv}
 
-% Walkthrough of upload -> parse -> persist. Show prompt template
-% structure. Discuss failure modes (rate limits, schema drift).
+CV ingestion is the most complex feature and is implemented as a nine-stage
+pipeline with two entry points --- candidate self-upload (a single file) and
+HR bulk upload (many files or a ZIP archive). The stages are: (1) validate the
+file's MIME type and size; (2) store the original in Supabase Storage; (3)
+extract text (\texttt{unpdf} for PDF, \texttt{mammoth} for DOCX, direct
+decoding for plain text); (4) validate that enough text was recovered; (5)
+send the text to the LLM with a structured-output prompt; (6) validate the
+model's JSON against a strict Zod schema, retrying once on failure; (7) run
+deduplication against existing candidates; (8) upsert the candidate and its
+experiences, education, languages and skills; and (9) compute the CV score.
+
+The prompt instructs the model to return a single JSON object with personal
+information, experiences (each with a job title, company, dates, current-role
+flag and a field-of-work tag), education, self-declared language levels and
+categorised skills, using the provider's JSON mode. Two failure modes
+dominate and are handled explicitly: \textbf{schema drift}, where the model
+returns slightly malformed or invented fields --- absorbed by the tolerant
+Zod schema and the single retry --- and \textbf{provider rate limits or
+outages}, absorbed by retrying the same request against the OpenAI fallback.
+A telemetry row is written per extraction for observability. For bulk
+uploads, a \texttt{parsing\_jobs} row tracks parsed, failed and total counts
+so that HR can monitor progress by polling.
+
+%----------------------------------------------------------------------------------------
 
 \section{Jobs and Matching}
 \label{sec:impl-jobs}
 
-% Job CRUD, JD parsing, matchCandidatesToJob orchestrator,
-% match-candidates UI. Per-job shortlist (table job_shortlists).
+Jobs are created and edited by HR or ingested by a scraper that collects
+real listings from the adidas careers portal (used to populate a realistic
+demonstration dataset). When an HR user first opens a job's ranking screen,
+its description is parsed lazily into the versioned requirements schema and
+cached. The orchestrator \texttt{matchCandidatesToJob} then loads the
+candidate pool with their experiences, languages, education and skills,
+builds the per-field experience vector each candidate needs, runs the pure
+\texttt{computeJobFit} for every candidate, and persists the top results into
+the \texttt{job\_matches} cache. The \texttt{match-candidates} screen renders
+the ranking with the per-criterion breakdown, and a per-job
+\texttt{job\_shortlists} table records the recruiter's working pick list,
+snapshotting the fit score at the moment a candidate is added so that later
+re-ranking does not rewrite history.
+
+A subtle implementation point lives in the bridge that converts a persisted
+database row into the matcher's input type. An early version read the wrong
+property for the job title, which silently emptied the evidence text used for
+title-based seniority matching; the defect was invisible because the pure
+matcher itself was correct. It is now fixed and locked by the
+\texttt{job-matching-bridge} tests of Chapter~\ref{cap:validation}, and it is
+the concrete basis for the testing lesson in Chapter~\ref{cap:conclusions}.
+
+%----------------------------------------------------------------------------------------
 
 \section{AI Interviewer Integration}
 \label{sec:impl-interviewer}
 
-% From the Next.js side: session creation, token signing, popup window,
-% transcript turn API, evaluation save. Note: the sidecar internals are
-% the contribution of the second team member; this section documents
-% the integration surface.
+The conversational interviewer itself is the second team member's
+contribution; this section documents only the integration surface owned by
+the Next.js application. On the application side the flow is: an API route
+creates an \texttt{interview\_sessions} row and issues a short-lived
+HMAC-SHA256 token (storing only its hash); the browser opens an interview
+popup that streams audio and chat; transcript turns are recorded through a
+realtime turn endpoint; proctoring events are logged; and, on completion, the
+structured evaluation returned by the sidecar is saved as the assessment
+result. The selected skill (for the technical mode) is persisted on the
+session and enforced server-side so that questions cannot drift off the
+chosen topic. The token-signing utility resolves its secret at call time
+rather than at module load, so that a local build can complete without the
+deployment-only secret while still failing fast at request time in
+production.
+
+%----------------------------------------------------------------------------------------
 
 \section{Notifications and Campaigns}
 \label{sec:impl-notifications}
 
-% Notification types, interaction history panel, campaign scheduling.
+The notification system serves both roles. It records pipeline events
+(status changes, contact emails, promotional outreach) as typed
+notifications, each carrying a metadata payload and the HR sender where
+applicable. A per-candidate interaction-history panel reconstructs the full
+timeline --- status changes, emails (with expandable bodies) and campaign
+membership --- by joining notifications to their originating campaign or job.
+Promotional campaigns are authored in a rich-text editor and fan out to
+preference-aware recipients, respecting each candidate's field and country
+notification preferences so that irrelevant outreach is suppressed.
+
+%----------------------------------------------------------------------------------------
 
 \section{Analytics}
 \label{sec:impl-analytics}
 
-% Built-in 7 charts on /dashboard/analytics. Custom widget builder
-% (catalog + WidgetSpecSchema + chart-from-spec).
+The analytics dashboard combines seven built-in charts (pipeline funnel,
+status distribution, top skills and languages, trends and so on) with a
+constrained custom-widget builder. Rather than exposing free-form SQL, the
+builder is driven by a Zod-validated catalogue that whitelists the available
+metrics, the dimensions allowed per metric, the chart types allowed per
+dimension family, and the permitted filter keys; a strict widget-specification
+schema rejects any unknown key. A hand-written query service runs each
+validated specification, and a single universal renderer turns the resulting
+\texttt{\{label, value\}} series into a bar, line, area, pie or stat chart.
+Saved widgets are stored per user. This design gives HR analytical freedom
+while making it impossible to express an injected or malformed query
+(Chapter~\ref{cap:validation}).
+
+%----------------------------------------------------------------------------------------
 
 \section{Authentication, Roles and Middleware}
 \label{sec:impl-auth}
 
-% Supabase OAuth callback, role assignment, middleware.ts gating.
-% requireHr() helper.
+Authentication uses Supabase Google OAuth. On first sign-in, an auth callback
+route assigns the user's role into \texttt{app\_metadata.role} using the
+service-role key, making it immutable from the client. The Next.js middleware
+runs on every request: it refreshes the session, returns \texttt{401} for
+unauthenticated API callers, returns \texttt{403} for non-HR callers on the
+HR-only API prefixes, and protects the dashboard routes. Keeping this logic
+in one middleware --- rather than repeating it in every route handler --- means
+a new route is gated by default and the check cannot be forgotten. Inside
+route handlers that need it, a small \texttt{require-hr} helper performs the
+same role check with the revocation-aware \texttt{getUser()} call.
+
+%----------------------------------------------------------------------------------------
 
 \section{Logging and Observability}
 \label{sec:impl-observability}
 
-% createLogger(scope) usage; replacement of raw console.* in API
-% routes; Vercel logs.
+Structured logging is provided by an in-house \texttt{createLogger(scope)}
+factory that replaced raw \texttt{console} calls across the API routes. It
+emits scoped, structured records and redacts personally identifiable
+information --- e-mail addresses and tokens are masked --- so that logs
+shipped to the hosting platform do not leak candidate data, a property pinned
+by the redaction tests of Chapter~\ref{cap:validation}. The CV and
+job-description parsers additionally write per-call telemetry rows, giving a
+queryable view of provider reliability, latency and token cost.
 
-\section{CI/CD}
+%----------------------------------------------------------------------------------------
+
+\section{Continuous Integration and Deployment}
 \label{sec:impl-cicd}
 
-% GitHub Actions: tsc + vitest + coverage artefact. Vercel build
-% pipeline (Turbopack). .npmrc legacy-peer-deps rationale.
+Every change runs through GitHub Actions, which type-checks the codebase with
+\texttt{tsc -{}-noEmit} and executes the full Vitest suite with coverage,
+uploading the coverage report as an artefact. The canonical local validation
+mirrors the first step, since a full production build depends on
+deployment-only environment variables. Deployment is handled by Vercel, which
+builds with Turbopack and provisions a preview deployment per change, so the
+live deployment is always the demonstrable product increment referred to in
+Chapter~\ref{cap:analysis}. A repository policy (\texttt{legacy-peer-deps})
+keeps installs reproducible by pinning peers explicitly where they are only
+transitively required.
+
+%----------------------------------------------------------------------------------------
 
 \section{Selected Code Excerpts}
 \label{sec:impl-code}
 
-% Use lstlisting for: (a) computeJobFit signature + one criterion,
-% (b) one repo method, (c) the auth middleware, (d) one Vitest test.
-% Keep each excerpt under 25 lines.
+Three short excerpts illustrate the patterns described above. The first is
+the core of the matching engine: a pure function that scores only the
+applicable, weighted criteria and computes eligibility as their conjunction.
+
+\begin{lstlisting}[language=TypeScript,caption={The matching engine core (\texttt{computeJobFit}).},captionpos=b]
+export function computeJobFit(job, candidate, config = DEFAULT_FIT_CONFIG) {
+  const breakdown = [
+    matchField(job, candidate),    matchExperience(job, candidate),
+    matchSeniority(job, candidate), matchRequiredSkills(job, candidate, config),
+    matchPreferredSkills(job, candidate), matchLanguages(job, candidate),
+    matchEducation(job, candidate),
+  ];
+  const weights = config.criterionWeights ?? DEFAULT_CRITERION_WEIGHTS;
+  // Only applicable criteria with a positive weight contribute.
+  const contributing = breakdown.filter(
+    (c) => c.applicable && (weights[c.key] ?? 0) > 0);
+  const totalWeight = contributing.reduce((s, c) => s + (weights[c.key] ?? 0), 0);
+  const overallScore = totalWeight === 0 ? 0 : Math.round(
+    contributing.reduce((s, c) => s + c.score * (weights[c.key] ?? 0), 0)
+      / totalWeight);
+  const isEligible = contributing.every((c) => c.met);
+  return { overallScore, isEligible, breakdown };
+}
+\end{lstlisting}
+
+The second is the heart of the authorisation middleware: a single guard that
+gates every API route, returning \texttt{401} for unauthenticated callers and
+\texttt{403} for non-HR callers on the HR-only prefixes.
+
+\begin{lstlisting}[language=TypeScript,caption={Centralised API route gating in the middleware.},captionpos=b]
+const role = user?.app_metadata?.role as "hr" | "candidate" | undefined;
+if (pathname.startsWith("/api/")) {
+  const isPublic = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+  if (!isPublic) {
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const hrOnly = HR_ONLY_API_PREFIXES.some((p) => pathname.startsWith(p));
+    if (hrOnly && role !== "hr")
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+}
+\end{lstlisting}
+
+The third illustrates the data-integrity boundary: untrusted search input is
+escaped before it is interpolated into a PostgREST \texttt{.or()} filter, so
+special characters cannot alter the query.
+
+\begin{lstlisting}[language=TypeScript,caption={Escaping user input before a PostgREST filter.},captionpos=b]
+const term = escapeOrTerm(rawSearch);
+query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
+\end{lstlisting}

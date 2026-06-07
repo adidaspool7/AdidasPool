@@ -19,6 +19,36 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=newest}
 
+% --- Source code listings ---------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\definecolor{lstkeyword}{RGB}{0,0,180}
+\definecolor{lstcomment}{RGB}{100,100,100}
+\definecolor{lststring}{RGB}{0,128,0}
+\definecolor{lstback}{RGB}{248,248,248}
+\lstset{
+	basicstyle=\ttfamily\footnotesize,
+	keywordstyle=\color{lstkeyword}\bfseries,
+	commentstyle=\color{lstcomment}\itshape,
+	stringstyle=\color{lststring},
+	backgroundcolor=\color{lstback},
+	breaklines=true,
+	showstringspaces=false,
+	tabsize=2,
+	frame=single,
+	rulecolor=\color{lstcomment},
+	captionpos=b,
+	columns=fullflexible,
+}
+\lstdefinelanguage{TypeScript}{
+	keywords={const,let,var,function,return,if,else,for,filter,reduce,every,as,export,import,from},
+	morecomment=[l]{//},
+	morecomment=[s]{/*}{*/},
+	morestring=[b]",
+	morestring=[b]',
+	morestring=[b]`,
+}
+
 % --- Citation style (Harvard-like, recommended by the template) -------------
 \usepackage[style=authoryear-comp,backend=biber]{biblatex}
 \addbibresource{mainbibliography.bib}
