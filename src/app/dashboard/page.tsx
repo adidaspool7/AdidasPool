@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@client/components/ui/card";
+import { Skeleton } from "@client/components/ui/skeleton";
 import {
   Users,
   Briefcase,
@@ -25,6 +26,63 @@ import { Progress } from "@client/components/ui/progress";
 import { Badge } from "@client/components/ui/badge";
 import { toast } from "sonner";
 import Link from "next/link";
+
+// ─── Dashboard Skeleton ─────────────────────────────────────────
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Title */}
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-4 w-80" />
+      </div>
+
+      {/* 4 stat cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-4 rounded-full" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16 mb-1" />
+              <Skeleton className="h-3 w-24" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* 2 medium cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-5 w-36" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Activity card */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-md" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // ─── HR Dashboard ────────────────────────────────────────────────
 interface HrActivityItem {
@@ -64,25 +122,27 @@ function HRDashboard() {
   const stats = [
     {
       title: "Total Candidates",
-      value: loading ? "–" : overview.totalCandidates.toLocaleString(),
+      value: loading ? null : overview.totalCandidates.toLocaleString(),
       description: "In talent pool",
       icon: Users,
     },
     {
       title: "Open Positions",
-      value: loading ? "–" : overview.openPositions.toLocaleString(),
+      value: loading ? null : overview.openPositions.toLocaleString(),
       description: "Active job openings",
       icon: Briefcase,
     },
     {
       title: "Applications",
-      value: loading ? "–" : overview.totalApplications.toLocaleString(),
+      value: loading ? null : overview.totalApplications.toLocaleString(),
       description: "Total received",
+      icon: ClipboardCheck,
+    },
       icon: ClipboardCheck,
     },
     {
       title: "Watchlist",
-      value: loading ? "–" : overview.shortlisted.toLocaleString(),
+      value: loading ? null : overview.shortlisted.toLocaleString(),
       description: "Ready for interview",
       icon: TrendingUp,
     },
@@ -108,7 +168,9 @@ function HRDashboard() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">
+                {stat.value ?? <Skeleton className="h-8 w-16" />}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {stat.description}
               </p>
@@ -231,6 +293,7 @@ function CandidateDashboard() {
   const [mlUploading, setMlUploading] = useState(false);
   const mlInputRef = useRef<HTMLInputElement>(null);
   const [candidateId, setCandidateId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [appStats, setAppStats] = useState({
     total: 0,
     inProgress: 0,
@@ -271,7 +334,8 @@ function CandidateDashboard() {
             setAppStats({ total, inProgress, completed });
           });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const formatDate = (iso: string) =>
@@ -329,25 +393,25 @@ function CandidateDashboard() {
   const stats = [
     {
       title: "My Applications",
-      value: String(appStats.total),
+      value: loading ? null : String(appStats.total),
       description: "Submitted applications",
       icon: FileText,
     },
     {
       title: "Assessments",
-      value: "0",
+      value: loading ? null : "0",
       description: "Pending or completed",
       icon: ClipboardCheck,
     },
     {
       title: "In Progress",
-      value: String(appStats.inProgress),
+      value: loading ? null : String(appStats.inProgress),
       description: "Under review",
       icon: Clock,
     },
     {
       title: "Completed",
-      value: String(appStats.completed),
+      value: loading ? null : String(appStats.completed),
       description: "Finalized processes",
       icon: CheckCircle2,
     },
@@ -403,7 +467,9 @@ function CandidateDashboard() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">
+                {stat.value ?? <Skeleton className="h-8 w-16" />}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {stat.description}
               </p>
@@ -561,7 +627,11 @@ function CandidateDashboard() {
 // ─── Main Page ──────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { role } = useRole();
+  const { role, isLoading } = useRole();
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   if (role === "candidate") {
     return <CandidateDashboard />;
