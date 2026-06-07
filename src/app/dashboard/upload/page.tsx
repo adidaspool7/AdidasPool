@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Upload,
@@ -23,6 +24,7 @@ import {
   FileUp,
   FileSignature,
   Clock,
+  ArrowLeft,
 } from "lucide-react";
 
 import { Button } from "@client/components/ui/button";
@@ -142,6 +144,7 @@ const EUROPEAN_LANGUAGES = [
 
 export default function UploadPage() {
   const { role } = useRole();
+  const router = useRouter();
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -555,6 +558,9 @@ export default function UploadPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
+        <Button variant="ghost" size="sm" className="mb-2" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        </Button>
         <h1 className="text-3xl font-bold tracking-tight">Documents Upload</h1>
         <p className="text-muted-foreground">
           Upload your documents. Supported formats vary by document type.
