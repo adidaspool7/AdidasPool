@@ -558,9 +558,6 @@ export default function UploadPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Button variant="ghost" size="sm" className="mb-2" onClick={() => router.push("/dashboard")}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
-        </Button>
         <h1 className="text-3xl font-bold tracking-tight">Documents Upload</h1>
         <p className="text-muted-foreground">
           Upload your documents. Supported formats vary by document type.
@@ -785,6 +782,16 @@ export default function UploadPage() {
               ) : (
                 // ── Drop Zone ──
                 <div className="space-y-4">
+                  {/* Back to parsed CV if user came from Replace CV */}
+                  {result && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUploadState("success")}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" /> Back to Documents Upload
+                    </Button>
+                  )}
                   <div
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
