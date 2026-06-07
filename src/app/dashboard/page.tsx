@@ -138,8 +138,6 @@ function HRDashboard() {
       description: "Total received",
       icon: ClipboardCheck,
     },
-      icon: ClipboardCheck,
-    },
     {
       title: "Watchlist",
       value: loading ? null : overview.shortlisted.toLocaleString(),
