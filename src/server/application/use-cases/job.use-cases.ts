@@ -367,7 +367,7 @@ export class JobUseCases {
             // Manual job (no source URL): try synthesizing requirements
             // from whatever structured fields HR filled in on the form.
             const fullRow = await this.jobRepo.findById(job.id);
-            const manual = fullRow ? this.buildManualRequirements(fullRow) : null;
+            const manual = fullRow ? buildManualRequirements(fullRow) : null;
             if (manual) {
               await this.jobRepo.updateParsedRequirements(
                 job.id,
@@ -426,97 +426,6 @@ export class JobUseCases {
   }
 
   /**
-   * Synthesize a `JobRequirements` row directly from the structured fields
-   * an HR user filled in via the "Create New Job" form.
-   *
-   * Used for jobs that were created manually (no source_url, no scrape-derived
-   * description body) so that Job Matching still works without ever calling
-   * the LLM. Returns null when there isn't enough manual signal to be useful.
-   */
-  private buildManualRequirements(job: Record<string, unknown>): JobRequirements | null {
-    const dept: string | null =
-      typeof job.department === "string" ? job.department : null;
-    const skills: string[] = Array.isArray(job.requiredSkills)
-      ? (job.requiredSkills as unknown[]).filter(
-          (s): s is string => typeof s === "string" && s.trim().length > 0
-        )
-      : [];
-    const lang: string | null =
-      typeof job.requiredLanguage === "string" && job.requiredLanguage.trim()
-        ? job.requiredLanguage.trim()
-        : null;
-    const langLevel: string | null =
-      typeof job.requiredLanguageLevel === "string" &&
-      job.requiredLanguageLevel.trim()
-        ? job.requiredLanguageLevel.trim()
-        : null;
-    const eduLevel: string | null =
-      typeof job.requiredEducationLevel === "string" &&
-      job.requiredEducationLevel.trim()
-        ? job.requiredEducationLevel.trim()
-        : null;
-    const minYears: number | null =
-      typeof job.minYearsExperience === "number" ? job.minYearsExperience : null;
-    const description: string | null =
-      typeof job.description === "string" && job.description.trim()
-        ? job.description.trim()
-        : null;
-
-    // If absolutely no structured signal exists, give up — caller will throw.
-    const hasAnySignal =
-      skills.length > 0 ||
-      lang !== null ||
-      eduLevel !== null ||
-      minYears !== null ||
-      description !== null ||
-      dept !== null;
-    if (!hasAnySignal) return null;
-
-    // Match department against the canonical FIELDS_OF_WORK (case-insensitive,
-    // exact). Anything else is dropped — the matcher tolerates an empty array.
-    const fieldsOfWork: string[] = [];
-    if (dept) {
-      const lower = dept.toLowerCase();
-      const hit = FIELDS_OF_WORK.find((f) => f.toLowerCase() === lower);
-      if (hit) fieldsOfWork.push(hit);
-    }
-
-    const allowedCefr = new Set(["A1", "A2", "B1", "B2", "C1", "C2"]);
-    const allowedEdu = new Set([
-      "HIGH_SCHOOL",
-      "VOCATIONAL",
-      "BACHELOR",
-      "MASTER",
-      "PHD",
-      "OTHER",
-    ]);
-
-    const candidate = {
-      fieldsOfWork,
-      seniorityLevel: null,
-      minYearsInField: minYears,
-      requiredSkills: skills,
-      preferredSkills: [],
-      requiredLanguages: lang
-        ? [
-            {
-              language: lang,
-              cefr: langLevel && allowedCefr.has(langLevel) ? langLevel : null,
-            },
-          ]
-        : [],
-      requiredEducationLevel:
-        eduLevel && allowedEdu.has(eduLevel) ? eduLevel : null,
-      responsibilitiesSummary: description,
-      rawExtractionModel: "manual:hr-form",
-      rawExtractionTimestamp: new Date().toISOString(),
-    };
-
-    const parsed = JobRequirementsSchema.safeParse(candidate);
-    return parsed.success ? parsed.data : null;
-  }
-
-  /**
    * Phase 3 lazy-parse wrapper.
    *
    * Returns the JD's structured requirements, parsing inline if the cache
@@ -558,7 +467,7 @@ export class JobUseCases {
       // Manually-created job (no source URL): synthesize requirements from
       // the form fields the HR user filled in. Skips the LLM entirely.
       if (!sourceUrl) {
-        const manual = this.buildManualRequirements(job);
+        const manual = buildManualRequirements(job);
         if (manual) {
           await this.jobRepo.updateParsedRequirements(
             jobId,
@@ -623,7 +532,7 @@ export class JobUseCases {
       const sourceUrl = job.sourceUrl as string | null;
       // Manual job: synthesize from form fields, persist, return.
       if (!sourceUrl) {
-        const manual = this.buildManualRequirements(job);
+        const manual = buildManualRequirements(job);
         if (manual) {
           await this.jobRepo.updateParsedRequirements(
             jobId,
@@ -783,8 +692,10 @@ export class JobUseCases {
  * Adapt a "matching" candidate row (with experiences, languages, education,
  * skills relations) into the pure `CandidateFitInput` shape consumed by the
  * Phase 3 fit engine. Keeps the use-case readable.
+ *
+ * Exported for unit testing of the DB-row → matcher-input bridge.
  */
-function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
+export function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
   const experiences = Array.isArray(c.experiences) ? c.experiences : [];
   const experienceByField: Record<string, number> = {};
   const rawExperiences: Array<{ fields: string[]; years: number }> = [];
@@ -843,14 +754,14 @@ function buildCandidateFitInput(c: Record<string, any>): CandidateFitInput {
     // excluded (too noisy / not skill-bearing). Descriptions are also
     // excluded in this pass — they often contain filler that would
     // produce false-positive matches.
-    evidenceTexts: (experiences as Array<{ title?: unknown }>)
-      .map((exp) => String(exp.title ?? ""))
+    evidenceTexts: (experiences as Array<{ jobTitle?: unknown }>)
+      .map((exp) => String(exp.jobTitle ?? ""))
       .filter((s: string) => s.length > 0),
     rawExperiences,
   };
 }
 
-function experienceDurationYears(
+export function experienceDurationYears(
   startDate: string | null,
   endDate: string | null,
   isCurrent: boolean
@@ -863,11 +774,107 @@ function experienceDurationYears(
   return ms / (1000 * 60 * 60 * 24 * 365.25);
 }
 
-function parseLooseDate(s: string | null): Date | null {
+export function parseLooseDate(s: string | null): Date | null {
   if (!s) return null;
   const trimmed = s.trim();
   if (/^\d{4}$/.test(trimmed)) return new Date(`${trimmed}-01-01`);
   if (/^\d{4}-\d{2}$/.test(trimmed)) return new Date(`${trimmed}-01`);
   const d = new Date(trimmed);
   return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Synthesize a `JobRequirements` row directly from the structured fields
+ * an HR user filled in via the "Create New Job" form.
+ *
+ * Used for jobs that were created manually (no source_url, no scrape-derived
+ * description body) so that Job Matching still works without ever calling
+ * the LLM. Returns null when there isn't enough manual signal to be useful.
+ *
+ * Module-level + exported so the manual-job matching path is unit-testable
+ * without standing up the full use-case and its repositories.
+ */
+export function buildManualRequirements(
+  job: Record<string, unknown>
+): JobRequirements | null {
+  const dept: string | null =
+    typeof job.department === "string" ? job.department : null;
+  const skills: string[] = Array.isArray(job.requiredSkills)
+    ? (job.requiredSkills as unknown[]).filter(
+        (s): s is string => typeof s === "string" && s.trim().length > 0
+      )
+    : [];
+  const lang: string | null =
+    typeof job.requiredLanguage === "string" && job.requiredLanguage.trim()
+      ? job.requiredLanguage.trim()
+      : null;
+  const langLevel: string | null =
+    typeof job.requiredLanguageLevel === "string" &&
+    job.requiredLanguageLevel.trim()
+      ? job.requiredLanguageLevel.trim()
+      : null;
+  const eduLevel: string | null =
+    typeof job.requiredEducationLevel === "string" &&
+    job.requiredEducationLevel.trim()
+      ? job.requiredEducationLevel.trim()
+      : null;
+  const minYears: number | null =
+    typeof job.minYearsExperience === "number" ? job.minYearsExperience : null;
+  const description: string | null =
+    typeof job.description === "string" && job.description.trim()
+      ? job.description.trim()
+      : null;
+
+  // If absolutely no structured signal exists, give up — caller will throw.
+  const hasAnySignal =
+    skills.length > 0 ||
+    lang !== null ||
+    eduLevel !== null ||
+    minYears !== null ||
+    description !== null ||
+    dept !== null;
+  if (!hasAnySignal) return null;
+
+  // Match department against the canonical FIELDS_OF_WORK (case-insensitive,
+  // exact). Anything else is dropped — the matcher tolerates an empty array.
+  const fieldsOfWork: string[] = [];
+  if (dept) {
+    const lower = dept.toLowerCase();
+    const hit = FIELDS_OF_WORK.find((f) => f.toLowerCase() === lower);
+    if (hit) fieldsOfWork.push(hit);
+  }
+
+  const allowedCefr = new Set(["A1", "A2", "B1", "B2", "C1", "C2"]);
+  const allowedEdu = new Set([
+    "HIGH_SCHOOL",
+    "VOCATIONAL",
+    "BACHELOR",
+    "MASTER",
+    "PHD",
+    "OTHER",
+  ]);
+
+  const candidate = {
+    fieldsOfWork,
+    seniorityLevel: null,
+    minYearsInField: minYears,
+    requiredSkills: skills,
+    preferredSkills: [],
+    requiredLanguages: lang
+      ? [
+          {
+            language: lang,
+            cefr: langLevel && allowedCefr.has(langLevel) ? langLevel : null,
+          },
+        ]
+      : [],
+    requiredEducationLevel:
+      eduLevel && allowedEdu.has(eduLevel) ? eduLevel : null,
+    responsibilitiesSummary: description,
+    rawExtractionModel: "manual:hr-form",
+    rawExtractionTimestamp: new Date().toISOString(),
+  };
+
+  const parsed = JobRequirementsSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
