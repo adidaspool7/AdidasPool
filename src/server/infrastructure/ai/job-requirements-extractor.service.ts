@@ -115,7 +115,15 @@ CRITICAL RULES:
   3. requiredLanguages: only include languages the JD explicitly asks for. CEFR level only if
      the JD names it explicitly OR maps cleanly per the table above.
   4. responsibilitiesSummary: write it in English, one or two sentences max, even if input was non-English.
-  5. Return valid JSON. No commentary.`;
+  5. SKILL NAMING (applies to BOTH requiredSkills and preferredSkills):
+     - Use the COMMON, CANONICAL name of each skill so it can be matched against candidate CVs.
+       Spell out the standard name rather than ad-hoc phrasing (e.g. "JavaScript" not "JS coding",
+       "Microsoft Excel" not "advanced excel", "Project Management" not "managing projects").
+     - List each distinct skill separately. Split compound entries
+       (e.g. "HTML, CSS and JavaScript" → three skills; "Python/SQL" → two skills).
+     - Drop proficiency adjectives ("advanced", "strong", "basic", "expert in").
+     - Do NOT list the same skill twice under different spellings.
+  6. Return valid JSON. No commentary.`;
 
 export class JobRequirementsExtractorService {
   /**
