@@ -1,7 +1,161 @@
 \chapter{Survey Instrument and Client Meeting Evidence}
 \label{app:survey}
 
-% Full reproduction of the survey questions
-% (TalentPool-client_pain_points.md) and a redacted excerpt of meeting
-% minutes (ata-de-reuniao.md) as evidence of the Scrum cadence with
-% the client.
+This appendix documents the empirical basis of the requirements analysis
+(Chapter~\ref{cap:analysis}) and the validation (Chapter~\ref{cap:validation}).
+Section~\ref{app:survey-meeting} summarises the client engagement that
+produced the pain points; Section~\ref{app:survey-instrument} reproduces the
+full survey instrument used to validate them.
+
+\section{Client Engagement and Scrum Cadence}
+\label{app:survey-meeting}
+
+The project was conducted as a five-month internship (16~February~--~26~June
+2026) with adidas Business Services in Porto, a shared-services centre
+employing more than 900 people, of whom roughly 22\% are international,
+operating daily across some 15 business languages. The original client brief
+asked for a \emph{framework and sustainable strategy} to attract, develop and
+retain language capabilities; the platform documented in this report is the
+concrete proof-of-concept that operationalises that brief.
+
+\begin{table}[ht]
+	\centering
+	\caption{Selected milestones of the client engagement.}
+	\label{tab:meeting-log}
+	\begin{tabular}{@{}l p{8.5cm}@{}}
+		\toprule
+		\textbf{Date} & \textbf{Milestone} \\
+		\midrule
+		Feb 2026      & Problem analysis and requirements gathering; original four-question survey bank drafted. \\
+		Late Feb 2026 & Kick-off meeting (Hellenic Mediterranean University, Crete) with the international, multidisciplinary team. \\
+		Feb--Mar 2026 & System architecture and database design. \\
+		Mar--Apr 2026 & Core platform development: CV parsing, candidate management, job matching. \\
+		Apr 2026      & Language-assessment module integration. \\
+		29 Apr 2026   & Client pain-point review; nine pain points consolidated and mapped to survey questions. \\
+		Apr--May 2026 & Testing, deployment and stakeholder validation on the production environment. \\
+		May 2026      & Survey distribution, data collection and analysis. \\
+		May--Jun 2026 & Final report and presentation. \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+These meetings established the Scrum-with-the-client cadence described in
+Section~\ref{sec:method-scrum}: the author acted as Product Owner, translating
+client conversations into a prioritised backlog and demonstrating increments
+on the deployed environment. Nine pain points emerged from the engagement and
+are reproduced verbatim below; each maps to one or more platform modules in
+Table~\ref{tab:survey-mapping}.
+
+\begin{enumerate}
+	\item \textbf{Organise candidate information} --- the team sometimes relies on Excel.
+	\item \textbf{Know which candidates applied before or are new} --- under GDPR, candidate data may be kept for only six months.
+	\item \textbf{Screening for language skills} (extendable to any skill) --- a first screening layer, not a replacement for the existing process.
+	\item \textbf{Direct contact with candidates} --- the basis of the notifications and campaigns features.
+	\item \textbf{Save time analysing CVs and extracting information} --- even reading a candidate's location requires opening every CV individually.
+	\item \textbf{Analytics} --- clear, organised views of the recruitment process.
+	\item \textbf{Understand where to focus recruitment efforts} --- e.g. German speakers, internship candidates, technical profiles.
+	\item \textbf{Empower HR productivity} --- a tool that makes the work feel more structured.
+	\item \textbf{Keep non-selected candidates engaged} --- re-engaging ``borderline'' candidates within the six-month window via assessments, campaigns and improvement tracks.
+\end{enumerate}
+
+\section{Survey Instrument}
+\label{app:survey-instrument}
+
+The survey was designed so that each question describes a problem neutrally,
+without hinting at any solution, so that responses constitute independent
+evidence for the corresponding module. One question was authored per pain
+point, with backup questions where a single phrasing was insufficient.
+
+\subsection*{Pain-point questionnaire}
+
+\begin{enumerate}
+	\item \textit{Organising candidate information.}\\
+	``What tool does your team primarily use to store and manage candidate
+	information during a recruitment process?''
+	(Excel / Google Sheets / An ATS / Email folders / Shared documents /
+	No structured system)
+
+	\item \textit{Knowing if a candidate has applied before (GDPR / six-month rule).}\\
+	``How does your team currently identify whether a candidate has previously
+	applied for a position at adidas Porto?''
+	(Check manually / Rely on the candidate declaring it / No way to verify /
+	Automated system) \\
+	\emph{Backup:} ``Has your team ever lost useful information about a past
+	candidate because data-retention policies required it to be deleted?''
+
+	\item \textit{Language / skills screening.}\\
+	``At what stage of your recruitment process do you currently perform a
+	first formal check of a candidate's language proficiency or technical
+	skills?''
+	(Before the first interview / During the first interview / Only in a
+	dedicated assessment round / No formal check --- we rely on the CV)
+
+	\item \textit{Direct contact and communication.}\\
+	``How does your team currently keep candidates informed about their
+	application status or upcoming opportunities?''
+	(Manual individual emails / Automated emails via an ATS / Phone calls /
+	No structured process) \\
+	\emph{Backup:} ``Has your team ever had to re-engage a candidate for a new
+	position after they were not selected for a previous one?''
+
+	\item \textit{Saving time on CV analysis.}\\
+	``When screening a batch of CVs, how long does it typically take your team
+	to extract key information (e.g.\ location, years of experience, languages)
+	from each individual CV?''
+	(Under 1~min / 1--3~min / 3--5~min / More than 5~min) \\
+	\emph{Backup:} ``How often do you open a CV only to find immediately that
+	the candidate does not meet a basic requirement?''
+
+	\item \textit{Analytics and pipeline visibility.}\\
+	``How easy is it for you to get a quick overview of your current
+	recruitment pipeline --- how many candidates are at each stage, or how
+	many applications were received per opening?''
+	(Very easy --- I have a dashboard / Possible but slow / Very difficult /
+	No visibility)
+
+	\item \textit{Where to focus recruitment efforts.}\\
+	``When planning a new recruitment campaign, how does your team identify
+	which skills, languages or profiles are most in demand?''
+	(Analyse past data / Rely on managers / Done intuitively / No structured
+	process)
+
+	\item \textit{HR tooling and productivity.}\\
+	``On a scale of 1 to 5, how would you rate the degree to which your current
+	recruitment tools help you work more efficiently and reduce repetitive
+	manual tasks?''
+	(1 = very little value $\to$ 5 = significant productivity boost)
+
+	\item \textit{Keeping borderline candidates engaged.}\\
+	``What happens to candidates who were not selected for a position but
+	showed potential --- for example strong language skills or relevant
+	experience?''
+	(Keep their profile for future openings / Inform them proactively /
+	Rejected and removed / No structured process)
+\end{enumerate}
+
+\subsection*{Original four-question bank (28 April session)}
+
+A shorter instrument, drafted before the full pain-point mapping, framed four
+quantitative questions later folded into the questionnaire above:
+
+\begin{enumerate}
+	\item \textit{CV screening workload} --- ``On average, how many hours per
+	week does your team spend manually reviewing CVs and shortlisting
+	candidates for a single open position?'' ($<$1h / 1--3h / 3--6h / $>$6h)
+	\item \textit{Language proficiency verification} --- ``How confident are
+	you in your current process for objectively verifying a candidate's foreign
+	language proficiency before the first interview?'' (1--5)
+	\item \textit{Evaluation consistency across the team} --- ``When multiple
+	HR members evaluate the same candidate, how often do inconsistencies arise
+	in how they are scored or ranked?'' (Never $\to$ Always)
+	\item \textit{Tracking candidate communication history} --- ``How easy is
+	it to retrieve a complete history of all interactions with a specific
+	candidate across different HR team members?'' (1--5)
+\end{enumerate}
+
+\subsection*{Response data}
+
+The questionnaire was distributed to adidas Porto HR staff and stakeholders in
+May 2026. The collected responses are held in the project archive
+(\texttt{TalentPool-survey-answers.docx}); a summary of the results and their
+interpretation is presented in Section~\ref{sec:val-survey}.

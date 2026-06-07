@@ -1,6 +1,124 @@
 \chapter{API Reference}
 \label{app:api}
 
-% Full table of API endpoints, grouped by area (auth, candidates, jobs,
-% interview, notifications, campaigns, analytics).
-% Source: AppReport/07_API_Documentation.md.
+This appendix lists the complete REST surface of the platform. All routes are
+file-based Next.js App Router handlers under \texttt{src/app/api/}; each maps
+\texttt{[METHOD] /api/[resource]} to a single use-case method. Responses are
+JSON (except the CSV export), request bodies are validated with Zod, and
+errors follow the convention \texttt{\{ error: "message" \}}. Authorisation is
+enforced at the middleware layer described in
+Section~\ref{sec:design-authz}: every route requires an authenticated
+Supabase session except the public prefixes, and the HR-only subset
+additionally requires \texttt{app\_metadata.role === "hr"}.
+
+\begin{longtable}{@{}r l p{6.4cm} l@{}}
+	\caption{Complete REST API surface (66 endpoints).}
+	\label{tab:api-reference} \\
+	\toprule
+	\textbf{\#} & \textbf{Method} & \textbf{Endpoint} & \textbf{Access} \\
+	\midrule
+	\endfirsthead
+	\multicolumn{4}{c}{\tablename\ \thetable\ -- \textit{continued}} \\
+	\toprule
+	\textbf{\#} & \textbf{Method} & \textbf{Endpoint} & \textbf{Access} \\
+	\midrule
+	\endhead
+	\midrule \multicolumn{4}{r}{\textit{continued on next page}} \\
+	\endfoot
+	\bottomrule
+	\endlastfoot
+
+	\multicolumn{4}{@{}l}{\textit{Candidates}} \\
+	1  & GET    & \texttt{/api/candidates}                & HR \\
+	2  & GET    & \texttt{/api/candidates/[id]}           & Auth \\
+	3  & PATCH  & \texttt{/api/candidates/[id]}           & HR \\
+	4  & POST   & \texttt{/api/candidates/[id]/notes}     & HR \\
+	5  & POST   & \texttt{/api/candidates/rerank}         & HR \\
+	41 & POST   & \texttt{/api/candidates/rescore}        & HR \\
+	42 & POST   & \texttt{/api/candidates/[id]/skills/[skillId]/verification} & HR \\
+	52 & GET    & \texttt{/api/candidates/[id]/shortlists}        & HR \\
+	53 & POST   & \texttt{/api/candidates/[id]/contact}           & HR \\
+	54 & GET    & \texttt{/api/candidates/[id]/interaction-history} & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Jobs and Matching}} \\
+	6  & GET    & \texttt{/api/jobs}                      & Auth \\
+	7  & POST   & \texttt{/api/jobs}                      & HR \\
+	8  & GET    & \texttt{/api/jobs/[id]}                 & Auth \\
+	9  & PATCH  & \texttt{/api/jobs/[id]}                 & HR \\
+	10 & POST   & \texttt{/api/jobs/sync}                 & HR \\
+	11 & POST   & \texttt{/api/jobs/[id]/match}           & HR \\
+	48 & POST   & \texttt{/api/jobs/[id]/match-candidates} & HR \\
+	49 & POST   & \texttt{/api/jobs/[id]/reparse-requirements} & HR \\
+	50 & GET/POST & \texttt{/api/jobs/[id]/shortlist}     & HR \\
+	51 & DELETE/PATCH & \texttt{/api/jobs/[id]/shortlist/[candidateId]} & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Assessments and Interview}} \\
+	12 & GET    & \texttt{/api/assessments}              & HR \\
+	13 & POST   & \texttt{/api/assessments}              & HR \\
+	43 & POST   & \texttt{/api/interview/realtime/session} & Auth \\
+	44 & POST   & \texttt{/api/interview/realtime/turn}    & Auth \\
+	45 & POST   & \texttt{/api/interview/realtime/complete} & Auth \\
+	46 & POST   & \texttt{/api/interview/realtime/terminate} & Auth \\
+	47 & POST   & \texttt{/api/interview/proctoring}      & Auth \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Applications}} \\
+	14 & POST   & \texttt{/api/applications}             & Candidate \\
+	15 & GET    & \texttt{/api/applications}             & Candidate \\
+	16 & PATCH  & \texttt{/api/applications/[id]}         & Candidate \\
+	17 & GET    & \texttt{/api/applications/all}          & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Notifications and Campaigns}} \\
+	18 & GET    & \texttt{/api/notifications}            & Auth \\
+	19 & PATCH  & \texttt{/api/notifications}            & Auth \\
+	20 & GET/PATCH & \texttt{/api/notifications/preferences} & Auth \\
+	21 & GET/POST  & \texttt{/api/notifications/campaigns}   & HR \\
+	22 & GET/PATCH & \texttt{/api/notifications/campaigns/[id]} & HR \\
+	23 & POST   & \texttt{/api/notifications/campaigns/[id]/send} & HR \\
+	24 & POST   & \texttt{/api/notifications/campaigns/preview}   & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Uploads and Files}} \\
+	25 & POST   & \texttt{/api/upload}                    & HR \\
+	26 & POST   & \texttt{/api/upload/candidate}          & Candidate \\
+	27 & POST   & \texttt{/api/upload/bulk}               & HR \\
+	28 & POST   & \texttt{/api/upload/bulk/[jobId]}       & HR \\
+	29 & POST   & \texttt{/api/upload/motivation-letter}  & Candidate \\
+	30 & POST   & \texttt{/api/upload/learning-agreement} & Candidate \\
+	31 & POST   & \texttt{/api/upload/image}              & HR \\
+	32 & GET    & \texttt{/api/upload/download}           & Auth \\
+	33 & GET    & \texttt{/api/export/candidates}         & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Self-Service (Candidate)}} \\
+	34 & GET    & \texttt{/api/me}                        & Candidate \\
+	35 & PATCH  & \texttt{/api/me}                        & Candidate \\
+	59 & GET    & \texttt{/api/me/export}                 & Candidate \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Scoring}} \\
+	37 & GET    & \texttt{/api/scoring/weights}           & HR \\
+	38 & PUT    & \texttt{/api/scoring/weights}           & HR \\
+	39 & GET/POST & \texttt{/api/scoring/presets}         & HR \\
+	40 & DELETE & \texttt{/api/scoring/presets/[id]}      & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Analytics}} \\
+	36 & GET    & \texttt{/api/analytics}                 & HR \\
+	55 & GET    & \texttt{/api/analytics/catalog}         & HR \\
+	56 & POST   & \texttt{/api/analytics/query}           & HR \\
+	57 & GET/POST & \texttt{/api/analytics/widgets}       & HR \\
+	58 & PATCH/DELETE & \texttt{/api/analytics/widgets/[id]} & HR \\
+	\addlinespace
+	\multicolumn{4}{@{}l}{\textit{Ambassador Program}} \\
+	60 & GET    & \texttt{/api/ambassador}                & Public \\
+	61 & POST   & \texttt{/api/ambassador}                & HR \\
+	62 & GET    & \texttt{/api/ambassador/[id]}           & HR \\
+	63 & PATCH  & \texttt{/api/ambassador/[id]}           & HR \\
+	64 & DELETE & \texttt{/api/ambassador/[id]}           & HR \\
+	65 & POST   & \texttt{/api/ambassador/[id]/apply}     & Candidate \\
+	66 & PATCH  & \texttt{/api/ambassador/[id]/applications/[appId]} & HR \\
+
+\end{longtable}
+
+The \emph{Access} column summarises the effective authorisation: \emph{Public}
+routes are listed in the middleware \texttt{PUBLIC\_API\_PREFIXES}; \emph{Auth}
+routes require any authenticated session; \emph{HR} routes require the
+\texttt{hr} role (enforced either by \texttt{HR\_ONLY\_API\_PREFIXES} or by the
+inline \texttt{requireHr()} helper); and \emph{Candidate} routes are scoped to
+the signed-in candidate's own data.

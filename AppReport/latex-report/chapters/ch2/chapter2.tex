@@ -1,57 +1,152 @@
 \chapter{State of the Art}
 \label{cap:state-of-the-art}
 
-% TARGET LENGTH: ~8 pages.
-% Sources to draw from: AppReport/03_Technology_Stack.md and external
-% literature (academic + industry). Cite via \parencite{key} or \textcite{key}.
+This chapter situates the platform within the existing landscape. It first
+surveys recruitment software and the gaps it leaves for a small,
+GDPR-constrained team; then reviews the role of artificial intelligence in
+hiring --- CV parsing, candidate--job matching and conversational assessment;
+introduces the language-proficiency framework adopted for assessment; and
+finally summarises the regulatory context that shaped the data model. The
+review motivates the design choices defended in Chapter~\ref{cap:design}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Recruitment Software Landscape}
 \label{sec:sota-recruitment}
 
-% Compare ATS players: Workday, Greenhouse, Lever, SmartRecruiters,
-% Recruitee, Manatal, Personio. Position each by audience size and
-% feature focus. Highlight gaps the present platform addresses
-% (lightweight, GDPR-aware, AI-augmented, single-team scale).
+Applicant Tracking Systems (\gls{ats}) are the dominant category of
+recruitment software. At the enterprise end, suites such as Workday and
+SmartRecruiters integrate requisition management, applicant tracking,
+onboarding and analytics across very large organisations; mid-market tools
+such as Greenhouse, Lever and Personio target structured hiring with strong
+interview-workflow and collaboration features; and lighter products such as
+Recruitee and Manatal aim at smaller teams, increasingly bundling
+AI-assisted sourcing and ranking.
 
-% TODO
+Two observations follow from this landscape and frame the present work.
+First, the category is broad but its centre of gravity is \emph{workflow}
+--- moving a candidate through stages --- rather than \emph{intelligence}
+about the candidate pool as a persistent, analysable asset. Second, the
+features that this project treats as central --- explainable, per-criterion
+job matching; a deletion-aware data model built around \gls{gdpr} retention;
+and an integrated language-assessment pipeline --- are typically either
+absent, opaque, or offered only as separate enterprise add-ons. The platform
+described here is therefore positioned not as a competitor to a full ATS but
+as a right-sized talent-intelligence tool for a single multilingual HR team,
+where auditability and compliance are first-class concerns.
+
+%----------------------------------------------------------------------------------------
 
 \section{Artificial Intelligence in Hiring}
 \label{sec:sota-ai}
 
+The recent surge of capable Large Language Models, beginning with the
+demonstration that sufficiently large models perform tasks from natural
+instructions with few examples \parencite{Brown2020GPT3} and continued by
+efficient open foundation models \parencite{Touvron2023Llama}, has changed
+what is practical in recruitment tooling. Three sub-problems are relevant
+here.
+
 \subsection{CV Parsing}
-% Approaches: rule-based (Sovren, RChilli), ML-based (BERT-based parsers),
-% LLM-based (GPT/Llama with structured-output schemas). Trade-offs:
-% accuracy, cost, latency, hallucination risk, schema drift.
+\label{sec:sota-cv}
+
+CV parsing --- turning an unstructured document into structured fields ---
+has progressed through three generations. \textbf{Rule-based} parsers
+(commercial engines such as Sovren and RChilli) rely on hand-crafted
+patterns and gazetteers; they are fast and predictable but brittle against
+unusual layouts and multilingual content. \textbf{Machine-learning} parsers,
+typically built on transformer encoders such as BERT, improve robustness by
+learning to label spans, at the cost of training data and pipeline
+complexity. \textbf{LLM-based} parsing, used in this project, prompts a
+general model to emit a structured object directly. Its advantages are
+flexibility across layouts and languages and near-zero bespoke engineering;
+its risks are hallucination (invented fields), schema drift (subtly malformed
+output) and per-call cost and latency. The mitigation adopted here ---
+constraining the model with a strict, tolerant validation schema and a
+provider fallback --- is the practical answer to those risks and is detailed
+in Chapter~\ref{cap:design}.
 
 \subsection{Candidate--Job Matching}
-% Discuss embedding-based ranking (vector similarity), rule-based fit
-% scoring, and hybrid approaches. Critique opacity of pure embedding
-% systems for HR explainability.
+\label{sec:sota-matching}
+
+Two broad approaches dominate automated matching. \textbf{Embedding-based}
+ranking encodes both the candidate and the job as vectors and ranks by
+similarity; it captures fuzzy semantic closeness and requires little manual
+rule-writing, but it is \emph{opaque} --- a recruiter cannot easily see
+\emph{why} a candidate ranked highly, which is a serious limitation where
+hiring decisions must be justified and audited. \textbf{Rule-based} fit
+scoring evaluates explicit criteria (skills, experience, languages,
+education) and is fully explainable, at the cost of needing the criteria to
+be modelled. Hybrid systems combine the two. This project deliberately
+chooses the rule-based path: as argued in Chapter~\ref{cap:design}, the
+ability to show a per-criterion breakdown and a clear eligibility flag was
+judged more valuable for a compliance-sensitive HR team than the marginal
+recall of opaque similarity.
 
 \subsection{Conversational Assessment}
-% LLM-driven interviews (HireVue, Sapia.ai, MyInterview), prompt
-% engineering for evaluative tasks, and academic work on automatic
-% language proficiency assessment.
+\label{sec:sota-conversational}
+
+A growing class of products (for example HireVue, Sapia.ai and
+MyInterview) conducts asynchronous, AI-mediated interviews and scores the
+responses. The technical core is prompt engineering for an evaluative task:
+the model must both conduct a coherent conversation and produce a structured,
+rubric-aligned judgement. Such systems raise well-documented concerns around
+fairness and transparency, which reinforce the design stance taken here ---
+the assessment never auto-rejects a candidate; it produces an explainable,
+rubric-based result for human review.
+
+%----------------------------------------------------------------------------------------
 
 \section{Language Proficiency Frameworks}
 \label{sec:sota-cefr}
 
-% Introduce CEFR (A1--C2) and its sub-skills. Briefly mention TOEFL/IELTS
-% mapping. Justify why CEFR is the right rubric for asynchronous,
-% software-driven assessment.
+For language assessment the platform adopts the Common European Framework of
+Reference for Languages (\gls{cefr}), which defines a six-level scale from A1
+to C2 and describes proficiency through can-do descriptors across distinct
+competences \parencite{CEFR2001}; its 2020 companion volume refines the
+descriptors, notably for mediation and spoken interaction
+\parencite{CEFRCompanion2020}. Compared with test-specific scales such as
+TOEFL or IELTS --- which can be mapped onto CEFR bands --- CEFR is
+test-agnostic, internationally recognised, and expressed as behavioural
+descriptors rather than tied to a single examination. These properties make
+it the natural rubric for an asynchronous, software-driven assessment: the
+descriptors translate cleanly into the grammar, vocabulary and fluency
+sub-scores the evaluator returns, and the resulting level is immediately
+meaningful to an HR team operating across many languages.
+
+%----------------------------------------------------------------------------------------
 
 \section{Regulatory Context: GDPR for Recruitment}
 \label{sec:sota-gdpr}
 
-% Articles relevant to recruitment: lawful basis (consent, legitimate
-% interest), data minimisation, retention limitations, right to erasure,
-% right of access. Reference the six-month informal industry rule and
-% why it is the most cited constraint in the client interviews.
+Recruitment processes personal data and therefore fall squarely under the
+General Data Protection Regulation \parencite{GDPR2016}. Several of its
+principles bear directly on the design. Processing requires a \emph{lawful
+basis} (typically consent or legitimate interest for recruitment);
+\emph{data minimisation} requires storing only what is necessary;
+\emph{storage limitation} requires that data not be kept longer than needed;
+and data subjects hold rights of \emph{access} and \emph{erasure}. In
+practice, recruitment teams commonly translate storage limitation into a
+fixed retention window --- the ``six-month rule'' that recurred throughout the
+client interviews --- after which candidate data must be deleted. This single
+constraint is what turns institutional memory into a liability and is the
+regulatory pressure the platform is designed around: a deletion-aware data
+model, an interaction-history audit trail, and a candidate self-service view
+that supports the right of access, as developed in
+Chapter~\ref{cap:design}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Summary}
 \label{sec:sota-summary}
 
-% Synthesise: which gaps remain in current tools that the present
-% platform aims to fill (auditable matching, GDPR-aware retention,
-% integrated language assessment, single coherent product for small HR
-% teams).
+The review exposes a consistent gap. Mainstream recruitment software is
+strong on workflow but weak on the three properties this project treats as
+essential: \emph{auditable} candidate--job matching rather than opaque
+ranking; a data model built \emph{around} GDPR retention rather than bolting
+compliance on afterwards; and an \emph{integrated} language-assessment
+pipeline rather than a separate tool. Modern LLMs make the parsing and
+assessment components feasible for a small team, provided their output is
+constrained and validated, while CEFR supplies a recognised rubric for the
+language dimension. The remainder of this report shows how these pieces are
+combined into a single coherent product for a multilingual HR team.

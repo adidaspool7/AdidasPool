@@ -1,7 +1,26 @@
 \chapter{Detailed Database Schema}
 \label{app:db-schema}
 
-% Full DDL extracted from supabase/migrations/00000000000000_schema.sql
-% (or a faithful summary). Use lstlisting with language=SQL.
-% This appendix is allowed to be long --- annexes are not counted in
-% the 70-page main-body limit.
+This appendix reproduces the canonical PostgreSQL schema of the platform,
+exactly as applied to the Supabase project. It is the single source of truth
+referenced throughout Chapter~\ref{cap:design}
+(Section~\ref{sec:design-database}) and is generated from
+\texttt{supabase/migrations/00000000000000\_schema.sql}. The schema
+consolidates the enumerated types and the 33 tables together with their
+triggers, indexes and foreign-key constraints. Row-Level Security is
+intentionally disabled on every application table: all database access is
+performed server-side through the service-role key, as discussed in
+Section~\ref{sec:design-security}.
+
+The listing below is reproduced verbatim and is therefore long; annexes are
+not counted towards the page budget of the main body.
+
+\lstinputlisting[
+	language=SQL,
+	basicstyle=\ttfamily\tiny,
+	numbers=left,
+	numberstyle=\tiny\color{lstcomment},
+	breaklines=true,
+	caption={Canonical PostgreSQL schema (\texttt{00000000000000\_schema.sql}).},
+	label={lst:full-schema}
+]{appendices/schema.sql}
