@@ -1,88 +1,298 @@
 \chapter{Solution Design}
 \label{cap:design}
 
-% TARGET LENGTH: ~12 pages.
-% Sources: AppReport/04_Architecture_Design.md, 05_Database_Design.md,
-% 09_Security_Infrastructure.md.
+This chapter presents the design of the platform: the high-level container
+view, the onion architecture that organises the code, the domain model and
+its relational schema, the job-anchored matching algorithm, the AI pipelines
+that ingest unstructured text, and the security, compliance and frontend
+decisions. It closes with a decision log that records the main trade-offs.
+
+%----------------------------------------------------------------------------------------
 
 \section{Architectural Overview}
 \label{sec:design-overview}
 
-% C4 Level 1 (system context) and Level 2 (containers). Two containers:
-% Next.js application + Supabase managed services + FastAPI sidecar.
+At the highest level the system is a single web application supported by
+managed services and one specialised sidecar. The \textbf{Next.js
+application} hosts both the user interface and the server-side API routes,
+and is the only component a user's browser talks to directly. It depends on
+three \textbf{Supabase} managed services --- PostgreSQL for data,
+Authentication for Google OAuth, and Storage for uploaded CVs --- and on two
+external \textbf{Large Language Model} providers (Groq as primary, OpenAI as
+fallback) for parsing. The conversational \textbf{AI Interviewer} is a
+separate Python \textit{FastAPI} service: the browser opens an interview
+popup that communicates with the Next.js API routes, which in turn delegate
+the conversation to the sidecar through a signed-token contract. Table
+\ref{tab:containers} summarises the containers and their responsibilities.
+
+\begin{table}[h]
+\centering
+\caption[System containers]{Top-level containers and their responsibilities.}
+\label{tab:containers}
+\small
+\begin{tabular}{p{0.26\linewidth}p{0.30\linewidth}p{0.32\linewidth}}
+\toprule
+\textbf{Container} & \textbf{Technology} & \textbf{Responsibility} \\
+\midrule
+Web application & Next.js 16 / TypeScript on Vercel & UI, API routes, use cases, repositories \\
+Database & Supabase PostgreSQL & Persistent relational store \\
+Authentication & Supabase Auth (Google OAuth) & Identity, session, role claim \\
+Object storage & Supabase Storage & Uploaded CV files \\
+LLM providers & Groq (primary), OpenAI (fallback) & CV and job-description parsing \\
+AI Interviewer & Python FastAPI sidecar & Conversational assessment + CEFR evaluation \\
+Email & Resend & Assessment invitations, outreach \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%----------------------------------------------------------------------------------------
 
 \section{Onion / Clean Architecture}
 \label{sec:design-onion}
 
-% Layer diagram: Domain (no deps) -> Application (use cases) ->
-% Infrastructure (repos, AI services, storage) -> Presentation (API
-% routes, React components). Dependency rule. Examples.
+The code follows an \gls{onion}, chosen and enforced from the start. The
+guiding rule is that \emph{dependencies always point inward}: the Domain at
+the centre has zero external dependencies, the Application layer orchestrates
+the Domain, the Infrastructure layer implements the Domain's port interfaces,
+and the Presentation layer is a thin shell over the Application. Crucially,
+Infrastructure \emph{depends on} the Domain (by implementing its ports) while
+the Domain never imports Infrastructure:
+
+\begin{quote}
+Presentation $\rightarrow$ Application $\rightarrow$ Domain $\leftarrow$
+Infrastructure
+\end{quote}
+
+\begin{description}
+	\item[Domain (\texttt{src/server/domain/}).] Pure business logic ---
+	value objects (CEFR levels, scoring weights, status configuration,
+	thresholds), pure domain services (scoring, matching), and the port
+	interfaces that abstract persistence and external services. No
+	database, HTTP or framework code.
+	\item[Application (\texttt{src/server/application/}).] Use cases that
+	orchestrate domain logic and ports, plus DTOs validated with Zod. It
+	never imports a concrete repository or external SDK.
+	\item[Infrastructure (\texttt{src/server/infrastructure/}).] The only
+	layer that knows about external services: Supabase repositories, the
+	LLM parsing services, storage, email and logging --- each implementing
+	a domain port.
+	\item[Presentation (\texttt{src/app/}, \texttt{src/client/}).] Next.js
+	API routes and React components. Thin: it parses the request, calls a
+	use case, and renders the result.
+\end{description}
+
+This discipline was chosen for testability (Domain and Application are
+tested without mocks of infrastructure), swappability (the migration from an
+ORM-and-Neon stack to Supabase required only new repository implementations,
+with no domain or use-case changes), and provider flexibility (changing LLM
+provider is a new service implementation behind an existing port). The
+alternatives --- MVC, a permissive three-tier split, microservices, or a
+bag of serverless functions --- were rejected as either too coupled or too
+heavy for a two-person team. The payoff became concrete when the AI
+Interviewer had to be extracted into its own process, which the boundary
+made a contract change rather than a rewrite.
+
+%----------------------------------------------------------------------------------------
 
 \section{Domain Model}
 \label{sec:design-domain}
 
-% Core entities: Candidate, Experience, Education, Language, Skill,
-% Job, JobApplication, JobMatch, JobShortlist, AssessmentTemplate,
-% AssessmentResult, InterviewSession, ImprovementTrack, Notification,
-% PromoCampaign, ParsingJob.
+The domain is inherently relational and is centred on two aggregates. A
+\textbf{Candidate} owns the facts derived from a CV --- \textit{Experiences}
+(each tagged with one or more fields of work), \textit{Education} entries,
+\textit{Languages} with CEFR levels, \textit{Skills}, \textit{Tags} and
+\textit{Notes} --- and accumulates process artefacts: \textit{Assessments}
+and their \textit{Results}, \textit{Improvement Tracks}, \textit{Job
+Matches}, \textit{Job Applications} and \textit{Notifications}. A
+\textbf{Job} owns its \textit{Applications}, cached \textit{Matches},
+\textit{Assessment Templates} and \textit{Shortlist} entries. Around these
+sit supporting entities --- \textit{Promo Campaigns} (which generate
+notifications), \textit{Parsing Jobs} (which track bulk uploads),
+\textit{Ambassador Programs} with their applications, and \textit{Candidate
+Segments} --- giving thirty-three application tables in total.
+
+%----------------------------------------------------------------------------------------
 
 \section{Database Design}
 \label{sec:design-database}
 
-% ERD. Naming convention (snake_case in DB, camelCase in JS via
-% camelizeKeys / snakeifyKeys). JSONB usage and the JSONB_KEYS opt-out.
-% IDs: TEXT PRIMARY KEY + crypto.randomUUID(). updated_at trigger.
-% Why RLS is disabled and how access control is enforced.
+The store is a Supabase-managed PostgreSQL database accessed directly
+through the Supabase client, with \textbf{no ORM}. The schema lives in a
+single canonical SQL file (\texttt{00000000000000\_schema.sql}) into which
+every per-feature change was consolidated, so a fresh database is created by
+running one script.
+
+\paragraph{Conventions.}
+Database columns are \texttt{snake\_case}; JavaScript objects are
+\texttt{camelCase}; conversion happens at the repository boundary through
+\texttt{camelizeKeys} and \texttt{snakeifyKeys}. Fields stored as JSONB ---
+parsed CV data, evaluation rationales, telemetry --- are listed in a
+\texttt{JSONB\_KEYS} opt-out so that their internal keys are \emph{not}
+recursively camelised and survive round-trips verbatim. Primary keys are
+\texttt{text} values generated at the application layer with
+\texttt{crypto.randomUUID()}, which keeps IDs opaque and stable across the
+API boundary; the sole exception is \texttt{auth.users.id}, a native
+\texttt{uuid} that \texttt{candidates.user\_id} references. The
+\texttt{updated\_at} column is maintained by a PostgreSQL trigger rather than
+in application code.
+
+\paragraph{Access control without RLS.}
+Row-Level Security is deliberately \emph{disabled} on the application tables.
+Every database call is made server-side by code holding the service-role
+key, and authorisation is enforced one layer out --- in the middleware and
+in route helpers such as \texttt{require-hr.ts} --- rather than in the
+database. This concentrates the authorisation logic in one auditable place,
+at the explicit cost of making the server-side trust boundary critical;
+that cost is precisely why the authentication and route-gating tests of
+Chapter~\ref{cap:validation} are central to the design.
+
+%----------------------------------------------------------------------------------------
 
 \section{Job-Anchored Matching Algorithm}
 \label{sec:design-matching}
 
-% Two scores: Quality (CV intrinsic) vs Fit (per-job).
-% computeJobFit() criteria: field of work, experience-in-field,
-% seniority, required/preferred skills, languages, education.
-% Aggregation: average of applicable criteria; isEligible = AND of
-% applicable.met. Persistence in job_matches as a cache.
+A central design decision is that there is \emph{no} universal
+``candidate score'' for hiring; matching is always candidate~$\times$~a
+specific job. The system therefore exposes two distinct numbers with
+distinct meanings:
+
+\begin{description}
+	\item[Quality.] A CV-intrinsic profile score
+	(\texttt{overall\_cv\_score}) reflecting completeness, education,
+	languages and location. It is independent of any job and is useful only
+	as a prefilter, never as a hiring signal.
+	\item[Fit.] Computed live for a chosen job by \texttt{computeJobFit}.
+\end{description}
+
+\texttt{computeJobFit} is a pure function evaluating seven criteria: field
+of work, experience in that field, seniority, required skills, preferred
+skills, languages and education. The overall fit is the average of the
+\emph{applicable} criteria only --- a criterion the job does not specify is
+excluded rather than counted as zero, so jobs are not penalised for being
+unspecific. A separate \texttt{isEligible} flag is the logical conjunction
+of the applicable ``met'' flags, distinguishing ``ranked but not strictly
+eligible'' from ``eligible''. Because the function is pure and dependency-free
+it is exhaustively unit-tested (Chapter~\ref{cap:validation}), and because
+every criterion yields a per-criterion explanation the ranking is auditable
+--- the reason the rule-based approach was preferred over opaque
+embedding similarity. The top results are persisted in a \texttt{job\_matches}
+cache so the ranking screen does not recompute on every view.
+
+%----------------------------------------------------------------------------------------
 
 \section{AI Pipelines}
 \label{sec:design-ai}
 
 \subsection{CV Parsing Pipeline}
-% Storage upload -> text extraction -> Groq Llama 3.3 70B prompt with
-% structured-output schema -> Zod validation -> persistence.
-% Fallback to OpenAI GPT-4o on Groq failure. Telemetry table.
+\label{sec:design-cv}
+
+An uploaded CV flows through a fixed sequence: the file is stored in Supabase
+Storage; its text is extracted (from PDF, DOCX or plain text); the text is
+sent to the primary LLM (Groq Llama~3.3 70B) with a structured-output prompt;
+the model's response is validated against a strict Zod schema, with an
+automatic retry on a parse failure; and the validated, de-duplicated result
+is persisted as a Candidate with its experiences, education, languages and
+skills. If Groq fails, the same request is retried against the OpenAI
+fallback. Every extraction call writes one fire-and-forget row to a telemetry
+table (provider, model, success, duration, token counts, whether the
+fallback was used), so the pipeline's reliability and cost can be observed
+without affecting the parse itself.
 
 \subsection{Job Description Extractor}
-% JobRequirementsExtractorService with versioned schema
-% (JOB_REQUIREMENTS_SCHEMA_VERSION). Lazy parsing on first HR open of
-% "Rank candidates" page.
+\label{sec:design-jd}
+
+Job descriptions are parsed by the same structured-output approach through a
+dedicated service, into a \emph{versioned} requirements schema. Parsing is
+\textbf{lazy}: a job description is parsed the first time an HR user opens its
+ranking screen, not in bulk, and the result is cached with its schema version
+so it is reused until either the source text or the schema version changes.
+This keeps LLM usage proportional to actual use.
 
 \subsection{AI Interviewer (FastAPI Sidecar)}
-% Architecture diagram: popup browser window <-> Next.js API routes
-% <-> Python FastAPI. HMAC-SHA256 session token (10-min TTL).
-% Dual mode: TECHNICAL vs LANGUAGE.
-% Evaluator output schema (cefr_level, grammar, vocabulary, fluency).
+\label{sec:design-interviewer}
+
+The conversational assessment runs in a separate Python FastAPI service,
+developed by the second team member; the design point relevant here is the
+\emph{contract}. The browser opens an interview popup that talks to the
+Next.js API routes; those routes create a session, issue a short-lived
+HMAC-SHA256 token (ten-minute TTL, with only its hash stored), proxy the
+conversation turns to the sidecar, and persist the final evaluation. The
+interview has two modes --- \textbf{technical} skill validation and
+\textbf{language} assessment --- and the evaluator returns a structured
+result (for the language mode, a CEFR level with grammar, vocabulary and
+fluency sub-scores) that is stored as JSONB. The narrowness of this token
+contract is what allowed the two developers to work in parallel and is the
+clearest dividend of the onion boundary.
+
+%----------------------------------------------------------------------------------------
 
 \section{Security and Compliance}
 \label{sec:design-security}
 
 \subsection{Authentication and Authorisation}
-% Supabase Google OAuth. app_metadata.role server-set on first sign-in.
-% Middleware gating: 401 unauth, 403 non-HR on HR_ONLY_API_PREFIXES.
+\label{sec:design-authz}
+
+Authentication is delegated entirely to Supabase Auth using Google OAuth.
+The user's role --- \texttt{candidate} or \texttt{hr} --- is stored in
+\texttt{app\_metadata.role}, set server-side on first sign-in with the
+service-role key so that it cannot be altered from the client. The Next.js
+middleware refreshes the session on every request and gates access: an
+unauthenticated caller to an API route receives \texttt{401}, a non-HR
+caller to an HR-only prefix receives \texttt{403}, and dashboard routes are
+protected accordingly. Authorisation thus lives in the application edge,
+consistent with the decision to disable database RLS.
 
 \subsection{GDPR Alignment}
-% Six-month retention; deletion-aware design. Interaction history audit
-% trail. Right of access via candidate dashboard.
+\label{sec:design-gdpr}
+
+The data model is deletion-aware to support the six-month retention rule:
+candidate data can be removed through standard operations, and only the
+inferences actually needed are stored. A per-candidate interaction history
+provides an audit trail of status changes, emails and campaign outreach, and
+the candidate self-service portal gives data subjects visibility over their
+own record. The known gap --- that right-to-erasure is currently an
+operational script rather than a self-service flow --- is recorded as future
+work in Chapter~\ref{cap:conclusions}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Frontend Design}
 \label{sec:design-frontend}
 
-% shadcn/ui + Tailwind. Information architecture for the HR dashboard
-% vs candidate dashboard. Component library decisions.
+The interface is built with shadcn/ui components over Tailwind CSS, which
+gives a consistent, accessible primitive set without committing to a heavy
+component framework. The information architecture is split by persona: the
+\textbf{HR dashboard} is organised around the recruiter's workflow (talent
+pool, jobs and ranking, shortlists, assessments, notifications, analytics),
+while the \textbf{candidate portal} exposes only self-service actions
+(profile, CV upload, applications, assessments). The same application serves
+both, with navigation and permitted actions driven by the authenticated
+role, so a single codebase presents two coherent experiences.
+
+%----------------------------------------------------------------------------------------
 
 \section{Design Decision Log}
 \label{sec:design-decisions}
 
-% Compact table of decisions: choice, alternatives considered, rationale,
-% trade-off accepted. Examples: Supabase over Neon+Prisma; Groq primary
-% over OpenAI; FastAPI sidecar over in-process JS for AI Interviewer;
-% rule-based job fit over embedding similarity.
+Table~\ref{tab:design-decisions} records the principal design decisions, the
+alternatives weighed, and the trade-off accepted in each case.
+
+\begin{table}[h]
+\centering
+\caption[Design decision log]{Principal design decisions and their trade-offs.}
+\label{tab:design-decisions}
+\small
+\begin{tabular}{p{0.24\linewidth}p{0.26\linewidth}p{0.38\linewidth}}
+\toprule
+\textbf{Decision} & \textbf{Alternative} & \textbf{Rationale / trade-off} \\
+\midrule
+Supabase (DB+Auth+Storage) & ORM + separate Neon, Blob, auth & One managed provider; less glue; migration cost paid once \\
+No ORM, raw client & Prisma/Drizzle & Full control + transparency; cost is manual key conversion \\
+RLS disabled, app-side authz & Per-row RLS policies & Single auditable authz layer; server trust boundary becomes critical \\
+Rule-based \texttt{computeJobFit} & Embedding similarity & Per-criterion explainability over opaque ranking \\
+Groq primary, OpenAI fallback & Single provider & Outage becomes degradation, not failure \\
+FastAPI sidecar for interviewer & In-process JS & Clean language/process boundary; parallel development \\
+Text UUID primary keys & DB serial / native uuid & Opaque, collision-resistant, distributed-safe IDs \\
+\bottomrule
+\end{tabular}
+\end{table}
