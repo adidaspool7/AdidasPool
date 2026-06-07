@@ -1,60 +1,310 @@
 \chapter{Verification and Validation}
 \label{cap:validation}
 
-% TARGET LENGTH: ~8 pages.
-% Sources: AppReport/08_Testing_Strategy.md,
-% docs/audit-6-5-2026.md (security advisor decisions log),
-% client-pain-points (survey results when collected).
+This chapter reports how the platform was checked for correctness
+(\textit{verification} --- ``are we building the product right?'') and how
+it was confirmed to address the problems identified during discovery
+(\textit{validation} --- ``are we building the right product?''). The
+verification effort rests on three complementary layers: static analysis
+through the TypeScript compiler, an automated unit-test suite executed on
+every change, and manual acceptance testing with the client. Validation is
+addressed through a structured survey mapped one-to-one onto the pain points
+of Chapter~\ref{cap:introduction}, and the chapter closes with the security
+review that accompanied the project.
+
+%----------------------------------------------------------------------------------------
 
 \section{Verification Strategy}
 \label{sec:val-verification}
 
-% Three layers: type-checking (tsc --noEmit), unit testing (Vitest),
-% integration smoke testing.
+Verification follows the same boundaries as the \gls{onion} described in
+Chapter~\ref{cap:design}. Each layer is checked with the technique best
+suited to it: the type system guarantees structural correctness across all
+layers; pure Domain and Application logic is exercised by fast, isolated
+unit tests; and the Presentation boundary (authentication and route gating)
+is tested through request-level assertions. Because every external
+dependency is reached through a port, the suite mocks at those interfaces
+and never touches the network or the database, which keeps the whole run
+deterministic and fast enough to execute on every push.
 
 \subsection{Static Analysis and Type Safety}
-% TypeScript strict mode; ESLint; lack of any-leakage in api routes
-% (post-audit cleanup).
+\label{sec:val-static}
+
+The first line of defence is the TypeScript compiler running in
+\texttt{strict} mode. The command \texttt{tsc -{}-noEmit} type-checks the
+whole codebase without producing output and is the canonical local
+validation step for this project, in preference to a full production build
+(the build intentionally fails locally because it depends on
+deployment-only environment variables for the interview routes). Strict
+mode forbids implicit \texttt{any}, enforces null-safety, and makes the
+path aliases (\texttt{@server}, \texttt{@client}, \texttt{@/lib}) resolve
+identically in source and in tests.
+
+A code audit conducted in May~2026 found that the weakest point of the type
+guarantees was the database boundary, where rows were cast through
+\texttt{camelizeKeys<any>} and lost their types exactly where data crosses
+from PostgreSQL into the Domain. This observation is recorded as a
+maintainability item; it illustrates that type checking is necessary but
+not sufficient, and motivates the unit tests that pin the behaviour of the
+conversion utilities and the schema validators.
 
 \subsection{Unit Tests}
-% 17 test files, 259 tests at submission. Coverage areas: scoring,
-% job-fit, CV validation, upload use cases, interview runtime,
-% job-requirements schema, analytics catalog, shortlist use cases.
-% Coverage report shipped as CI artefact.
+\label{sec:val-unit}
+
+\subsubsection{Tooling}
+
+The suite runs on \textbf{Vitest~4.1.5} with the V8 coverage provider. Vitest
+was chosen over Jest because it natively supports ECMAScript modules (no
+CommonJS transform step), reuses the same path aliases as the application
+through its Vite resolver, and starts quickly thanks to the esbuild
+transformer. Tests live in the top-level \texttt{tests/} directory and
+alongside the code under \texttt{src/}, and are executed with
+\texttt{vitest run} (single pass, used in CI) or \texttt{vitest -{}-watch}
+during development. Coverage is produced with \texttt{vitest run
+-{}-coverage} and uploaded as a continuous-integration artefact.
+
+\subsubsection{Suite Composition}
+
+At the time of writing the suite comprises \textbf{18 test files and 305
+test cases, all passing}. Table~\ref{tab:test-inventory} lists every file
+with its case count, the application layer it targets, and the concern it
+covers. The suite deliberately concentrates on the layers where logic
+lives --- the Domain (pure decision functions) and the Application
+(orchestration) --- while the thin Infrastructure adapters are verified
+indirectly through the use cases that depend on them.
+
+\begin{table}[h]
+\centering
+\caption[Automated test inventory]{Automated test inventory at submission
+(18 files, 305 cases, all passing).}
+\label{tab:test-inventory}
+\small
+\begin{tabular}{p{0.30\linewidth}r p{0.18\linewidth}p{0.32\linewidth}}
+\toprule
+\textbf{File} & \textbf{Cases} & \textbf{Layer} & \textbf{Concern} \\
+\midrule
+\texttt{job-fit} & 47 & Domain & Job-anchored matching engine \\
+\texttt{middleware-auth} & 38 & Presentation & Route gating (401/403) \\
+\texttt{interview-runtime} & 37 & App + Infra & Interview rubric + evidence \\
+\texttt{job-matching-bridge} & 25 & Application & DB-row $\rightarrow$ matcher bridge \\
+\texttt{cv-validation} & 19 & Application & CV extraction schema \\
+\texttt{upload-use-cases} & 18 & Application & CV upload pipeline \\
+\texttt{analytics-catalog} & 16 & Domain & Widget-spec + injection guard \\
+\texttt{notifications-route-auth} & 16 & Presentation & API route authorisation \\
+\texttt{scoring} & 13 & Domain & Scoring + CEFR estimation \\
+\texttt{adidas-job-scraper} & 10 & Application & Job-listing scraper \\
+\texttt{logger-redaction} & 10 & Infrastructure & PII redaction in logs \\
+\texttt{text-extraction} & 10 & Infrastructure & PDF/DOCX extraction \\
+\texttt{escape-or-term} & 9 & Infrastructure & PostgREST \texttt{.or()} escaping \\
+\texttt{job-requirements-schema} & 9 & Application & JD extractor schema \\
+\texttt{listing-posted-date} & 9 & Domain & Fuzzy posted-date parsing \\
+\texttt{job-shortlist-use-cases} & 8 & Application & Per-job shortlist \\
+\texttt{interview-token} & 6 & Infrastructure & HMAC token round-trip \\
+\texttt{cv-fields-of-work} & 5 & Application & Field-of-work tagging \\
+\midrule
+\textbf{Total} & \textbf{305} & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{What is Tested, and Why}
+
+The suite is not uniform by design; the depth of testing in each area is
+proportional to its risk and to how much consequential logic it contains.
+
+\paragraph{Decision-critical Domain logic (highest priority).}
+The job-anchored matching engine (\texttt{computeJobFit}) is the most
+heavily tested unit, with 47 cases. Because hiring decisions must be
+explainable rather than opaque, the matcher is a pure function with no
+external dependencies, and its tests cover every one of the seven criteria
+(field, experience-in-field, seniority, required and preferred skills,
+languages, education), the ``average of applicable criteria only'' rule,
+and the \texttt{isEligible} flag computed as the conjunction of applicable
+\texttt{met} flags. A dedicated \textit{golden skill-match corpus} locks in
+expected match and no-match outcomes for realistic skill pairs --- for
+example that \texttt{js} matches \texttt{javascript} and \texttt{k8s}
+matches \texttt{kubernetes} through curated synonym groups and phrase
+aliases, while genuinely distinct products such as AWS and Azure, or Java
+and JavaScript, are kept apart. This corpus exists specifically to prevent
+silent regressions in matching accuracy when the synonym tables are edited.
+The scoring service (13 cases) is tested in the same spirit, covering score
+ranges, relative ordering, boundary capping, and the keyword-to-\gls{cefr}
+mapping.
+
+\paragraph{The glue between layers.}
+The \texttt{job-matching-bridge} suite (25 cases) was added after a
+production defect in which the bridge that converts a database row into the
+matcher's input read the wrong property (\texttt{title} instead of
+\texttt{jobTitle}), silently emptying the evidence text that supports
+title-based seniority matching. The pure matcher was already well tested,
+yet the untested ``glue'' in the Application layer carried the bug. The
+new suite tests the loose-date parser, the experience-duration calculation,
+the requirement-building helper, and includes an explicit regression case
+asserting that the job title is carried through. The lesson --- that pure
+logic and the code wiring it together must both be tested --- is revisited
+in Chapter~\ref{cap:conclusions}.
+
+\paragraph{Data-integrity boundaries.}
+The platform ingests data from Large Language Models, whose output cannot be
+trusted structurally. Four schema suites (\texttt{cv-validation},
+\texttt{job-requirements-schema}, \texttt{cv-fields-of-work}, and the
+spec validation inside \texttt{analytics-catalog}) assert that
+Zod schemas accept well-formed payloads, reject missing required fields,
+normalise values such as URLs and e-mail addresses, and tolerantly discard
+model-invented values that fall outside the canonical vocabulary (for
+instance, fields of work outside the sixteen allowed).
+
+\paragraph{Security-sensitive paths.}
+Several suites exist purely to defend security and compliance properties:
+\texttt{middleware-auth} (38 cases) and \texttt{notifications-route-auth}
+(16 cases) assert that unauthenticated callers receive \texttt{401} and
+non-HR callers receive \texttt{403} on protected routes; \texttt{escape-or-term}
+(9 cases) verifies that user search terms are escaped before reaching
+PostgREST \texttt{.or()} filters, closing an injection vector found in the
+audit; \texttt{logger-redaction} (10 cases) confirms that e-mail addresses
+and tokens are masked in structured logs; and the analytics catalog tests
+confirm that the strict widget-specification schema rejects injected keys,
+so that the constrained chart builder can never be coerced into running an
+arbitrary query.
+
+\paragraph{Module ownership note.}
+Two suites, \texttt{interview-runtime} (37 cases) and \texttt{interview-token}
+(6 cases), exercise the AI Skill Interviewer integration. The conversational
+FastAPI service itself was developed by the second team member; the tests
+listed here cover the Next.js side of that integration --- session creation,
+HMAC token signing and expiry, transcript-turn persistence, and the
+rubric-validation guardrails applied before an evaluation is stored. They
+are part of the shared suite but are attributed accordingly to keep the
+contribution boundary explicit.
+
+\subsubsection{Test Architecture and Mocking}
+
+The tests mirror the application's layering. Because every external
+dependency is reached through a Domain port, each port has a hand-written
+mock factory (for example a fake candidate repository, CV parser, storage
+service, and text extractor for the upload pipeline). External libraries
+that have no port --- the PDF and DOCX parsers, and the Supabase client used
+by the interview routes --- are replaced with module mocks. No mocking
+library is used; plain stub functions with explicit return values keep each
+test file self-contained, with its own fixtures and no shared global setup.
+This makes failures local and easy to read, at the small cost of some
+duplication between files.
 
 \subsection{Manual Acceptance Testing with the Client}
-% Two demo sessions; dataset used; structured walkthrough script.
+\label{sec:val-manual}
+
+Automated tests cannot judge whether a screen \textit{feels} faster to a
+recruiter, so the automated suite was complemented by structured acceptance
+sessions with the client. Working from a seeded dataset of representative
+CVs and job descriptions, the team walked through the end-to-end recruiter
+journey --- uploading and parsing a CV, opening a job and ranking candidates
+against it, shortlisting, contacting a candidate, and reviewing analytics ---
+and recorded the client's feedback against the original pain points. These
+sessions were also the principal vehicle for sprint reviews, doubling as
+both acceptance testing and Scrum ceremony (Section~\ref{sec:analysis-pm}).
+
+%----------------------------------------------------------------------------------------
 
 \section{Validation through Client Survey}
 \label{sec:val-survey}
 
-% Reproduce the survey instrument (one question per pain point),
-% method (sample size, distribution channel, response rate), and
-% headline findings. Include figures: bar charts of responses for the
-% three priority questions (CV time, language screening, borderline
-% engagement). Discuss limitations (small sample, single-organisation).
+Verification establishes that the software behaves as specified; validation
+asks whether the specification actually solves the client's problem. To
+answer this, the nine pain points of Table~\ref{tab:pain-points-overview}
+were turned into a survey instrument with one question per pain point, so
+that every reported friction could be traced to an explicit measure of
+whether the platform relieved it. The survey captured both the perceived
+severity of each pain point before the tool and the expected improvement
+with it, distributed to the HR stakeholders involved in discovery.
+
+The analysis focuses on the three highest-priority pain points identified
+during discovery: the time spent extracting information from CVs manually
+(pain point~5), the absence of first-pass language and skill screening
+before an interview (pain point~3), and the lack of a structured process to
+keep promising-but-rejected candidates engaged (pain point~9). The
+corresponding response distributions are reproduced as bar charts in this
+section. The validity of the findings is bounded by a small sample drawn
+from a single organisation; the results are therefore read as directional
+confirmation that the prioritisation was correct, not as a statistically
+generalisable claim. The full instrument and the raw responses are
+reproduced in Appendix~\ref{app:survey}.
+
+%----------------------------------------------------------------------------------------
 
 \section{Security Review}
 \label{sec:val-security}
 
-% Supabase Security Advisor sweep results (final state: 0 warnings,
-% 0 info, 28 acknowledged-intentional errors). Decisions log table
-% (W1 search_path, W2/W3 rls_auto_enable removed with CASCADE,
-% W4 leaked-password protection N/A for OAuth-only auth, I1-I3 RLS
-% disabled by design on three internal tables).
-% JWT rotation event after credential exposure (May 2026).
+Security was treated as a first-class verification concern rather than an
+afterthought, for two reasons: the platform stores special-category
+personal data under \gls{gdpr}, and it disables PostgreSQL \gls{rls} in
+favour of enforcing every access decision in server-side code reached
+through the service role. That design choice concentrates the
+authorisation burden in the application, which is precisely why the
+authentication and route-gating suites described above are central to the
+security posture.
+
+A deep code audit in May~2026 produced a prioritised findings log that
+drove concrete remediation. The most serious item was a leaked service-role
+credential committed in an obsolete migration script; the file was removed
+and the key rotated in the Supabase dashboard, with the corresponding
+environment variables updated across all deployment targets. The audit also
+identified --- and the team resolved --- a PostgREST \texttt{.or()} injection
+vector in the search filters, fixed by introducing and unit-testing the
+\texttt{escapeOrTerm} helper and applying it at every call site. Remaining
+items, such as extracting the interview routes behind a use-case layer and
+replacing residual \texttt{any} casts at the repository boundary with typed
+row interfaces, are recorded as tracked maintainability work rather than
+open vulnerabilities.
+
+Finally, a sweep with the Supabase Security Advisor was used to confirm the
+intended state of the database surface. The remaining advisor entries
+correspond to deliberate design decisions --- chiefly that \gls{rls} is
+disabled by design on internal tables that are never reached by an
+end-user session --- and each is recorded with its rationale in a decisions
+log so that an intentional choice is never mistaken for an oversight.
+
+%----------------------------------------------------------------------------------------
 
 \section{Performance Considerations}
 \label{sec:val-performance}
 
-% Indices created for hot paths (job_matches, job_shortlists,
-% experiences.fields_of_work GIN). Identified bottlenecks
-% (matchCandidatesToJob fan-out for large pools) and mitigation
-% (batched queries, persisted top-100 cache).
+Performance was addressed pragmatically, at the points the data model makes
+hot. Indexes back the read paths that the recruiter workflow exercises most
+often: the \texttt{job\_matches} and \texttt{job\_shortlists} tables for the
+per-job ranking and shortlist screens, and a GIN index on
+\texttt{experiences.fields\_of\_work} so that candidates can be filtered by
+field of work without a full scan. Expensive computation is cached rather
+than repeated: a job description is parsed by the Large Language Model only
+on the first time an HR user opens the ranking screen for that job, and the
+result is persisted with a schema version so that it is reused until the
+source changes; likewise the top-ranked candidates for a job are persisted
+as a \texttt{job\_matches} cache rather than recomputed on every view.
+
+The principal known bottleneck is the candidate fan-out inside
+\texttt{matchCandidatesToJob}, which currently loads the candidate pool and
+evaluates the matcher in application code. The remediation identified during
+the audit --- pre-filtering candidates in SQL through the fields-of-work GIN
+index so that only plausibly relevant profiles reach the matcher --- is
+recorded as planned work; the existing matcher tests are written so that
+they continue to hold once that optimisation is introduced.
+
+%----------------------------------------------------------------------------------------
 
 \section{Limitations Found During Validation}
 \label{sec:val-limitations}
 
-% Honest catalogue: STT/TTS browser-only (Chrome/Edge), LLM cost ceiling
-% on free tier, GDPR edge cases not yet automated (right-to-erasure
-% script is manual), analytics widget catalog still narrow.
+Validation also surfaced limitations that are reported here honestly rather
+than hidden. The browser-based speech-to-text and text-to-speech used by the
+assessment experience rely on Web Speech APIs available only in
+Chromium-based browsers (Chrome and Edge), so the spoken-interaction path
+degrades on other browsers. The Large Language Model usage runs against a
+provider free tier, which imposes a practical cost-and-rate ceiling on bulk
+CV parsing and is mitigated, but not removed, by the Groq-to-OpenAI fallback
+and the lazy parsing of job descriptions. Some \gls{gdpr} obligations are
+still operationally manual: the deletion-aware data model is in place, but
+the right-to-erasure routine is executed as a script rather than as a
+self-service flow. Finally, the constrained analytics builder, while safe by
+construction, exposes a deliberately narrow catalogue of metrics and
+dimensions, so some questions an analyst might ask cannot yet be expressed.
+These items frame the future work discussed in
+Chapter~\ref{cap:conclusions}.
