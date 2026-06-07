@@ -760,7 +760,7 @@ export default function UploadPage() {
                             size="sm"
                             onClick={resetForReupload}
                           >
-                            Replace CV
+                            Replace Document
                           </Button>
                         </>
                       )}
