@@ -309,3 +309,66 @@ describe("skill synonyms + evidence texts", () => {
   });
 });
 
+/**
+ * Golden skill-match corpus.
+ *
+ * Each row pins a realistic (JD required skill, candidate skill) pair to the
+ * expected match outcome. This is a regression lock: it captures the matcher's
+ * intended behaviour so that future edits to SKILL_SYNONYM_GROUPS or the
+ * tokenizer can ADD matches but never silently break the ones below.
+ *
+ * `shouldMatch: true`  → the criterion must score 100 / be met.
+ * `shouldMatch: false` → the criterion must score 0 / not be met (no false
+ *                        positive — distinct skills must stay distinct).
+ *
+ * When you add a new synonym group, add the corresponding true-row here too.
+ */
+describe("golden skill-match corpus", () => {
+  const cases: Array<{ jd: string; cv: string; shouldMatch: boolean }> = [
+    // ── Office suite (existing) ──────────────────────────────
+    { jd: "Microsoft Office", cv: "Microsoft Excel", shouldMatch: true },
+    { jd: "Excel", cv: "Microsoft Excel", shouldMatch: true },
+    // ── Soft-skill families (existing) ───────────────────────
+    { jd: "Team management", cv: "Team Lead", shouldMatch: true },
+    { jd: "Analytical skills", cv: "data analysis", shouldMatch: true },
+    { jd: "Problem solving", cv: "Troubleshooting", shouldMatch: true },
+    { jd: "Communication", cv: "Presentation skills", shouldMatch: true },
+    // ── Programming-language abbreviations (technical, new) ───
+    { jd: "JavaScript", cv: "JS", shouldMatch: true },
+    { jd: "TypeScript", cv: "TS", shouldMatch: true },
+    { jd: "Python", cv: "Python 3", shouldMatch: true },
+    // ── Tool / platform abbreviations (technical, new) ───────
+    { jd: "Kubernetes", cv: "k8s", shouldMatch: true },
+    { jd: "PostgreSQL", cv: "Postgres", shouldMatch: true },
+    { jd: "Machine Learning", cv: "ML", shouldMatch: true },
+    { jd: "CI/CD", cv: "ci cd pipelines", shouldMatch: true },
+    { jd: "Power BI", cv: "powerbi", shouldMatch: true },
+    { jd: "Google Cloud Platform", cv: "GCP", shouldMatch: true },
+    { jd: ".NET", cv: "dotnet", shouldMatch: true },
+    { jd: "C#", cv: "csharp", shouldMatch: true },
+    { jd: "Node.js", cv: "nodejs", shouldMatch: true },
+    // ── Distinct skills MUST NOT collide (no false positives) ─
+    { jd: "AWS", cv: "Azure", shouldMatch: false },
+    { jd: "Java", cv: "JavaScript", shouldMatch: false },
+    { jd: "SAP FI", cv: "Microsoft Excel", shouldMatch: false },
+    { jd: "Python", cv: "Java", shouldMatch: false },
+  ];
+
+  for (const { jd, cv, shouldMatch } of cases) {
+    it(`${shouldMatch ? "matches" : "does NOT match"} JD "${jd}" vs CV "${cv}"`, () => {
+      const result = computeJobFit(
+        { ...baseJob, requiredSkills: [jd] },
+        { ...baseCandidate, skillNames: [cv] }
+      );
+      const req = result.breakdown.find((c) => c.key === "requiredSkills")!;
+      if (shouldMatch) {
+        expect(req.score).toBe(100);
+        expect(req.met).toBe(true);
+      } else {
+        expect(req.score).toBe(0);
+        expect(req.met).toBe(false);
+      }
+    });
+  }
+});
+

@@ -127,6 +127,11 @@ Rules:
   - If the section is titled "Other Courses", "Certifications", "Formations", "Professional Development", or similar — extract every single entry as a separate education item
 - Sort experiences by date (most recent first)
 - For each experience's "fieldsOfWork": pick 1–3 entries from the SAME official departments list used by businessAreaClassification. Use ONLY those exact strings (case-sensitive). If the experience is clearly unrelated to every field, return an empty array. Do NOT invent new field names.
+- For "skills": list each distinct skill as its own entry. Use the COMMON, CANONICAL name of the skill so it can be matched against job descriptions:
+  - Spell out the full standard name rather than ad-hoc phrasing (e.g. "JavaScript" not "JS scripting", "Microsoft Excel" not "advanced excel usage", "Project Management" not "managed projects").
+  - Split compound entries into separate skills (e.g. "HTML, CSS & JavaScript" → three skills; "Python and SQL" → two skills).
+  - Keep the skill name itself only — drop proficiency words like "advanced", "strong", "basic", "expert in".
+  - Do NOT duplicate the same skill under different spellings.
 - For estimatedTotalYears: calculate total professional years from all experiences. Sum the durations. If dates are missing, estimate from context.
 - For businessAreaClassification: classify the candidate based on their overall experience and skills into the best-fit department from the official list. If none fits, set the primary to the closest match and fill customArea with a more accurate label.
 - For parsingConfidence: honestly assess how confident you are about each extracted field (0.0 to 1.0). Add flags for any uncertainties (e.g. "location_uncertain", "missing_language_levels", "date_gaps", "no_email", "ambiguous_education_level").

@@ -605,7 +605,51 @@ const SKILL_SYNONYM_GROUPS: string[][] = [
   ["motivation", "motivating", "motivational", "engagement", "inspiring"],
   // Appraisal / performance review.
   ["appraisal", "appraisals", "review", "reviews", "evaluation", "evaluations", "feedback"],
+
+  // ── Technical equivalences (single-token abbreviations) ──────────────
+  // Only UNAMBIGUOUS abbreviations / exact aliases are grouped here.
+  // Distinct products (e.g. aws vs azure, java vs javascript) are NEVER
+  // merged — they must remain separate to avoid false-positive matches.
+  ["javascript", "js", "ecmascript"],
+  ["typescript", "ts"],
+  ["kubernetes", "k8s"],
+  ["postgresql", "postgres", "psql"],
+  ["nodejs", "node.js"],
+  ["dotnet", ".net"],
+  ["csharp", "c#"],
+  ["golang", "go"],
 ];
+
+/**
+ * Multi-word / punctuation skill aliases collapsed to a single canonical
+ * token. Applied to BOTH the JD side and the candidate side, AFTER the
+ * char-strip pass in `skillTokenSet`. Append-only: each entry only ENABLES
+ * a new equivalence, it can never remove an existing match.
+ *
+ * Longer phrases must appear before their abbreviation so both collapse to
+ * the same canonical token (e.g. "machine learning" and "ml" → "machinelearning").
+ */
+const SKILL_PHRASE_ALIASES: Array<[RegExp, string]> = [
+  [/\bmachine\s+learning\b/g, "machinelearning"],
+  [/\bml\b/g, "machinelearning"],
+  [/\bdeep\s+learning\b/g, "deeplearning"],
+  [/\bnatural\s+language\s+processing\b/g, "nlp"],
+  [/\bpower\s+bi\b/g, "powerbi"],
+  [/\bpowerbi\b/g, "powerbi"],
+  [/\bgoogle\s+cloud(\s+platform)?\b/g, "googlecloud"],
+  [/\bgcp\b/g, "googlecloud"],
+  [/\bci\s+cd\b/g, "cicd"],
+  [/\bci-cd\b/g, "cicd"],
+  [/\bcicd\b/g, "cicd"],
+];
+
+function applyPhraseAliases(s: string): string {
+  let out = s;
+  for (const [re, replacement] of SKILL_PHRASE_ALIASES) {
+    out = out.replace(re, replacement);
+  }
+  return out;
+}
 
 const SKILL_TOKEN_CANONICAL = (() => {
   const map = new Map<string, string>();
@@ -621,8 +665,10 @@ function canonicalToken(t: string): string {
 }
 
 function skillTokenSet(raw: string): Set<string> {
-  const tokens = normalizeSkill(raw)
-    .replace(/[^a-z0-9\s+.#-]/g, " ")
+  const cleaned = applyPhraseAliases(
+    normalizeSkill(raw).replace(/[^a-z0-9\s+.#-]/g, " ")
+  );
+  const tokens = cleaned
     .split(/\s+/)
     .filter((t) => t.length > 0 && !SKILL_STOPWORDS.has(t))
     .map(canonicalToken);
