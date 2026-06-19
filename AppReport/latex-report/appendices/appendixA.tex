@@ -1,26 +1,190 @@
 \chapter{Detailed Database Schema}
 \label{app:db-schema}
 
-This appendix reproduces the canonical PostgreSQL schema of the platform,
-exactly as applied to the Supabase project. It is the single source of truth
-referenced throughout Chapter~\ref{cap:design}
-(Section~\ref{sec:design-database}) and is generated from
-\texttt{supabase/migrations/00000000000000\_schema.sql}. The schema
-consolidates the enumerated types and the 33 tables together with their
-triggers, indexes and foreign-key constraints. Row-Level Security is
-intentionally disabled on every application table: all database access is
-performed server-side through the service-role key, as discussed in
-Section~\ref{sec:design-security}.
+This appendix documents the canonical PostgreSQL schema of the platform.
+The complete DDL is maintained in
+\texttt{supabase/migrations/00000000000000\_schema.sql} in the project
+repository and is the single source of truth for both the production Supabase
+instance and any fresh development database. It consolidates 27 enumerated
+types and 33 tables together with their triggers, indexes and foreign-key
+constraints. Row-Level Security is intentionally disabled on every application
+table; all database access is performed server-side through the service-role
+key, as discussed in Section~\ref{sec:design-security}.
 
-The listing below is reproduced verbatim and is therefore long; annexes are
-not counted towards the page budget of the main body.
+Section~\ref{app:db-enums} lists all enumerated types; Section~\ref{app:db-candidates} shows the central \texttt{candidates} table in full as a representative example of the schema conventions; Section~\ref{app:db-tables} lists the remaining 32 tables with their purpose.
 
-\lstinputlisting[
-	language=SQL,
-	basicstyle=\ttfamily\tiny,
-	numbers=left,
-	numberstyle=\tiny\color{lstcomment},
-	breaklines=true,
-	caption={Canonical PostgreSQL schema (\texttt{00000000000000\_schema.sql}).},
-	label={lst:full-schema}
-]{appendices/schema.sql}
+%----------------------------------------------------------------------------------------
+\section{Enumerated Types}
+\label{app:db-enums}
+
+\begin{lstlisting}[language=SQL,
+    basicstyle=\ttfamily\footnotesize,
+    caption={All 27 enumerated types.},
+    label={lst:enums}]
+CREATE TYPE candidate_status AS ENUM (
+  'NEW','PARSED','SCREENED','INVITED','ASSESSED',
+  'SHORTLISTED','BORDERLINE','ON_IMPROVEMENT_TRACK','REJECTED','HIRED');
+CREATE TYPE candidate_source AS ENUM (
+  'EXTERNAL','INTERNAL','PLATFORM','AMBASSADOR');
+CREATE TYPE work_model AS ENUM ('REMOTE','HYBRID','ON_SITE');
+CREATE TYPE education_level AS ENUM (
+  'HIGH_SCHOOL','BACHELOR','MASTER','PHD','VOCATIONAL','OTHER');
+CREATE TYPE cefr_level AS ENUM ('A1','A2','B1','B2','C1','C2');
+CREATE TYPE job_status   AS ENUM ('DRAFT','OPEN','CLOSED','ARCHIVED');
+CREATE TYPE job_type     AS ENUM (
+  'FULL_TIME','PART_TIME','INTERNSHIP','CONTRACT');
+CREATE TYPE application_status AS ENUM (
+  'SUBMITTED','UNDER_REVIEW','INVITED','ASSESSED',
+  'SHORTLISTED','REJECTED','WITHDRAWN');
+CREATE TYPE assessment_status AS ENUM (
+  'PENDING','IN_PROGRESS','SUBMITTED','SCORED','REVIEWED','EXPIRED');
+CREATE TYPE interview_session_status AS ENUM (
+  'CREATED','RUNNING','ENDED','EVALUATED');
+CREATE TYPE interview_decision  AS ENUM ('PASS','FAIL');
+CREATE TYPE integrity_decision  AS ENUM ('CLEAR','REVIEW','FAIL');
+CREATE TYPE proctoring_severity AS ENUM ('INFO','WARNING','CRITICAL');
+CREATE TYPE interview_mode      AS ENUM ('TECHNICAL','LANGUAGE');
+CREATE TYPE track_status AS ENUM (
+  'ENROLLED','IN_PROGRESS','COMPLETED',
+  'REASSESSMENT_PENDING','REASSESSED','DROPPED');
+CREATE TYPE notification_type AS ENUM (
+  'JOB_POSTED','INTERNSHIP_POSTED','JOB_STATE_CHANGED',
+  'APPLICATION_RECEIVED','APPLICATION_STATUS_CHANGED',
+  'APPLICATION_WITHDRAWN','ASSESSMENT_INVITE','ASSESSMENT_COMPLETED',
+  'HR_APPLICATION_RECEIVED','HR_APPLICATION_WITHDRAWN',
+  'HR_ASSESSMENT_COMPLETED','HR_CV_UPLOADED','HR_PROFILE_UPDATED',
+  'PROMOTIONAL','CV_UPLOADED','STATUS_CHANGE',
+  'JOB_INVITATION','CONTACT_EMAIL_SENT');
+CREATE TYPE parsing_job_status AS ENUM (
+  'QUEUED','PROCESSING','COMPLETED','FAILED');
+CREATE TYPE campaign_status AS ENUM (
+  'DRAFT','SENT','TERMINATED','ARCHIVED');
+CREATE TYPE ambassador_program_status AS ENUM ('DRAFT','OPEN','CLOSED');
+CREATE TYPE ambassador_application_status AS ENUM (
+  'SUBMITTED','UNDER_REVIEW','ACCEPTED','REJECTED');
+\end{lstlisting}
+
+%----------------------------------------------------------------------------------------
+\section{Central Table: \texttt{candidates}}
+\label{app:db-candidates}
+
+The \texttt{candidates} table is the hub of the schema. It links to
+Supabase Auth via \texttt{user\_id}, holds all parsed CV fields, scoring
+outputs, status lifecycle, and the GDPR-relevant invitation and
+activation timestamps.
+
+\begin{lstlisting}[language=SQL,
+    basicstyle=\ttfamily\footnotesize,
+    caption={The \texttt{candidates} table (central hub of the schema).},
+    label={lst:candidates-table}]
+CREATE TABLE candidates (
+  id                       TEXT PRIMARY KEY,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  user_id                  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  first_name               TEXT NOT NULL,
+  last_name                TEXT NOT NULL,
+  email                    TEXT UNIQUE,
+  phone                    TEXT,
+  location                 TEXT,
+  country                  TEXT,
+  linkedin_url             TEXT,
+  date_of_birth            TIMESTAMPTZ,
+  nationality              TEXT,
+  willing_to_relocate      BOOLEAN,
+  availability             TEXT,
+  work_model               work_model,
+  bio                      TEXT,
+  raw_cv_url               TEXT,
+  raw_cv_text              TEXT,
+  parsed_data              JSONB,
+  motivation_letter_url    TEXT,
+  motivation_letter_text   TEXT,
+  learning_agreement_url   TEXT,
+  overall_cv_score         FLOAT,
+  experience_score         FLOAT,
+  education_score          FLOAT,
+  location_score           FLOAT,
+  language_score           FLOAT,
+  years_of_experience      FLOAT,
+  primary_business_area    TEXT,
+  secondary_business_areas TEXT[]  NOT NULL DEFAULT '{}',
+  parsing_confidence       JSONB,
+  needs_review             BOOLEAN,
+  status                   candidate_status NOT NULL DEFAULT 'NEW',
+  source_type              candidate_source NOT NULL DEFAULT 'EXTERNAL',
+  is_duplicate             BOOLEAN NOT NULL DEFAULT FALSE,
+  duplicate_of             TEXT,
+  secondary_email          TEXT,
+  activated_at             TIMESTAMPTZ,
+  invitation_sent          BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TRIGGER trg_candidates_updated_at
+  BEFORE UPDATE ON candidates
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_candidates_email            ON candidates(email);
+CREATE INDEX idx_candidates_status           ON candidates(status);
+CREATE INDEX idx_candidates_overall_cv_score ON candidates(overall_cv_score);
+CREATE INDEX idx_candidates_country          ON candidates(country);
+\end{lstlisting}
+
+%----------------------------------------------------------------------------------------
+\section{Remaining Tables}
+\label{app:db-tables}
+
+Table~\ref{tab:db-all-tables} lists all 33 tables with their
+purpose. The full DDL for each is available in the project repository at
+\texttt{supabase/migrations/00000000000000\_schema.sql}.
+
+\begin{longtable}{@{}l p{9cm}@{}}
+	\caption{All 33 database tables.}
+	\label{tab:db-all-tables} \\
+	\toprule
+	\textbf{Table} & \textbf{Purpose} \\
+	\midrule
+	\endfirsthead
+	\multicolumn{2}{c}{\tablename\ \thetable\ -- \textit{continued}} \\
+	\toprule
+	\textbf{Table} & \textbf{Purpose} \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endlastfoot
+
+	\texttt{candidates}                  & Central candidate record; links auth user, CV data, scores, status. \\
+	\texttt{experiences}                 & Work-experience entries per candidate; \texttt{fields\_of\_work} GIN-indexed. \\
+	\texttt{education}                   & Education history per candidate. \\
+	\texttt{candidate\_languages}        & Language proficiency records (CEFR level). \\
+	\texttt{skills}                      & Extracted skills per candidate. \\
+	\texttt{candidate\_tags}             & Free-form tags per candidate (upserted, idempotent). \\
+	\texttt{candidate\_notes}            & HR recruiter notes per candidate. \\
+	\texttt{candidate\_segments}         & Named saved filters / cohort definitions. \\
+	\texttt{candidate\_segment\_members} & Membership join between candidates and segments. \\
+	\texttt{jobs}                        & Job/internship listings; \texttt{parsed\_requirements} JSONB (lazy JD parsing). \\
+	\texttt{job\_applications}           & Applications linking candidates to jobs. \\
+	\texttt{job\_matches}                & Cached per-job fit scores (candidate $\times$ job). \\
+	\texttt{job\_shortlists}             & HR working pick-list per job; stores fit snapshot at time of add. \\
+	\texttt{jd\_parsing\_telemetry}      & Fire-and-forget telemetry for each JD parse call. \\
+	\texttt{assessment\_templates}       & Reusable assessment configuration. \\
+	\texttt{assessments}                 & Assessment invitations sent to candidates. \\
+	\texttt{assessment\_results}         & Scored results from completed assessments. \\
+	\texttt{interview\_sessions}         & AI interview sessions (technical or language mode). \\
+	\texttt{interview\_transcript\_turns}& Per-turn conversation log for each session. \\
+	\texttt{interview\_proctoring\_events} & Proctoring events (tab-switch, fullscreen exit, etc.). \\
+	\texttt{improvement\_tracks}         & Improvement plans auto-created on FAIL assessment. \\
+	\texttt{improvement\_progress}       & Progress entries within an improvement track. \\
+	\texttt{notifications}               & All system and HR-triggered notifications. \\
+	\texttt{notification\_preferences}   & Per-user notification opt-in/out configuration. \\
+	\texttt{promo\_campaigns}            & Promotional email campaigns with targeting rules. \\
+	\texttt{parsing\_jobs}               & Async CV parsing job queue. \\
+	\texttt{scoring\_weights}            & Singleton scoring-weight configuration (HR-tunable). \\
+	\texttt{scoring\_presets}            & Named scoring-weight presets. \\
+	\texttt{sync\_jobs}                  & Job-sync runs from the adidas careers portal scraper. \\
+	\texttt{hr\_dashboard\_widgets}      & Saved custom analytics widgets per HR user. \\
+	\texttt{hr\_profiles}               & HR user profile data. \\
+	\texttt{ambassador\_programs}        & Brand ambassador recruitment programmes. \\
+	\texttt{ambassador\_applications}    & Candidate applications to ambassador programmes. \\
+
+\end{longtable}
