@@ -409,7 +409,17 @@ can retune the model without a code change.
 
 Jobs are created and edited by HR or ingested by a scraper that collects
 real listings from the adidas careers portal (used to populate a realistic
-demonstration dataset). When an HR user first opens a job's ranking screen,
+demonstration dataset). Because a full portal sync can take the better part of
+a minute, it reuses the same fire-and-forget pattern as the bulk CV upload
+(Section~\ref{sec:impl-cv}): the route returns \texttt{202\,Accepted} with a
+sync identifier and runs the scrape through the Next.js \texttt{after()}
+primitive, recording progress in a \texttt{sync\_jobs} row that the client
+polls. The work therefore continues server-side regardless of the browser, so
+the recruiter can navigate away and return to find the sync still progressing
+or its result waiting. The same run also reconciles the local board against
+the portal: scraped jobs that are no longer listed are marked closed, while
+manually-created jobs are left untouched. When an HR user first opens a job's
+ranking screen,
 its description is parsed lazily into the versioned requirements schema and
 cached. The orchestrator \texttt{matchCandidatesToJob} then loads the
 candidate pool with their experiences, languages, education and skills,
