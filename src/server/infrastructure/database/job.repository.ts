@@ -478,16 +478,30 @@ export class SupabaseJobRepository implements IJobRepository {
   async closeStaleScrapedJobs(seenExternalIds: string[]): Promise<number> {
     if (seenExternalIds.length === 0) return 0;
 
-    // Fetch all currently OPEN jobs that came from the scraper
-    const { data, error } = await db
-      .from("jobs")
-      .select("id, external_id")
-      .eq("status", "OPEN")
-      .not("external_id", "is", null);
-    assertNoError(error, "job.closeStaleScrapedJobs.fetch");
+    // Fetch ALL currently OPEN scraper-sourced jobs. Supabase caps a single
+    // response at 1000 rows, so page through with .range() — otherwise stale
+    // jobs beyond the first 1000 would never be examined and would stay OPEN
+    // forever (the open-positions count would drift above the scraped total).
+    const allOpen: Array<{ id: string; external_id: string | null }> = [];
+    const FETCH_PAGE = 1000;
+    let from = 0;
+    // Cap at 50k rows defensively to avoid runaway loops.
+    while (allOpen.length < 50000) {
+      const { data, error } = await db
+        .from("jobs")
+        .select("id, external_id")
+        .eq("status", "OPEN")
+        .not("external_id", "is", null)
+        .range(from, from + FETCH_PAGE - 1);
+      assertNoError(error, "job.closeStaleScrapedJobs.fetch");
+      const rows = (data ?? []) as Array<{ id: string; external_id: string | null }>;
+      allOpen.push(...rows);
+      if (rows.length < FETCH_PAGE) break;
+      from += FETCH_PAGE;
+    }
 
     const seenSet = new Set(seenExternalIds);
-    const toClose = ((data ?? []) as Array<{ id: string; external_id: string | null }>)
+    const toClose = allOpen
       .filter((r) => r.external_id !== null && !seenSet.has(r.external_id!));
 
     if (toClose.length === 0) return 0;
