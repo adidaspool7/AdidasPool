@@ -947,7 +947,13 @@ export default function JobsPage() {
 
         if (data.status === "running") {
           setSyncing(true);
-          startSyncTimer();
+          // Seed the timer with the TRUE elapsed time since the server
+          // started this sync, so the bar reflects real progress instead of
+          // restarting from 0 when we navigate back to this page.
+          const startedMs = data.startedAt
+            ? Date.now() - new Date(data.startedAt).getTime()
+            : 0;
+          startSyncTimer(Math.max(0, startedMs));
           localStorage.setItem("activeSyncId", data.syncId);
           pollSyncStatus(data.syncId);
         } else if (
