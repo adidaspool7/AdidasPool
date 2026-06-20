@@ -1,7 +1,7 @@
 \chapter{Solution Design}
 \label{cap:design}
 
-This chapter presents the design of the platform: the high-level container
+This chapter presents the design of TalentHub: the high-level container
 view, the onion architecture that organises the code, the domain model and
 its relational schema, the job-anchored matching algorithm, the AI pipelines
 that ingest unstructured text, and the security, compliance and frontend
@@ -25,7 +25,7 @@ popup that communicates with the Next.js API routes, which in turn delegate
 the conversation to the sidecar through a signed-token contract. Table
 \ref{tab:containers} summarises the containers and their responsibilities.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption[System containers]{Top-level containers and their responsibilities.}
 \label{tab:containers}
@@ -45,6 +45,43 @@ Email & Resend & Assessment invitations, outreach \\
 \end{tabular}
 \end{table}
 
+Figure~\ref{fig:c4-container} renders the same containers as a context view,
+making explicit which actor talks to which component and where each external
+dependency sits. The single inward-facing fact it captures is that the
+browser only ever reaches the Next.js application; every managed service and
+external provider is contacted server-side, which is the structural
+precondition for the application-edge authorisation model defended in
+Section~\ref{sec:design-security}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  font=\scriptsize,
+  person/.style={draw, rounded corners, fill=lstkeyword!12, text width=2.0cm, align=center, minimum height=0.9cm},
+  core/.style={draw, thick, fill=lstkeyword!30, text width=3.0cm, align=center, minimum height=1.1cm},
+  ext/.style={draw, fill=lstcomment!18, text width=2.2cm, align=center, minimum height=0.9cm}]
+% actors
+\node[person] (hr) at (0,0) {HR recruiter (browser)};
+\node[person] (cand) at (4.2,0) {Candidate (browser)};
+% core
+\node[core] (web) at (2.1,-2.0) {Next.js web app: UI + API routes + use cases (Vercel)};
+% external left/right
+\node[ext] (llm) at (-2.6,-2.0) {LLM providers Groq / OpenAI};
+\node[ext] (ai) at (6.8,-2.0) {FastAPI AI Interviewer};
+% managed services
+\node[ext] (db) at (-1.2,-4.2) {Supabase PostgreSQL};
+\node[ext] (auth) at (2.1,-4.2) {Supabase Auth (OAuth)};
+\node[ext] (store) at (5.4,-4.2) {Supabase Storage};
+% relations
+\foreach \a in {hr,cand} \draw[-{Stealth}] (\a) -- (web);
+\foreach \b in {llm,ai,db,auth,store} \draw[-{Stealth}, lstcomment] (web) -- (\b);
+\end{tikzpicture}
+\caption[Container view]{Container (context) view of TalentHub. The browser
+reaches only the Next.js application; all managed services and external
+providers are contacted server-side.}
+\label{fig:c4-container}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{Onion / Clean Architecture}
@@ -62,6 +99,33 @@ the Domain never imports Infrastructure:
 Presentation $\rightarrow$ Application $\rightarrow$ Domain $\leftarrow$
 Infrastructure
 \end{quote}
+
+Figure~\ref{fig:onion} draws this as concentric layers. The dependency-free
+Domain sits at the centre; the Application layer wraps it; Infrastructure and
+Presentation form the outer shell. Crucially, although Infrastructure is drawn
+on the outside, its source-code dependencies point \emph{inward} --- it
+implements port interfaces declared by the Domain --- which is the property
+that keeps databases and LLM providers replaceable.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\footnotesize]
+\filldraw[fill=lstkeyword!8, draw=lstkeyword, thick, rounded corners] (-5.0,-3.4) rectangle (5.0,3.4);
+\node[anchor=north] at (0,3.25) {\textbf{Presentation} --- API routes, React components};
+\filldraw[fill=lstkeyword!18, draw=lstkeyword, thick, rounded corners] (-4.0,-2.75) rectangle (4.0,2.75);
+\node[anchor=north] at (0,2.6) {\textbf{Infrastructure} --- Supabase repos, LLM, storage, email};
+\filldraw[fill=lstkeyword!32, draw=lstkeyword, thick, rounded corners] (-2.9,-2.0) rectangle (2.9,2.0);
+\node[anchor=north] at (0,1.85) {\textbf{Application} --- use cases, DTOs};
+\filldraw[fill=lstkeyword!55, draw=lstkeyword, thick, rounded corners] (-1.7,-1.0) rectangle (1.7,1.0);
+\node[align=center] at (0,0) {\textbf{Domain}\\\scriptsize ports, value objects,\\\scriptsize pure services};
+\draw[-{Stealth}, very thick, lststring] (4.6,-3.0) -- (1.9,-0.7);
+\node[lststring, font=\scriptsize, anchor=west] at (3.0,-3.15) {dependencies point inward};
+\end{tikzpicture}
+\caption[Onion architecture]{The onion architecture as enforced in the
+codebase. All source-code dependencies point inward toward a
+dependency-free Domain; Infrastructure implements the Domain's ports.}
+\label{fig:onion}
+\end{figure}
 
 \begin{description}
 	\item[Domain (\texttt{src/server/domain/}).] Pure business logic ---
@@ -92,6 +156,31 @@ heavy for a two-person team. The payoff became concrete when the AI
 Interviewer had to be extracted into its own process, which the boundary
 made a contract change rather than a rewrite.
 
+\subsection{Dependency Injection and the Composition Root}
+\label{sec:design-di}
+
+The inward dependency rule is realised in practice through constructor
+injection and a single composition root. Each use-case class receives its
+collaborators --- always as port \emph{interfaces}, never as concrete classes
+--- through its constructor, so the use case is unaware of which technology
+fulfils the contract. A use case is therefore constructed against
+\texttt{ICandidateRepository}, not against \texttt{SupabaseCandidateRepository},
+and the same use case could be exercised against an in-memory fake in a unit
+test without changing a line of its code.
+
+The wiring itself is centralised. A single container module instantiates the
+concrete infrastructure implementations and a factory module imports those
+instances to assemble pre-wired use cases. These two files are the only place
+in the codebase that names a concrete repository or service; everywhere else
+depends on interfaces. This arrangement also expresses the Interface
+Segregation Principle directly: \texttt{CandidateUseCases} receives only a
+candidate repository, while \texttt{UploadUseCases} receives the six
+collaborators it genuinely needs (candidate repository, CV parser, storage,
+text extraction, deduplication and parsing-job repositories) and nothing
+more. No use case is given a dependency it does not use, which keeps the
+blast radius of any infrastructure change small and makes the dependency
+graph legible from the constructor signatures alone.
+
 %----------------------------------------------------------------------------------------
 
 \section{Domain Model}
@@ -110,7 +199,79 @@ sit supporting entities --- \textit{Promo Campaigns} (which generate
 notifications), \textit{Parsing Jobs} (which track bulk uploads),
 \textit{Ambassador Programs} with their applications, and \textit{Candidate
 Segments} --- giving thirty-three application tables in total.
+The business rules that drive scoring and assessment are not scattered
+through the codebase but are encoded as immutable value objects in the Domain
+layer, so that changing a weight or a threshold is a single, reviewable edit
+in one file. Table~\ref{tab:value-objects} lists the principal constants and
+the rules they encode. Expressing these as domain constants rather than as
+magic numbers buried in queries is what makes the scoring ``transparent'' in
+the sense promised to the client: every component of a score traces back to a
+named weight whose value is visible and version-controlled.
 
+\begin{table}[ht]
+\centering
+\caption[Principal domain value objects]{Principal domain value objects encoding
+business rules in the Domain layer.}
+\label{tab:value-objects}
+\small
+\begin{tabular}{p{0.30\linewidth}p{0.60\linewidth}}
+\toprule
+\textbf{Constant} & \textbf{Encoded rule} \\
+\midrule
+\texttt{CEFR\_LEVELS} & The six-level proficiency scale A1--C2 \\
+\texttt{CV\_SCORING\_WEIGHTS} & Language 35\%, experience relevance 25\%, education 15\%, location 15\%, years of experience 10\% \\
+\texttt{EDUCATION\_LEVEL\_SCORES} & High school 20, vocational 40, bachelor 60, master 80, PhD 100 \\
+\texttt{ASSESSMENT\_DEFAULT\_WEIGHTS} & Grammar, vocabulary, clarity, fluency and customer handling at 20\% each \\
+\texttt{BORDERLINE\_THRESHOLD} & Borderline band: score between 45 and 60 \\
+\texttt{MAGIC\_LINK\_EXPIRY\_HOURS} & Assessment-link validity of 48 hours \\
+\texttt{MAX\_FILE\_SIZE\_MB} / \texttt{MAX\_BULK\_FILES} & Upload limits: 10\,MB per file, 500 files per batch \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The candidate itself carries a lifecycle status that the domain treats as a
+state machine rather than a free-text label. Figure~\ref{fig:status-sm} shows
+the permitted transitions: a candidate enters as \texttt{NEW}, becomes
+\texttt{PARSED} once the CV pipeline completes, is \texttt{SCREENED} after
+matching or assessment, and then moves to an outcome. A borderline result is
+not a dead end --- it routes the candidate onto an improvement track and back
+for re-evaluation, which is the mechanism behind the develop-and-retain pillar
+of the framework in Chapter~\ref{cap:analysis}. Encoding these as named states
+with explicit transitions keeps the status filters in the talent pool, the
+notifications fired on change, and the analytics buckets all consistent with a
+single source of truth.
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  st/.style={draw, rounded corners, fill=lstkeyword!18, align=center, minimum height=0.7cm, text width=1.8cm},
+  to/.style={-{Stealth}, draw}]
+\node[st] (new) at (0,0) {NEW};
+\node[st] (par) at (2.8,0) {PARSED};
+\node[st] (scr) at (5.6,0) {SCREENED};
+\node[st] (off) at (8.8,0) {OFFER\_SENT};
+\node[st] (hir) at (11.6,0) {HIRED};
+\node[st] (bor) at (5.6,-2.3) {BORDERLINE};
+\node[st] (imp) at (8.8,-2.3) {ON\_IMPROV. TRACK};
+\node[st] (rej) at (7.2,-4.3) {REJECTED};
+\fill (-1.2,0) circle (2.5pt);
+\draw[to] (-1.2,0) -- (new);
+\draw[to] (new) -- (par);
+\draw[to] (par) -- (scr);
+\draw[to] (scr) -- node[above]{pass} (off);
+\draw[to] (off) -- node[above]{accepts} (hir);
+\draw[to] (scr) -- node[right]{borderline} (bor);
+\draw[to] (bor) -- node[above]{assign} (imp);
+\draw[to] (imp) to[bend left=18] node[above]{re-evaluate} (scr);
+\draw[to] (scr.south west) to[bend right=12] node[left,pos=0.7]{fail} (rej);
+\draw[to] (off.south) to[bend left=18] node[right]{declines} (rej);
+\end{tikzpicture}}
+\caption[Candidate lifecycle state machine]{Candidate lifecycle as a state
+machine. A borderline outcome routes onto an improvement track and back to
+screening rather than terminating.}
+\label{fig:status-sm}
+\end{figure}
 %----------------------------------------------------------------------------------------
 
 \section{Database Design}
@@ -146,6 +307,73 @@ at the explicit cost of making the server-side trust boundary critical;
 that cost is precisely why the authentication and route-gating tests of
 Chapter~\ref{cap:validation} are central to the design.
 
+\paragraph{Relationships and integrity.}
+The schema is centred on the \texttt{candidates} table, from which radiate
+one-to-many relationships to experiences, education, languages, skills, tags,
+notes, assessments, improvement tracks, job matches, applications and
+notifications, plus a one-to-one notification-preference row. The
+\texttt{jobs} table similarly fans out to its applications, cached matches,
+assessment templates and shortlist entries. Junction-style tables with
+composite uniqueness express the genuinely many-to-many relationships ---
+\texttt{job\_shortlists} is unique on \texttt{(job\_id, candidate\_id)},
+\texttt{candidate\_languages} on \texttt{(candidate\_id, language)}, and
+\texttt{job\_applications} on \texttt{(job\_id, candidate\_id)} --- so the
+database, not the application, guarantees that a candidate cannot apply to
+the same job twice or hold two records for the same language. Foreign keys
+are declared throughout, both for referential integrity and because the
+Supabase PostgREST layer requires a real foreign key to resolve its
+relational join syntax.
+
+\paragraph{Indexing strategy.}
+Indexes target the queries the application actually issues. The
+\texttt{candidates} table is indexed on \texttt{email}, \texttt{status},
+\texttt{overall\_cv\_score} and \texttt{country}, which are the columns the
+talent-pool filters sort and restrict on. The array column
+\texttt{experiences.fields\_of\_work} carries a \textsc{gin} index so that the
+matching engine can test field membership efficiently across the whole
+experience corpus. The \texttt{hr\_dashboard\_widgets} table is indexed on
+\texttt{(user\_id, position)} to serve each recruiter's ordered set of custom
+charts in a single scan.
+
+Figure~\ref{fig:er} shows the core of the resulting schema. The two darker
+entities, \texttt{candidates} and \texttt{jobs}, are the aggregates from
+which everything else fans out; the lighter join entities
+(\texttt{job\_applications}, \texttt{job\_matches}, \texttt{job\_shortlists})
+are exactly the genuinely many-to-many relationships protected by composite
+uniqueness. Attributes are omitted here for legibility and are listed in full
+in Appendix~\ref{app:db-schema}.
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize,
+  ent/.style={draw, fill=lstkeyword!15, rounded corners, align=center, minimum height=0.6cm, inner sep=3pt},
+  agg/.style={draw, fill=lstkeyword!38, rounded corners, align=center, minimum height=0.7cm, inner sep=3pt, font=\scriptsize\bfseries},
+  jent/.style={draw, fill=lstcomment!18, rounded corners, align=center, minimum height=0.6cm, inner sep=3pt},
+  rl/.style={draw, lstcomment}]
+\node[agg] (cand) at (0,0) {candidates};
+\node[ent] (exp) at (-4.6,2.4) {experiences};
+\node[ent] (edu) at (-4.6,1.0) {education};
+\node[ent] (lan) at (-4.6,-0.4) {candidate\_languages};
+\node[ent] (ski) at (-4.6,-1.8) {skills};
+\node[ent] (isess) at (-3.4,-3.2) {interview\_sessions};
+\node[jent] (japp) at (3.6,2.6) {job\_applications};
+\node[jent] (jmat) at (3.6,1.2) {job\_matches};
+\node[jent] (jsho) at (3.6,-0.2) {job\_shortlists};
+\node[agg] (job) at (7.4,1.2) {jobs};
+\node[ent] (ass) at (3.6,-2.0) {assessments};
+\node[ent] (ares) at (7.4,-2.0) {assessment\_results};
+\foreach \c in {exp,edu,lan,ski,isess,japp,jmat,jsho,ass} \draw[rl] (cand) -- node[pos=0.82,font=\tiny]{$*$} (\c);
+\foreach \c in {japp,jmat,jsho,ass} \draw[rl] (job) -- node[pos=0.82,font=\tiny]{$*$} (\c);
+\draw[rl] (ass) -- node[pos=0.82,font=\tiny]{$1$} (ares);
+\end{tikzpicture}}
+\caption[Core entity--relationship diagram]{Core of the relational schema
+(attributes omitted). The \texttt{candidates} and \texttt{jobs} aggregates fan
+out to profile, matching and assessment entities; ``$*$'' marks the many side
+of each one-to-many relationship.}
+\label{fig:er}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{Job-Anchored Matching Algorithm}
@@ -178,6 +406,31 @@ every criterion yields a per-criterion explanation the ranking is auditable
 embedding similarity. The top results are persisted in a \texttt{job\_matches}
 cache so the ranking screen does not recompute on every view.
 
+Figure~\ref{fig:match-flow} traces the orchestration end to end, from the
+lazy parse of the job description to the persisted, ranked cache. The single
+most important property visible in the flow is that scoring is a pure function
+applied per candidate: nothing in the loop depends on external state, which is
+what makes the ranking reproducible and exhaustively testable.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\scriptsize, node distance=6mm,
+  flowstep/.style={draw, rounded corners, fill=lstkeyword!18, text width=8.0cm, align=center, minimum height=0.65cm},
+  arr/.style={-{Stealth}, draw}]
+\node[flowstep] (s1) {Lazy-parse job description $\rightarrow$ versioned requirements (cached until source or schema version changes)};
+\node[flowstep, below=of s1] (s2) {Load candidates with experiences, languages, education and skills};
+\node[flowstep, below=of s2] (s3) {Build per-field experience vector from \texttt{fields\_of\_work}};
+\node[flowstep, below=of s3] (s4) {For each candidate: \texttt{computeJobFit} over 7 criteria (pure function)};
+\node[flowstep, below=of s4] (s5) {Average applicable criteria $\rightarrow$ fit \%; AND of ``met'' $\rightarrow$ \texttt{isEligible}};
+\node[flowstep, below=of s5] (s6) {Persist top-100 to \texttt{job\_matches} cache; render ranked screen};
+\foreach \a/\b in {s1/s2,s2/s3,s3/s4,s4/s5,s5/s6} \draw[arr] (\a) -- (\b);
+\end{tikzpicture}
+\caption[Job-matching orchestration]{Job-matching orchestration. The per-candidate
+scoring step is a pure, dependency-free function, which makes the ranking
+reproducible and unit-testable.}
+\label{fig:match-flow}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{AI Pipelines}
@@ -197,6 +450,44 @@ fallback. Every extraction call writes one fire-and-forget row to a telemetry
 table (provider, model, success, duration, token counts, whether the
 fallback was used), so the pipeline's reliability and cost can be observed
 without affecting the parse itself.
+
+Figure~\ref{fig:seq-cv} renders this pipeline as an interaction sequence. The
+two self-messages on the use case --- text extraction and schema validation
+with its single retry --- are where the ``untrusted boundary'' discipline of
+Section~\ref{sec:sota-structured} is enforced: the model's output is never
+trusted until it has passed the Zod schema.
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  part/.style={draw, fill=lstkeyword!15, align=center, text width=2.0cm, minimum height=0.7cm},
+  m/.style={-{Stealth}, draw},
+  r/.style={-{Stealth}, draw, dashed, lstcomment}]
+\node[part] (br) at (0,0) {Browser};
+\node[part] (uc) at (3.4,0) {Upload use case};
+\node[part] (st) at (6.2,0) {Supabase Storage};
+\node[part] (llm) at (9.0,0) {LLM Groq/OpenAI};
+\node[part] (db) at (11.8,0) {Database};
+\foreach \px in {0,3.4,6.2,9.0,11.8} \draw[lstcomment!50,dashed] (\px,-0.45) -- (\px,-8.4);
+\draw[m] (0,-0.9) -- node[above]{upload CV (PDF/DOCX)} (3.4,-0.9);
+\draw[m] (3.4,-1.7) -- node[above]{store file} (6.2,-1.7);
+\draw[r] (6.2,-2.4) -- node[above]{file URL} (3.4,-2.4);
+\draw[m] (3.4,-3.1) -- ++(1.2,0) -- ++(0,-0.5) -- (3.4,-3.6);
+\node[anchor=west,font=\tiny] at (4.65,-3.35) {extract text};
+\draw[m] (3.4,-4.3) -- node[above]{structured-output prompt} (9.0,-4.3);
+\draw[r] (9.0,-5.0) -- node[above]{JSON candidate (retry on fail $\rightarrow$ OpenAI)} (3.4,-5.0);
+\draw[m] (3.4,-5.7) -- ++(1.2,0) -- ++(0,-0.5) -- (3.4,-6.2);
+\node[anchor=west,font=\tiny] at (4.65,-5.95) {validate (Zod) + retry};
+\draw[m] (3.4,-6.9) -- node[above]{persist candidate + children} (11.8,-6.9);
+\draw[r] (11.8,-7.5) -- node[above]{ok} (3.4,-7.5);
+\draw[r] (3.4,-8.1) -- node[above]{parsed candidate} (0,-8.1);
+\end{tikzpicture}}
+\caption[CV-parsing sequence]{CV-parsing pipeline as an interaction sequence.
+Text extraction and Zod validation are self-messages on the use case; a Groq
+failure transparently retries against the OpenAI fallback.}
+\label{fig:seq-cv}
+\end{figure}
 
 \subsection{Job Description Extractor}
 \label{sec:design-jd}
@@ -224,6 +515,45 @@ fluency sub-scores) that is stored as JSONB. The narrowness of this token
 contract is what allowed the two developers to work in parallel and is the
 clearest dividend of the onion boundary.
 
+Figure~\ref{fig:seq-interview} traces the token and session flow across the
+boundary. The Next.js core owns identity and persistence; the sidecar owns the
+conversation. The only thing crossing between them is a short-lived,
+hash-verified token and the structured turns it authorises --- a contract
+small enough to reason about in full.
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  part/.style={draw, fill=lstkeyword!15, align=center, text width=2.0cm, minimum height=0.7cm},
+  m/.style={-{Stealth}, draw},
+  r/.style={-{Stealth}, draw, dashed, lstcomment}]
+\node[part] (cand) at (0,0) {Candidate browser};
+\node[part] (api) at (3.8,0) {Next.js API};
+\node[part] (side) at (7.6,0) {FastAPI sidecar};
+\node[part] (db) at (10.8,0) {Database};
+\foreach \px in {0,3.8,7.6,10.8} \draw[lstcomment!50,dashed] (\px,-0.45) -- (\px,-10.0);
+\draw[m] (0,-0.9) -- node[above]{start interview} (3.8,-0.9);
+\draw[m] (3.8,-1.7) -- node[above]{create session + store token hash} (10.8,-1.7);
+\draw[r] (3.8,-2.4) -- node[above]{signed HMAC token (10-min TTL)} (0,-2.4);
+\draw[m] (0,-3.1) -- node[above]{turn (answer) + token} (3.8,-3.1);
+\draw[m] (3.8,-3.8) -- ++(1.2,0) -- ++(0,-0.5) -- (3.8,-4.3);
+\node[anchor=west,font=\tiny] at (5.05,-4.05) {verify token hash};
+\draw[m] (3.8,-5.0) -- node[above]{proxy turn} (7.6,-5.0);
+\draw[r] (7.6,-5.7) -- node[above]{next question} (3.8,-5.7);
+\draw[r] (3.8,-6.4) -- node[above]{next question} (0,-6.4);
+\draw[m] (0,-7.1) -- node[above]{finish + token} (3.8,-7.1);
+\draw[m] (3.8,-7.8) -- node[above]{evaluate} (7.6,-7.8);
+\draw[r] (7.6,-8.5) -- node[above]{CEFR / technical result} (3.8,-8.5);
+\draw[m] (3.8,-9.1) -- node[above]{persist result (JSONB)} (10.8,-9.1);
+\draw[r] (3.8,-9.7) -- node[above]{result} (0,-9.7);
+\end{tikzpicture}}
+\caption[Interview token and session sequence]{Token and session flow between
+the Next.js core and the FastAPI interviewer sidecar. Only a short-lived,
+hash-verified token and the turns it authorises cross the boundary.}
+\label{fig:seq-interview}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{Security and Compliance}
@@ -250,9 +580,13 @@ candidate data can be removed through standard operations, and only the
 inferences actually needed are stored. A per-candidate interaction history
 provides an audit trail of status changes, emails and campaign outreach, and
 the candidate self-service portal gives data subjects visibility over their
-own record. The known gap --- that right-to-erasure is currently an
-operational script rather than a self-service flow --- is recorded as future
-work in Chapter~\ref{cap:conclusions}.
+own record. The right to erasure is exercised directly by the data subject: a
+``Danger Zone'' in the candidate settings deletes the full candidate record
+and its stored documents (CV, motivation letter and learning agreement) from
+object storage in one operation, and the same view offers a CSV export of the
+profile in support of the right of access. The remaining gap --- automating
+the time-based purge so that retention is enforced without a manual trigger
+--- is recorded as future work in Chapter~\ref{cap:conclusions}.
 
 %----------------------------------------------------------------------------------------
 
@@ -263,11 +597,14 @@ The interface is built with shadcn/ui components over Tailwind CSS, which
 gives a consistent, accessible primitive set without committing to a heavy
 component framework. The information architecture is split by persona: the
 \textbf{HR dashboard} is organised around the recruiter's workflow (talent
-pool, jobs and ranking, shortlists, assessments, notifications, analytics),
-while the \textbf{candidate portal} exposes only self-service actions
-(profile, CV upload, applications, assessments). The same application serves
-both, with navigation and permitted actions driven by the authenticated
-role, so a single codebase presents two coherent experiences.
+pool, jobs and ranking, shortlists, assessments, campaigns, notifications,
+interaction history and analytics), while the \textbf{candidate portal}
+exposes only self-service actions (registration, profile and notification
+preferences, document upload and editing, applications to jobs, internships
+and the ambassador program, assessments, application-status tracking and
+account deletion). The same application serves both, with navigation and
+permitted actions driven by the authenticated role, so a single codebase
+presents two coherent experiences.
 
 %----------------------------------------------------------------------------------------
 
@@ -277,7 +614,7 @@ role, so a single codebase presents two coherent experiences.
 Table~\ref{tab:design-decisions} records the principal design decisions, the
 alternatives weighed, and the trade-off accepted in each case.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption[Design decision log]{Principal design decisions and their trade-offs.}
 \label{tab:design-decisions}

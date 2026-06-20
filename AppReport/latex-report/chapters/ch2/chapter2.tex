@@ -1,7 +1,7 @@
 \chapter{State of the Art}
 \label{cap:state-of-the-art}
 
-This chapter situates the platform within the existing landscape. It first
+This chapter situates TalentHub within the existing landscape. It first
 surveys recruitment software and the gaps it leaves for a small,
 GDPR-constrained team; then reviews the role of artificial intelligence in
 hiring --- CV parsing, candidate--job matching and conversational assessment;
@@ -35,12 +35,44 @@ described here is therefore positioned not as a competitor to a full ATS but
 as a right-sized talent-intelligence tool for a single multilingual HR team,
 where auditability and compliance are first-class concerns.
 
+Table~\ref{tab:ats-comparison} summarises how representative products in the
+three tiers relate to the capabilities this project prioritises. The reading
+is deliberately qualitative: the goal is not to benchmark feature checklists
+but to expose where the market concentrates its effort. Enterprise suites are
+deep on workflow and reporting but treat language verification and
+explainable, per-criterion matching as out of scope or as paid analytics
+modules; mid-market tools add collaboration and structured interviewing;
+lighter products increasingly advertise AI sourcing, but the ranking they
+expose is typically a single opaque score rather than an auditable breakdown.
+
+\begin{table}[ht]
+\centering
+\caption[Recruitment tooling tiers versus prioritised capabilities]{Representative
+recruitment tooling tiers contrasted with the capabilities prioritised by this
+project. ``Partial'' denotes a capability that exists but is opaque, paid, or
+bolted on rather than integral.}
+\label{tab:ats-comparison}
+\begin{tabular}{p{0.26\linewidth}p{0.15\linewidth}p{0.15\linewidth}p{0.15\linewidth}p{0.15\linewidth}}
+\toprule
+\textbf{Capability} & \textbf{Enterprise suite} & \textbf{Mid-market} & \textbf{Light / SMB} & \textbf{This work} \\
+\midrule
+Applicant workflow tracking & Full & Full & Full & Partial \\
+Explainable per-criterion matching & Partial & Partial & No & Full \\
+Integrated language verification & No & No & No & Full \\
+GDPR retention as a design axis & Partial & Partial & Partial & Full \\
+Persistent, queryable talent pool & Full & Partial & Partial & Full \\
+Self-hostable on a free tier & No & No & Partial & Full \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 %----------------------------------------------------------------------------------------
 
 \section{Artificial Intelligence in Hiring}
 \label{sec:sota-ai}
 
-The recent surge of capable Large Language Models, beginning with the
+The recent surge of capable Large Language Models, built on the transformer
+architecture \parencite{Vaswani2017} and beginning with the
 demonstration that sufficiently large models perform tasks from natural
 instructions with few examples \parencite{Brown2020GPT3} and continued by
 efficient open foundation models \parencite{Touvron2023Llama}, has changed
@@ -55,7 +87,8 @@ has progressed through three generations. \textbf{Rule-based} parsers
 (commercial engines such as Sovren and RChilli) rely on hand-crafted
 patterns and gazetteers; they are fast and predictable but brittle against
 unusual layouts and multilingual content. \textbf{Machine-learning} parsers,
-typically built on transformer encoders such as BERT, improve robustness by
+typically built on transformer encoders such as BERT
+\parencite{Devlin2019BERT}, improve robustness by
 learning to label spans, at the cost of training data and pipeline
 complexity. \textbf{LLM-based} parsing, used in this project, prompts a
 general model to emit a structured object directly. Its advantages are
@@ -83,6 +116,20 @@ ability to show a per-criterion breakdown and a clear eligibility flag was
 judged more valuable for a compliance-sensitive HR team than the marginal
 recall of opaque similarity.
 
+The explainability argument deserves emphasis because it interacts directly
+with the regulatory context discussed in Section~\ref{sec:sota-gdpr}. Under a
+legitimate-interest or consent basis, a candidate may reasonably ask why they
+were or were not advanced; an embedding similarity of, say, $0.83$ is not an
+answer a recruiter can defend, whereas a statement that the candidate met the
+field-of-work, seniority and language criteria but missed two of three
+required skills is both defensible and actionable. A further practical
+consideration is data volume: embedding-based systems reward large training
+or reference corpora, which a single HR team operating under a six-month
+retention rule structurally cannot accumulate. A transparent rule-based
+function, by contrast, performs identically on the first candidate and the
+thousandth, which suits the intermittent, campaign-driven nature of the
+target workflow.
+
 \subsection{Conversational Assessment}
 \label{sec:sota-conversational}
 
@@ -95,10 +142,29 @@ fairness and transparency, which reinforce the design stance taken here ---
 the assessment never auto-rejects a candidate; it produces an explainable,
 rubric-based result for human review.
 
-%----------------------------------------------------------------------------------------
+\subsection{Structured Output from Language Models}
+\label{sec:sota-structured}
 
-\section{Language Proficiency Frameworks}
-\label{sec:sota-cefr}
+Both CV parsing and conversational scoring depend on a capability that is
+easily overlooked: extracting a machine-readable object, not prose, from a
+generative model. Early practice coaxed structure through prompt engineering
+alone --- few-shot examples and explicit ``answer only in JSON''
+instructions --- which works but fails unpredictably, producing trailing
+commentary, malformed brackets or invented keys. Two more reliable
+mechanisms have since become standard. \textbf{Constrained decoding}, exposed
+by providers as a \emph{JSON mode} or \emph{structured-output} feature, forces
+the model's token stream to conform to a supplied JSON Schema, eliminating
+syntactic errors at the source \parencite{OpenAIStructured2024}.
+\textbf{Schema validation} treats the model as an untrusted boundary: the
+emitted object is parsed against a strict but tolerant schema that coerces
+missing or surplus fields rather than throwing, so that a partially correct
+response degrades gracefully instead of failing. This project combines both
+--- a prompt that requests a typed object, a validation schema that silently
+drops values outside a controlled vocabulary, and a single retry --- which is
+what makes LLM parsing dependable enough for production use, as detailed in
+Chapter~\ref{cap:implementation}. The broader lesson from the literature is
+that the reliability of an LLM feature lives less in the model than in the
+contract wrapped around it.
 
 For language assessment the platform adopts the Common European Framework of
 Reference for Languages (\gls{cefr}), which defines a six-level scale from A1
@@ -113,6 +179,65 @@ it the natural rubric for an asynchronous, software-driven assessment: the
 descriptors translate cleanly into the grammar, vocabulary and fluency
 sub-scores the evaluator returns, and the resulting level is immediately
 meaningful to an HR team operating across many languages.
+
+%----------------------------------------------------------------------------------------
+
+\section{Speech Interfaces for Spoken Assessment}
+\label{sec:sota-speech}
+
+A software-driven language assessment that judges spoken fluency must capture
+and reproduce speech. Two complementary technologies make this possible in
+the browser without native applications or paid services. \emph{Speech
+synthesis} (text-to-speech, TTS) renders the interviewer's questions as
+audio; \emph{speech recognition} (speech-to-text, STT) transcribes the
+candidate's spoken answer back into text the evaluator can score. The W3C
+Web Speech API \parencite{W3CWebSpeech2020} exposes both as the
+\texttt{SpeechSynthesis} and \texttt{SpeechRecognition} browser interfaces,
+allowing a purely client-side implementation that incurs no server cost and
+keeps the raw audio on the candidate's device --- a non-trivial privacy
+advantage under the regulatory context discussed below.
+
+The approach has a known and accepted limitation: the recognition interface
+is fully supported only on Chromium-based browsers (Chrome and Edge), and
+recognition quality varies with accent and microphone conditions. Server-side
+alternatives such as cloud transcription services or self-hosted models
+(for example Whisper) would remove the browser constraint at the cost of
+infrastructure, latency and data-handling obligations. For a free-tier,
+privacy-conscious deployment the browser-native path was judged the correct
+trade-off, with a server-side fallback recorded as future work in
+Chapter~\ref{cap:conclusions}. Because the assessment is advisory and never
+auto-rejects, occasional transcription noise lowers convenience but does not
+produce an unfair automated decision.
+
+%----------------------------------------------------------------------------------------
+
+\section{Architectural Patterns for Maintainable Systems}
+\label{sec:sota-architecture}
+
+A platform expected to outlive a single internship and to absorb features
+that were deliberately deferred must be structured for change. The relevant
+body of work is the family of \emph{dependency-inverting} architectures.
+Hexagonal architecture, or ``ports and adapters''
+\parencite{CockburnHexagonal2005}, isolates application logic behind ports
+so that databases, user interfaces and external services become
+interchangeable adapters at the edge. The Onion Architecture
+\parencite{PalermoOnion2008} expresses the same idea as concentric layers in
+which all source-code dependencies point inward toward a dependency-free
+domain, and Clean Architecture \parencite{Martin2017} generalises the
+principle into the dependency rule that inner layers must know nothing of
+outer ones. All three share a tactical core supplied by Domain-Driven Design
+\parencite{Evans2003}: model the problem with entities and value objects, and
+keep that model independent of frameworks.
+
+These patterns matter here for two concrete reasons. First, they make the
+LLM and database choices reversible --- the application talks to a repository
+port and an AI-service port, not to Supabase or Groq directly, so a provider
+can be swapped without touching use-case logic. Second, they create the clean
+seam along which the two-developer team divided work: the conversational
+assessment could be developed as an external service behind a narrow contract
+precisely because the architecture already treated external capabilities as
+adapters. Chapter~\ref{cap:design} realises this literature as the concrete
+layering, ports and composition root of TalentHub.
 
 %----------------------------------------------------------------------------------------
 
@@ -150,3 +275,28 @@ assessment components feasible for a small team, provided their output is
 constrained and validated, while CEFR supplies a recognised rubric for the
 language dimension. The remainder of this report shows how these pieces are
 combined into a single coherent product for a multilingual HR team.
+
+Table~\ref{tab:sota-positioning} consolidates this gap analysis into the
+specific design commitments that follow from it. Each row pairs an observed
+limitation of the surveyed landscape with the response adopted in this work,
+and points to the chapter where that response is realised. The table thus
+serves as a bridge from the state of the art to the requirements analysis of
+Chapter~\ref{cap:analysis} and the design of Chapter~\ref{cap:design}.
+
+\begin{table}[ht]
+\centering
+\caption[State-of-the-art gaps mapped to design commitments]{State-of-the-art
+gaps mapped to the design commitments adopted in this work.}
+\label{tab:sota-positioning}
+\begin{tabular}{p{0.42\linewidth}p{0.42\linewidth}}
+\toprule
+\textbf{Observed gap} & \textbf{Response in this work} \\
+\midrule
+Matching is workflow-centric and opaque & Pure, unit-tested \textit{computeJobFit} function with per-criterion breakdown (Chapter~\ref{cap:design}) \\
+Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with grammar, vocabulary and fluency sub-scores (Chapter~\ref{cap:design}) \\
+Compliance is bolted on after the fact & Deletion-aware data model and interaction-history audit trail designed from the schema up (Chapter~\ref{cap:design}) \\
+LLM output is unreliable for production parsing & Strict tolerant validation schema plus provider fallback (Chapter~\ref{cap:implementation}) \\
+Intelligence tooling assumes large data and budgets & Rule-based, free-tier-deployable design that performs identically at any scale (Chapter~\ref{cap:design}) \\
+\bottomrule
+\end{tabular}
+\end{table}

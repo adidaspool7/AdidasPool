@@ -247,7 +247,9 @@ Bulk upload is fully functional via `POST /api/upload/bulk` (HR-only, middleware
 3. Uses Next.js **`after()`** to run the parsing pipeline asynchronously — extraction → LLM parse → dedup → upsert → score — after the HTTP response has been sent.
 4. The UI polls `GET /api/parsing-jobs/[id]` for progress and displays a live counter of `parsedFiles` / `failedFiles`.
 
-> ZIP archive extraction is supported; scanned/image-based PDFs are flagged for manual review in the job's `errorLog`.
+> ZIP archive extraction is supported. Files are parsed **one at a time** with a short throttle between them to respect the LLM provider's rate limits, so budget roughly **5 seconds per CV**. A single background run safely processes about **150–180 CVs** within its ~15-minute window. The hard cap is 500 files per batch, but very large imports should be split into smaller batches so each run finishes inside one window.
+
+> **Scanned / image-only PDFs are not supported.** The pipeline extracts text directly from the file and has **no OCR (optical character recognition) fallback**. A CV that is a photo or scan with no embedded text yields too little text to parse and is flagged for manual review in the job's `errorLog` — re-upload a text-based PDF or DOCX instead.
 
 ---
 

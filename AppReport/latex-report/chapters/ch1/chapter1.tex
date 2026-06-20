@@ -1,9 +1,9 @@
 \chapter{Introduction}
 \label{cap:introduction}
 
-This report documents the design, implementation and validation of the
-\emph{Talent Intelligence and Language Verification Platform}, a web
-application built during the BlendEd program in partnership with adidas
+This report documents the design, implementation and validation of
+\emph{TalentHub}, an integrated HR platform for candidate lifecycle
+management, built during the BlendEd program in partnership with adidas
 Global Business Services (GBS) Porto, in the context of the LEI-PROJ
 (PESTI) project unit of the Bachelor's Degree in Computer Engineering at
 the Instituto Superior de Engenharia do Porto.
@@ -27,13 +27,35 @@ and re-engage promising candidates in a compliant way.
 \section{Context}
 \label{sec:context}
 
-The BlendEd program is a partnership between Portuguese higher education
-institutions and adidas GBS Porto in which student teams design and
-implement software solutions for problems sourced from the company's day-to-day
-operations. The team behind this project (two members) was assigned to the
-HR / Talent Acquisition area at adidas GBS Porto with a deliberately broad
-brief: to identify recurring frictions in the recruitment workflow and to
-propose a tool that improves them.
+The BlendEd program is an international partnership between universities and
+companies across Europe in which multinational student teams design and
+implement software solutions for problems sourced from a partner company's
+day-to-day operations. In this edition the partner company was adidas GBS
+Porto, and the teams were international: the author's team alone brought
+together members from several countries --- among them Portugal, Greece,
+Croatia, Belgium and Germany. The program ran four subprojects in parallel --- a talent pool,
+an onboarding assistant, a community-research tool and an employer-branding
+solution --- each with its own team and product owner. This report covers the
+\textbf{Talent Pool} subproject, whose two-person engineering team was
+assigned to the HR / Talent Acquisition area at adidas GBS Porto with a
+deliberately broad brief: to identify recurring frictions in the recruitment
+workflow and to propose a tool that improves them.
+
+adidas Business in Portugal provides shared services --- spanning Finance,
+Human Resources, Accounts and Sales Management, Supply Chain, Digital
+Services and Tech --- to other adidas companies across Europe. The Porto
+site employs more than 900 people, around 22\% of whom are foreign, and its
+teams operate daily across 15 different business languages. This linguistic
+diversity is a competitive strength, but it also raises a strategic
+workforce-planning question that framed the original client brief:
+\textit{how can adidas attract, develop and retain critical language
+capabilities in a sustainable way within its workforce in Portugal?} The
+brief therefore asked not merely for a recruitment utility but for a
+\emph{framework} --- and a supporting tool --- able to operationalise a
+language-and-talent strategy along three axes: attracting candidates with
+critical language skills, maintaining and developing those skills over time,
+and keeping the effort aligned with adidas's long-term business objectives
+and cultural diversity.
 
 Discovery sessions with the client surfaced a pattern that runs across most
 of their processes. Candidate data is rich and heterogeneous (CVs in
@@ -59,13 +81,18 @@ data model and a contact-history audit trail).
 \section{Problem Statement}
 \label{sec:problem}
 
-The HR teams interviewed during the discovery phase reported nine concrete
-pain points, summarised in
+The strategic challenge stated in the client brief --- attracting, developing
+and retaining language capabilities sustainably --- does not present itself
+to recruiters as an abstract goal but as a set of daily operational
+frictions. Translating the strategy into something a tool can address
+therefore began by decomposing it into concrete obstacles. The HR teams
+interviewed during the discovery phase reported nine concrete pain points,
+summarised in
 Table~\ref{tab:pain-points-overview}. These were validated through repeated
 client meetings and an instrumented survey with one question per pain
 point.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption[Pain points identified during client discovery]{Pain points
 identified during client discovery, as documented in
@@ -143,11 +170,63 @@ above and refined during sprint planning with the client:
 
 %----------------------------------------------------------------------------------------
 
+\section{Scope and Delimitations}
+\label{sec:scope}
+
+A recurring risk in a brief as broad as ``improve recruitment'' is that the
+product expands until nothing is finished well. The scope was therefore fixed
+explicitly with the client during sprint zero and held throughout: TalentHub
+is a \emph{talent-intelligence and language-verification layer}, not a
+replacement for the enterprise Applicant Tracking System (\gls{ats}) the
+company already operates. The boundary matters because it determines what the
+platform owns and what it deliberately leaves to existing systems.
+
+Table~\ref{tab:scope} states the boundary directly. In scope is everything
+that turns a heterogeneous stream of CVs into a structured, analysable and
+contactable talent pool, plus the language and skill verification that the
+existing process lacks. Out of scope is the transactional machinery of a full
+\gls{ats} --- requisition approval chains, offer management, payroll and
+onboarding --- together with any feature that would auto-reject a candidate
+without human review, which both the client's risk appetite and the
+regulatory analysis of Chapter~\ref{cap:state-of-the-art} rule out.
+
+\begin{table}[ht]
+\centering
+\caption[Project scope and delimitations]{What TalentHub deliberately does and
+does not do.}
+\label{tab:scope}
+\small
+\begin{tabular}{p{0.46\linewidth}p{0.46\linewidth}}
+\toprule
+\textbf{In scope} & \textbf{Out of scope (delimitations)} \\
+\midrule
+Structured, GDPR-aware talent pool & Full applicant-tracking workflow (requisitions, approvals) \\
+Automated CV ingestion and parsing & Offer management, contracts and payroll \\
+Explainable job-anchored matching & Onboarding of hired employees \\
+CEFR language and technical-skill verification & Automatic rejection without human review \\
+HR communication, campaigns and audit trail & Replacement of the corporate ATS (SAP SuccessFactors) \\
+Recruitment analytics and custom widgets & Cross-organisation, multi-tenant operation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three further delimitations bound the technical claims of this report. The
+spoken-assessment experience depends on browser-native speech APIs and is
+therefore validated only on Chromium-based browsers; the Large Language Model
+usage runs on provider free tiers, so throughput is rate-limited by design;
+and the conversational AI Interviewer is a separate service owned by the
+second team member, so this report documents its \emph{integration contract}
+rather than its internal conversational logic
+(Section~\ref{sec:team}). These boundaries are revisited as limitations in
+Chapter~\ref{cap:conclusions}.
+
+%----------------------------------------------------------------------------------------
+
 \section{Approach}
 \label{sec:approach}
 
 The project followed an incremental, Scrum-based delivery cycle over the
-academic year, with the author acting as Product Owner and the second team
+semester, with the author acting as Product Owner and the second team
 member, Stratos Demertzoglou, owning the AI Interviewer sidecar (a Python
 \textit{FastAPI} service) end to end. All other modules --- frontend,
 Next.js API routes, database schema, CV parsing pipeline, matching engine,
@@ -155,7 +234,7 @@ notifications, analytics and CI/CD --- were designed and implemented by
 the author.
 
 The technological choices were guided by the brief: a small two-person
-team, a tight academic deadline, and the need for production-grade
+engineering team, a tight academic deadline, and the need for production-grade
 deployment. The platform is implemented as a Next.js 16 application
 written in TypeScript, deployed on Vercel, and backed by a Supabase
 PostgreSQL database with Supabase Auth (Google OAuth). The codebase
@@ -179,8 +258,10 @@ The contributions claimed by this work are:
 	\item A dual-mode AI interviewer (technical skill validation and
 	CEFR-grade language assessment) integrated into a Next.js application
 	through a hardened HMAC-signed token contract.
-	\item A documented project-management experience report from a
-	two-person team using Scrum, with the author serving as Product Owner.
+	\item A documented project-management experience report from the
+	two-person talent-pool subproject of a four-team BlendEd program, with
+	the author serving as its Product Owner under the program's Scrum
+	process.
 \end{itemize}
 
 %----------------------------------------------------------------------------------------
@@ -188,7 +269,13 @@ The contributions claimed by this work are:
 \section{Team Composition and Personal Contribution}
 \label{sec:team}
 
-The project was developed by a team of two:
+This report concerns the Talent Pool, one of four subprojects delivered in
+parallel within the BlendEd program. The wider program team comprised four
+product owners (one per subproject, the author among them), four developers,
+two designers, and law, human-resources and marketing students, working under
+a coordinating professor and a Scrum Master who facilitated the shared sprint
+ceremonies. The Talent Pool subproject itself was built by a two-person
+engineering team:
 
 \begin{description}
 	\item[Fernando Regalado Lobo Ribeiro (author):] Product Owner;
@@ -210,9 +297,9 @@ product backlog as a module boundary, and re-confirmed at every sprint
 review. Because the author was simultaneously Product Owner and the main
 implementer, the role had to be exercised carefully: backlog ordering had
 to remain client-driven and not author-driven, and integration risk
-between the two modules was mitigated through a documented HTTP contract
-and a shared session-token scheme described in
-Chapter~\ref{cap:design}.
+between the two modules was mitigated through the documented REST and
+signed-token contract between the Next.js core and the FastAPI sidecar
+described in Chapter~\ref{cap:design}.
 
 %----------------------------------------------------------------------------------------
 
@@ -235,7 +322,7 @@ trade-offs encountered along the way.
 Chapter~\ref{cap:validation} reports verification and validation results,
 including automated test coverage, security review and the client-facing
 survey.
-Chapter~\ref{cap:conclusions} closes the report with conclusions, an
-honest assessment of limitations and a roadmap for future work.
+Chapter~\ref{cap:conclusions} closes the report with conclusions, the
+project's limitations and directions for future work.
 The bibliography and a set of appendices --- detailed database schema,
 full API reference, and the survey instrument --- complete the document.

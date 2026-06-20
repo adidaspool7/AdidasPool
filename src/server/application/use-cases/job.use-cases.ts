@@ -305,8 +305,18 @@ export class JobUseCases {
 
     // Reconcile: jobs that were OPEN in the DB but absent from this scrape
     // have been taken down — mark them CLOSED.
-    const seenExternalIds = scrapedJobs.map((j) => j.externalId);
-    const closed = await this.jobRepo.closeStaleScrapedJobs(seenExternalIds);
+    //
+    // This is only safe on a FULL scrape (maxPages === 0). On a partial
+    // scrape the "absent" set includes every job beyond the scraped pages,
+    // which would wrongly close most of the board. We also require a healthy
+    // non-empty result so a transient scrape failure (0 jobs) never triggers
+    // a mass close-out.
+    const isFullScrape = maxPages === 0;
+    let closed = 0;
+    if (isFullScrape && scrapedJobs.length > 0) {
+      const seenExternalIds = scrapedJobs.map((j) => j.externalId);
+      closed = await this.jobRepo.closeStaleScrapedJobs(seenExternalIds);
+    }
 
     const durationMs = Date.now() - startTime;
 

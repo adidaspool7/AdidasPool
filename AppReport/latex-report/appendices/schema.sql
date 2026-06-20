@@ -1,5 +1,5 @@
 -- =============================================================
--- Talent Intelligence Platform — Canonical Schema
+-- TalentHub — Canonical Schema
 -- Migrated from Prisma schema to Supabase PostgreSQL
 -- Run this in the Supabase SQL Editor (Project → SQL Editor)
 --

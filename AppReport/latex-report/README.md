@@ -1,4 +1,4 @@
-# Talent Intelligence and Language Verification Platform — Project Report
+# TalentHub --- An Integrated HR Platform for Candidate Lifecycle Management --- Project Report
 
 LaTeX source for the LEI-PROJ (PESTI) academic report.
 

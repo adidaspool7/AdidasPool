@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Talent Intelligence & Language Verification Platform
+% TalentHub --- An Integrated HR Platform for Candidate Lifecycle Management
 % LEI-PROJ (PESTI) project report
 % Author: Fernando Regalado Lobo Ribeiro (1060064)
 % Academic year: 2025/2026
@@ -27,7 +27,7 @@
 \lstset{
 	basicstyle=\ttfamily\footnotesize,
 	keywordstyle=\color{lstkeyword}\bfseries,
-	commentstyle=\color{lstcomment}\itshape,
+	commentstyle=\color{lstcomment},
 	stringstyle=\color{lststring},
 	backgroundcolor=\color{lstback},
 	breaklines=true,
@@ -47,6 +47,40 @@
 	morestring=[b]`,
 }
 
+% --- Diagrams and charts ----------------------------------------------------
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,calc,backgrounds,chains}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% --- Table spacing ----------------------------------------------------------
+% Give every table more vertical breathing room and a touch more column
+% padding, so multi-line cells (e.g. the comparison and framework tables) no
+% longer look cramped against the booktabs rules.
+\renewcommand{\arraystretch}{1.35}
+\setlength{\tabcolsep}{8pt}
+
+% Screenshots live alongside the diagrams in frontmatter/assets/screenshots.
+% Drop PNG/JPG files there using the file names referenced in \includegraphics.
+\graphicspath{{.}{frontmatter/assets/}{frontmatter/assets/screenshots/}}
+
+% Placeholder used while a screenshot is still pending. Renders a labelled,
+% correctly-sized grey box so the page layout is final before the real image
+% is dropped in. To swap in a real screenshot, replace the \screenshotplaceholder
+% line with \includegraphics[width=...]{<file>} using the same caption/label.
+\newcommand{\screenshotplaceholder}[2][0.85\linewidth]{%
+	\begingroup
+	\setlength{\fboxsep}{0pt}%
+	\fcolorbox{lstcomment}{lstback}{%
+		\parbox[c][0.34\linewidth][c]{#1}{%
+			\centering\ttfamily\footnotesize\color{lstcomment}%
+			[\,screenshot pending\,]\\[2pt]#2%
+		}%
+	}%
+	\endgroup
+}
+
 % --- Citation style (Harvard-like, recommended by the template) -------------
 \usepackage[style=authoryear-comp,backend=biber]{biblatex}
 \addbibresource{mainbibliography.bib}
@@ -57,7 +91,7 @@
 %	REPORT INFORMATION
 %----------------------------------------------------------------------------------------
 
-\thesistitle{Talent Intelligence and Language Verification Platform}
+\thesistitle{TalentHub: An Integrated HR Platform for Candidate Lifecycle Management}
 
 \thesisinstitution{adidas GBS Porto --- BlendEd Program}
 
@@ -74,7 +108,7 @@
 
 \examdate{June 2026}
 
-\keywords{Talent Pool, Recruitment, AI, Large Language Models, GDPR, Language Assessment, CEFR}
+\keywords{Talent Pool, Recruitment, HR Tooling, Candidate Lifecycle Management, AI, Large Language Models, GDPR, Language Assessment, CEFR}
 
 \hypersetup{pdftitle=\ttitle}
 \hypersetup{pdfauthor=\author}
@@ -92,6 +126,8 @@
 %----------------------------------------------------------------------------------------
 %	BODY
 %----------------------------------------------------------------------------------------
+
+\mainmatter % switch to arabic page numbers + numbered chapters
 
 \input{chapters/ch1/chapter1} % Introduction
 \input{chapters/ch2/chapter2} % State of the Art

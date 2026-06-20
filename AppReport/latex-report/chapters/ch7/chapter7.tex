@@ -3,9 +3,9 @@
 
 This chapter closes the report. It restates what the project contributed,
 checks each objective against what was delivered, distils the lessons
-learned --- including the experience of acting as Product Owner in a
-two-person team --- and sets out the limitations and the future work that
-follow from them.
+learned --- including the experience of acting as Product Owner of the
+two-person talent-pool subproject --- and sets out the limitations and the
+future work that follow from them.
 
 %----------------------------------------------------------------------------------------
 
@@ -29,8 +29,9 @@ Chapter~\ref{cap:introduction}, each backed by a concrete deliverable:
 	and CEFR language assessment) integrated through a hardened HMAC token
 	contract --- the integration layer being the author's contribution, the
 	conversational service the second member's.
-	\item A \textbf{project-management experience report} from a two-person
-	Scrum team with the author as Product Owner, documented in
+	\item A \textbf{project-management experience report} from the
+	two-person talent-pool subproject of the BlendEd program, with the author
+	as its Product Owner, documented in
 	Chapter~\ref{cap:analysis} and reflected on below.
 \end{itemize}
 
@@ -62,8 +63,9 @@ outcome is as follows:
 	\item \textbf{Make the pipeline measurable.} \emph{Achieved} --- the
 	built-in dashboards and the constrained custom-widget builder.
 	\item \textbf{Respect compliance and security.} \emph{Largely
-	achieved} --- server-side authorisation and a deletion-aware model are
-	in place; full self-service right-to-erasure remains future work
+	achieved} --- server-side authorisation, a deletion-aware model and
+	self-service account erasure are in place; automating the time-based
+	retention purge remains future work
 	(Section~\ref{sec:concl-future}).
 \end{enumerate}
 
@@ -72,11 +74,12 @@ outcome is as follows:
 \section{Lessons Learned}
 \label{sec:concl-lessons}
 
-\subsection{Product Owner Lessons in a Two-Person Team}
+\subsection{Product Owner Lessons in a Two-Person Subproject}
 \label{sec:concl-po}
 
 Holding the Product Owner accountability while also writing most of the code
-was the defining experience of the project, and its lessons cut both ways.
+was the defining experience of the talent-pool subproject, and its lessons
+cut both ways.
 The advantage was immediacy: there was no translation loss between deciding
 what mattered and building it. The danger was the mirror image of that
 advantage --- when the same person sets priorities and implements them, the
@@ -135,9 +138,16 @@ statistically generalisable. Automated test coverage, though substantial, is
 concentrated in the Domain and Application layers and is thinner over some
 use-case orchestration and the thin infrastructure adapters. The spoken
 assessment relies on browser-native speech recognition and synthesis, which
-restricts it to Chromium-based browsers. And although the data model is
-deletion-aware, the right-to-erasure routine is still executed as an
-operational script rather than a self-service flow.
+restricts it to Chromium-based browsers. CV ingestion extracts text directly
+from the uploaded file and has no optical-character-recognition (OCR)
+fallback, so scanned or image-only PDFs yield too little text to parse and are
+flagged for manual review rather than processed automatically. Bulk imports
+are processed serially in a time-bounded background task, which keeps a single
+run to roughly 150--180 CVs and means the 500-file batch cap cannot always
+complete in one window without a durable queue. And although candidates can
+erase their own account on demand, the time-based retention purge is not yet
+automated --- it still depends on a manual trigger rather than running on a
+schedule.
 
 %----------------------------------------------------------------------------------------
 
@@ -148,11 +158,17 @@ The most immediate future work is the tracked backlog from the May~2026
 audit: extracting the remaining interview routes behind a use-case layer,
 replacing residual \texttt{any} casts at the repository boundary with typed
 row interfaces, and pre-filtering candidates in SQL before the matcher to
-scale matching on large pools. Beyond the audit, four directions stand out:
-automating right-to-erasure as a self-service, GDPR-compliant flow; widening
+scale matching on large pools. Beyond the audit, several directions stand out:
+automating the time-based retention purge as a scheduled, GDPR-compliant job;
+widening
 the analytics widget catalogue so analysts can express more questions safely;
 adding an offline transcription path (for example a Whisper-based fallback)
-so the spoken assessment works on browsers without the Web Speech API; and
+so the spoken assessment works on browsers without the Web Speech API; adding
+an OCR fallback to the ingestion pipeline so scanned and image-only CVs can be
+parsed automatically; moving bulk parsing onto a durable queue with a
+dedicated worker so large imports are no longer bounded by a single background
+window; enabling accent-insensitive deduplication through the PostgreSQL
+\texttt{unaccent} extension; and
 introducing organisation-level data isolation to make the platform
 multi-tenant.
 
@@ -169,6 +185,7 @@ proficiency through an AI interview, and gives recruiters the communication
 and analytics tools the original pain points called for. Just as valuable as
 the software, for the author, was the experience of carrying a product from
 client discovery through architecture, implementation and validation while
-acting as Product Owner --- a rehearsal, at a manageable scale, of how
+acting as the subproject's Product Owner --- a rehearsal, at a manageable
+scale, of how
 technical and product responsibility combine to turn a real organisational
 problem into working software.

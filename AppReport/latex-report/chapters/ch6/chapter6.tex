@@ -1,7 +1,7 @@
 \chapter{Verification and Validation}
 \label{cap:validation}
 
-This chapter reports how the platform was checked for correctness
+This chapter reports how TalentHub was checked for correctness
 (\textit{verification} --- ``are we building the product right?'') and how
 it was confirmed to address the problems identified during discovery
 (\textit{validation} --- ``are we building the right product?''). The
@@ -73,7 +73,7 @@ lives --- the Domain (pure decision functions) and the Application
 (orchestration) --- while the thin Infrastructure adapters are verified
 indirectly through the use cases that depend on them.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption[Automated test inventory]{Automated test inventory at submission
 (18 files, 305 cases, all passing).}
@@ -177,6 +177,47 @@ rubric-validation guardrails applied before an evaluation is stored. They
 are part of the shared suite but are attributed accordingly to keep the
 contribution boundary explicit.
 
+\subsubsection{Requirements Traceability}
+
+Verification is only meaningful if it can be traced back to what the system
+was supposed to do. Table~\ref{tab:traceability} threads each principal
+capability from its design home, through the automated test(s) that pin it,
+to the validation evidence that confirms it mattered to the client. The
+matrix is deliberately three-columned: a capability with a design but no test
+is unverified, and a capability that passes tests but maps to no client need
+is gold-plating --- the table makes both failure modes visible. Every
+must-have capability traces to at least one automated test, and the
+user-facing ones additionally trace to a survey item or an acceptance session.
+
+\begin{table}[ht]
+\centering
+\caption[Requirements traceability matrix]{Traceability from capability to
+automated test to validation evidence. Survey items are the numbered
+questions of Appendix~\ref{app:survey}.}
+\label{tab:traceability}
+\small
+\begin{tabular}{p{0.30\linewidth}p{0.34\linewidth}p{0.26\linewidth}}
+\toprule
+\textbf{Capability} & \textbf{Automated test(s)} & \textbf{Validation} \\
+\midrule
+Job-anchored matching & \texttt{job-fit}, \texttt{job-matching-bridge} & Survey Q10, Q11 \\
+CV extraction \& schema & \texttt{cv-validation}, \texttt{text-extraction}, \texttt{cv-fields-of-work} & Survey Q7, Q11 \\
+CV upload pipeline & \texttt{upload-use-cases} & Acceptance session \\
+Deduplication & \texttt{upload-use-cases} & Survey Q2 \\
+CV / CEFR scoring & \texttt{scoring} & Survey Q4 \\
+JD requirement extraction & \texttt{job-requirements-schema} & Survey Q11 \\
+Per-job shortlist & \texttt{job-shortlist-use-cases} & Survey Q14 \\
+Authn \& route RBAC & \texttt{middleware-auth}, \texttt{notifications-route-auth} & Security review \\
+Search-injection safety & \texttt{escape-or-term} & May 2026 audit \\
+PII redaction in logs & \texttt{logger-redaction} & GDPR review \\
+Interview token contract & \texttt{interview-token}, \texttt{interview-runtime} & Security review \\
+Constrained analytics & \texttt{analytics-catalog} & Survey Q9, Q10 \\
+Interaction history & Acceptance session & Survey Q5, Q14 \\
+Retention / deletion-aware model & Design + acceptance & Survey Q3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsubsection{Test Architecture and Mocking}
 
 The tests mirror the application's layering. Because every external
@@ -268,6 +309,38 @@ findings is bounded by a single respondent from one organisation, so the
 results are read as directional confirmation that the prioritisation was
 correct, not as a statistically generalisable claim.
 
+Figure~\ref{fig:survey-classification} summarises the fourteen survey items
+classified by how they bear on the project. The classification is the
+author's reading of the responses, not an additional measurement: six items
+describe a gap the platform is built to fill, five describe work the existing
+enterprise ATS already handles adequately, and three are contextual
+background. The shape of this distribution is itself the validation result
+--- a clear cluster of gap-validating answers --- while the visible ATS-adequate
+cluster is what keeps the platform's claimed scope honest.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.82\linewidth, height=5.2cm,
+  ybar, bar width=26pt,
+  ymin=0, ymax=8,
+  ylabel={Survey items (of 14)},
+  symbolic x coords={Gap validated, ATS adequate, Contextual},
+  xtick=data, x tick label style={font=\small},
+  nodes near coords, enlarge x limits=0.3,
+  ymajorgrids, tick align=inside,
+  ]
+\addplot[fill=lstkeyword!60, draw=lstkeyword] coordinates {(Gap validated,6) (ATS adequate,5) (Contextual,3)};
+\end{axis}
+\end{tikzpicture}
+\caption[Survey items by validation category]{The fourteen survey items
+classified by how they bear on the project (author's classification of the
+Appendix~\ref{app:survey} responses). Gap-validating items: Q3, Q10--Q14;
+ATS-adequate: Q2, Q6--Q9; contextual: Q1, Q4, Q5.}
+\label{fig:survey-classification}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{Security Review}
@@ -339,10 +412,13 @@ Chromium-based browsers (Chrome and Edge), so the spoken-interaction path
 degrades on other browsers. The Large Language Model usage runs against a
 provider free tier, which imposes a practical cost-and-rate ceiling on bulk
 CV parsing and is mitigated, but not removed, by the Groq-to-OpenAI fallback
-and the lazy parsing of job descriptions. Some \gls{gdpr} obligations are
-still operationally manual: the deletion-aware data model is in place, but
-the right-to-erasure routine is executed as a script rather than as a
-self-service flow. Finally, the constrained analytics builder, while safe by
+and the lazy parsing of job descriptions. CV ingestion also reads text
+directly from the uploaded file with no optical-character-recognition
+fallback, so scanned or image-only PDFs cannot be parsed automatically and are
+instead flagged for manual review. Some \gls{gdpr} obligations are
+still operationally manual: candidates can erase their own account on demand,
+but the time-based retention purge is not yet automated and still depends on
+a manual trigger rather than a schedule. Finally, the constrained analytics builder, while safe by
 construction, exposes a deliberately narrow catalogue of metrics and
 dimensions, so some questions an analyst might ask cannot yet be expressed.
 These items frame the future work discussed in

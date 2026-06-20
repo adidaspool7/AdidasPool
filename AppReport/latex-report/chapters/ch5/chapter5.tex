@@ -3,10 +3,10 @@
 
 This chapter describes how the design of Chapter~\ref{cap:design} was built.
 It states the technology stack and its rationale, the layout of the
-codebase, and then walks through the principal modules --- the talent pool,
-the CV parsing pipeline, jobs and matching, the AI interviewer integration,
-notifications, analytics, authentication and observability --- before
-covering the continuous-integration pipeline and a small set of
+codebase, and then walks through the principal modules of TalentHub --- the
+talent pool, the CV parsing pipeline, jobs and matching, the AI interviewer
+integration, notifications, analytics, authentication and observability ---
+before covering the continuous-integration pipeline and a small set of
 representative code excerpts.
 
 %----------------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ tiers. The stack deliberately avoids heavyweight enterprise infrastructure
 (Kubernetes, message queues, microservices) in favour of a right-sized
 single application. Table~\ref{tab:tech-stack} summarises the choices.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption[Technology stack]{Principal technologies and their roles.}
 \label{tab:tech-stack}
@@ -83,6 +83,39 @@ Outside \texttt{src/}, \texttt{tests/} holds the Vitest suite,
 \texttt{supabase/migrations/} the canonical schema, and \texttt{scripts/}
 the operational backfill utilities.
 
+Table~\ref{tab:feature-inventory} gives a consolidated view of the
+implemented feature set, so that the per-module sections that follow can be
+read against the whole. The platform reached a state in which the
+requirements designated \emph{must-have} and \emph{should-have} in
+Chapter~\ref{cap:analysis} are implemented; two items (a structured
+improvement-track flow and a dedicated bias-detection module) remain
+placeholders and are carried forward as future work in
+Chapter~\ref{cap:conclusions}.
+
+\begin{table}[ht]
+\centering
+\caption[Implemented feature inventory]{Implemented feature inventory, grouped
+by area. ``Partial'' marks a feature present in skeleton form only.}
+\label{tab:feature-inventory}
+\small
+\begin{tabular}{p{0.30\linewidth}p{0.50\linewidth}p{0.10\linewidth}}
+\toprule
+\textbf{Area} & \textbf{Features} & \textbf{State} \\
+\midrule
+Ingestion & CV upload + nine-stage parsing, bulk/ZIP upload, deduplication, CV scoring & Full \\
+Jobs & CRUD + search, adidas scraper, internship lifecycle, applications & Full \\
+Matching & Job-anchored \texttt{computeJobFit}, ranking screen, per-job shortlist & Full \\
+Assessment & Written rubric mode, dual-mode AI interview, per-skill verification & Full \\
+Communication & Dual-role notifications, rich-text campaigns, preference targeting, interaction history & Full \\
+Analytics & Seven built-in charts + constrained custom-widget builder & Full \\
+Engagement & Ambassador programs and applications, CSV export & Full \\
+Security & Supabase Auth, middleware RBAC, PII-redacting logger & Full \\
+Improvement tracks & Auto-created on failed assessment; structured flow & Partial \\
+Bias detection & Fairness module & Partial \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 %----------------------------------------------------------------------------------------
 
 \section{Talent Pool Module}
@@ -97,6 +130,26 @@ its port, so the route handlers stay thin and the business rules stay
 testable. Search terms supplied by the user are escaped before they reach the
 PostgREST \texttt{.or()} filter (Section~\ref{sec:impl-code}), closing the
 injection vector found during the audit.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{talent-pool.png}
+\caption[HR talent pool]{The HR talent pool: searchable, filterable candidate
+list with quality and (job-anchored) fit columns.}
+\label{fig:ss-pool}
+\end{figure}
+
+Figure~\ref{fig:ss-profile} shows the per-candidate view a recruiter opens
+from the pool, consolidating the parsed profile, recruiter notes and the
+interaction-history timeline in one place.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{candidate-profile.png}
+\caption[Candidate profile]{Candidate profile, consolidating parsed CV data,
+recruiter notes, shortlist membership and interaction history.}
+\label{fig:ss-profile}
+\end{figure}
 
 %----------------------------------------------------------------------------------------
 
@@ -126,6 +179,229 @@ A telemetry row is written per extraction for observability. For bulk
 uploads, a \texttt{parsing\_jobs} row tracks parsed, failed and total counts
 so that HR can monitor progress by polling.
 
+The deduplication stage (step seven) deserves a closer look because the same
+person frequently re-applies across campaigns, and silently creating a
+duplicate record would corrupt every downstream count and ranking. The check
+is tiered by confidence. An exact e-mail match is treated as the same person
+with full confidence and merges into the existing record; a match on first
+name, last name and location is treated as a probable duplicate (merged but
+flagged for human review); and a match on name alone is treated as a weak
+signal --- a new record is created but linked to the potential duplicate so a
+recruiter can resolve it later. One known limitation of the name-based tiers
+is that the comparison is currently accent-sensitive, so spellings that differ
+only in diacritics (for example \emph{Jo\~ao} versus \emph{Joao}) are not
+recognised as the same person; closing this gap requires accent-insensitive
+matching at the database level, as noted in
+Appendix~\ref{app:db-candidates}. On a confirmed merge the candidate's related
+records (experiences, education, languages and skills) are replaced wholesale
+in a single operation rather than appended, so re-uploading an updated CV
+refreshes the profile instead of accumulating stale rows. Bulk processing
+runs asynchronously through the Next.js \texttt{after()} primitive: the route
+returns \texttt{202\,Accepted} with a parsing-job identifier immediately, then
+processes files in the background with a short throttle between LLM calls and
+a cancellation check, and a stale-job recovery step marks any job left
+processing for more than ten minutes as failed.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{cv-upload.png}
+\caption[CV upload]{CV upload entry point. A single self-upload or an HR bulk
+/ ZIP upload both feed the same nine-stage parsing pipeline.}
+\label{fig:ss-upload}
+\end{figure}
+
+\subsection{Parse Confidence and Human-Review Triage}
+\label{sec:impl-cv-confidence}
+
+Automated extraction is never perfect, and the failure that matters is the
+\emph{silent} one: a CV that parses into a plausible-looking record with the
+wrong name, a dropped e-mail or mis-attributed dates pollutes deduplication,
+search and every downstream score without anyone noticing. The pipeline
+therefore attaches a \textbf{parse-confidence} object to every extraction and
+uses it to route uncertain results to a human rather than trusting them
+blindly. Two complementary signals feed it.
+
+The first is the model's own self-assessment. The structured-output prompt
+asks the model to return, alongside the extracted fields, an
+\texttt{overall} confidence in $[0,1]$, per-field confidences (name,
+location, languages, experience dates) and a list of free-text
+\texttt{flags} such as \texttt{location\_uncertain}, \texttt{date\_gaps} or
+\texttt{missing\_language\_levels}. This is cheap --- it costs only a few
+extra output tokens --- and it surfaces uncertainties the model is
+internally aware of. It is shown to the recruiter on the candidate profile
+as a single ``parse confidence'' percentage with the flags listed beside it,
+so the reviewer immediately knows which records to scrutinise.
+
+It is important to be honest about what this number is and is not. It is the
+model's \emph{stated} confidence, not a calibrated probability of
+correctness: Large Language Models are known to be imperfectly calibrated and
+can be confidently wrong. The value is therefore treated as a triage
+heuristic, not a guarantee. To avoid relying on it alone, the pipeline adds a
+second, deterministic signal: a rule-based check that forces review whenever a
+critical identity field falls back to a placeholder --- a name that resolved
+to \texttt{Unknown} or an e-mail that failed validation and became null.
+These conditions raise their own flags (\texttt{name\_missing},
+\texttt{no\_email}) regardless of what the model reported about itself.
+
+A record is marked \texttt{needs\_review} when either signal fires --- the
+model's overall confidence falls below a $0.7$ threshold, \emph{or} a
+deterministic identity check fails. The philosophy is deliberately a
+\emph{loud failure}: it is far better to flag a questionable parse for a few
+seconds of HR attention than to write a confident-looking but wrong record
+into the talent pool, where it would silently distort counts and rankings for
+the rest of the candidate's lifecycle. The confidence object is persisted as
+JSONB on the candidate row, so the triage signal travels with the record and
+can drive a review queue.
+
+\subsection{Parsing Cost and Scalability}
+\label{sec:impl-cv-cost}
+
+Because every CV and every job description is parsed by a Large Language
+Model, the recurring cost of the platform is dominated by parsing tokens
+rather than by hosting --- the database, storage and serverless functions all
+sit comfortably inside free tiers at the volumes a single HR team generates.
+It is therefore worth estimating how the parsing bill scales, and how the
+choice of provider changes it. The estimate below is deliberately scoped to
+\emph{parsing} (CV ingestion and job-description extraction); the AI
+Interviewer is a separate service and is excluded.
+
+A single CV parse is one LLM call. Measured against the telemetry rows the
+pipeline records, a representative call carries roughly 1{,}800 input
+tokens (the structured-output system prompt plus a one-to-two-page CV) and
+returns roughly 900 output tokens of JSON. Job-description extraction is
+comparable but slightly cheaper and far less frequent, so CV volume is the
+right unit to reason about. Table~\ref{tab:parse-cost} applies the mid-2026
+published list prices of three small/fast models to that token profile, and
+Figure~\ref{fig:parse-cost} plots the cumulative cost as the number of parsed
+CVs grows.
+
+\begin{table}[ht]
+\centering
+\caption[Estimated parsing cost per provider]{Estimated parsing cost per
+provider for the representative token profile (1{,}800 input $+$ 900
+output tokens per CV). List prices, mid-2026; figures are illustrative and
+exclude the AI Interviewer.}
+\label{tab:parse-cost}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{\$/CV} & \textbf{1k CVs} & \textbf{10k CVs} & \textbf{100k CVs} \\
+\midrule
+OpenAI GPT-4o-mini & 0.0008 & 0.81 & 8.10 & 81 \\
+Groq Llama 3.3 70B \textit{(primary)} & 0.0018 & 1.77 & 17.73 & 177 \\
+Anthropic Claude 3.5 Haiku & 0.0050 & 5.04 & 50.40 & 504 \\
+OpenAI GPT-4o \textit{(fallback)} & 0.0135 & 13.50 & 135 & 1350 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth, height=6.6cm,
+  xlabel={CVs parsed (thousands)},
+  ylabel={Cumulative parsing cost (USD)},
+  xmin=0, xmax=100, ymin=0,
+  legend pos=north west,
+  legend cell align=left,
+  grid=both,
+  grid style={lstcomment!20},
+  tick label style={font=\scriptsize},
+  label style={font=\small},
+  legend style={font=\scriptsize},
+]
+\addplot[mark=*, thick, color=blue] coordinates {(0,0)(10,8.1)(50,40.5)(100,81)};
+\addlegendentry{OpenAI GPT-4o-mini}
+\addplot[mark=square*, thick, color=green!55!black] coordinates {(0,0)(10,17.73)(50,88.65)(100,177.3)};
+\addlegendentry{Groq Llama 3.3 70B (primary)}
+\addplot[mark=triangle*, thick, color=orange!85!black] coordinates {(0,0)(10,50.4)(50,252)(100,504)};
+\addlegendentry{Anthropic Claude 3.5 Haiku}
+\end{axis}
+\end{tikzpicture}
+\caption[Parsing cost scaling]{Cumulative CV-parsing cost as volume grows, for
+three candidate providers. The lines are linear because cost scales directly
+with tokens; what differs is the slope. The production fallback (GPT-4o) is
+omitted from the plot for readability --- at roughly \$1{,}350 per
+100{,}000 CVs it is about seven times the primary, which is precisely why
+it is reserved for failover rather than used as the default.}
+\label{fig:parse-cost}
+\end{figure}
+
+Three conclusions follow. First, at any realistic single-team volume the
+parsing cost is small in absolute terms: even one hundred thousand CVs ---
+far beyond a year of one recruiter's intake --- costs on the order of a few
+hundred dollars on the primary model, and under a hundred on GPT-4o-mini.
+Second, the slopes diverge sharply with scale, so provider choice is a
+genuine architectural lever rather than a rounding error once the platform is
+shared across teams or sites. Third, the Groq-primary / OpenAI-fallback design
+(Section~\ref{sec:concl-ai}) is defensible on cost as well as reliability: the
+primary sits in the low-cost band with a generous free tier and high
+throughput, while the markedly more expensive fallback is engaged only when
+the primary is rate-limited or unavailable, bounding the worst case rather
+than paying for it continuously.
+
+Cost is only one axis of scalability; wall-clock time is the other. Bulk
+uploads are processed serially in a background task started after the HTTP
+response is returned (Section~\ref{sec:impl-cv}), with a short throttle
+between files to stay within the provider's rate limits. Budgeting each CV
+conservatively at around five seconds end-to-end --- text extraction, a single
+LLM call and the inter-file throttle combined --- a background run completed
+within a safe fifteen-minute window processes on the order of 150--180 CVs.
+This comfortably covers a single recruiter's realistic intake, but it means
+the hard cap of 500 files per batch cannot always finish inside one
+background window; very large imports should be split across batches, or
+offloaded to a durable queue with a dedicated worker. That durable-queue
+architecture is recorded as future work in
+Chapter~\ref{cap:conclusions}.
+
+%----------------------------------------------------------------------------------------
+
+\section{CV Scoring Engine}
+\label{sec:impl-scoring}
+
+Once a CV is parsed, the candidate receives a deterministic quality score.
+The engine is a pure domain service: the same input always produces the same
+output, which is the property the client asked for under the heading of
+transparency. The overall score is a weighted sum of four components, each
+normalised to the range $0$--$100$, as set out in
+Table~\ref{tab:cv-scoring}.
+
+\begin{table}[ht]
+\centering
+\caption[CV scoring components]{Components of the deterministic CV quality score.}
+\label{tab:cv-scoring}
+\small
+\begin{tabular}{p{0.24\linewidth}p{0.12\linewidth}p{0.52\linewidth}}
+\toprule
+\textbf{Component} & \textbf{Weight} & \textbf{Calculation} \\
+\midrule
+Experience relevance & 35\% & LLM-assessed relevance of the experience to the target roles, clamped to $0$--$100$ \\
+Years of experience & 25\% & $\min(100, (\text{years}/10)\times 100)$ --- ten years counts as full marks \\
+Education level & 20\% & Lookup: PhD 100, master 80, bachelor 60, vocational 40, high school 20 \\
+Location match & 20\% & Exact 100, substring 80, unknown 50, mismatch 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The formula is $\text{overall} = \sum_i (\text{component}_i \times w_i)$. A
+candidate with seven years of experience, an LLM relevance of 85, a master's
+degree and an exact location match therefore scores
+$85\times0.35 + 70\times0.25 + 80\times0.20 + 100\times0.20 \approx 83$, while
+a one-year bachelor in a different city scores roughly $29$ --- a spread that
+separates the pool without ever obscuring how it was produced. A candidate
+whose overall score falls inside the $45$--$60$ band is flagged as
+\emph{borderline}, marking them as close to the threshold and a natural
+candidate for an improvement track.
+
+The same weighted-sum approach scores the language assessment, averaging five
+rubric sub-scores (grammar, vocabulary, clarity, fluency and customer
+handling) at equal weight, and a banded lookup maps the resulting number onto
+a CEFR level (for instance, $\geq 78$ maps to C1 and $\geq 65$ to B2). Both
+the component weights and the assessment weights are domain value objects
+(Section~\ref{sec:design-domain}) and are persisted in editable
+\texttt{scoring\_weights} and \texttt{scoring\_presets} tables, so a recruiter
+can retune the model without a code change.
+
 %----------------------------------------------------------------------------------------
 
 \section{Jobs and Matching}
@@ -153,6 +429,14 @@ matcher itself was correct. It is now fixed and locked by the
 \texttt{job-matching-bridge} tests of Chapter~\ref{cap:validation}, and it is
 the concrete basis for the testing lesson in Chapter~\ref{cap:conclusions}.
 
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{job-ranking.png}
+\caption[Job-anchored ranking]{The job-anchored ranking screen, showing fit
+scores with the per-criterion breakdown and the eligibility flag.}
+\label{fig:ss-ranking}
+\end{figure}
+
 %----------------------------------------------------------------------------------------
 
 \section{AI Interviewer Integration}
@@ -172,6 +456,15 @@ chosen topic. The token-signing utility resolves its secret at call time
 rather than at module load, so that a local build can complete without the
 deployment-only secret while still failing fast at request time in
 production.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{ai-interview.png}
+\caption[AI interview]{The candidate-facing AI interview popup, with camera,
+live speech transcript and chat. The conversational engine is the second
+team member's contribution; the figure shows the integration surface.}
+\label{fig:ss-interview}
+\end{figure}
 
 %----------------------------------------------------------------------------------------
 
@@ -205,6 +498,106 @@ validated specification, and a single universal renderer turns the resulting
 Saved widgets are stored per user. This design gives HR analytical freedom
 while making it impossible to express an injected or malformed query
 (Chapter~\ref{cap:validation}).
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{analytics-dashboard.png}
+\caption[Analytics dashboard]{The analytics dashboard: seven built-in charts
+above the user's saved custom widgets.}
+\label{fig:ss-analytics}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{analytics-widget-builder.png}
+\caption[Custom-widget builder]{The constrained custom-widget builder: metric,
+dimension, chart type and filters are picked from a validated catalogue with a
+live preview.}
+\label{fig:ss-widget}
+\end{figure}
+
+%----------------------------------------------------------------------------------------
+
+\section{Engagement and Lifecycle Modules}
+\label{sec:impl-engagement}
+
+Beyond the core screening pipeline, TalentHub implements the attract-and-retain
+side of the framework (Chapter~\ref{cap:analysis}) through four further
+modules.
+
+\paragraph{Welcome and onboarding page.}
+At the request of the client's design team, the application opens on a branded
+welcome page that orients each visitor before authentication and, after Google
+sign-in, routes them to the dashboard appropriate to their role. It states the
+platform's purpose in adidas terms and presents the two entry paths ---
+recruiter and candidate --- so that neither persona is shown controls it
+cannot use.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{welcome-page.png}
+\caption[Welcome page]{The branded welcome page requested by the design team,
+shown before authentication.}
+\label{fig:ss-welcome}
+\end{figure}
+
+\paragraph{Ambassador programs.}
+HR can publish brand-ambassador programs (with a cohort, deadline, location,
+requirements and perks) that candidates browse and apply to from their portal.
+A submitted application is recorded against the program and the candidate is
+idempotently tagged \texttt{brand-ambassador}, so the engagement campaign and
+the talent pool stay in sync. Programs move through a draft/open/closed
+lifecycle and applications through a submitted/under-review/accepted/rejected
+flow.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{ambassador-programs.png}
+\caption[Ambassador programs]{HR management of brand-ambassador programs and
+their applications.}
+\label{fig:ss-ambassador}
+\end{figure}
+
+\paragraph{Improvement tracks.}
+When an assessment ends in a failing decision, the system auto-creates an
+improvement track for the candidate, with progress entries that record
+targeted development. This is the mechanism behind the borderline branch of
+the lifecycle state machine (Section~\ref{sec:design-domain}); the structured
+candidate-facing flow over it remains the partial item carried to future work.
+
+\paragraph{Candidate segments.}
+HR can group candidates into named segments for targeted outreach and
+analysis, with each segment holding an explicit membership set. Segments feed
+the preference-aware campaign targeting described above, letting a campaign
+reach exactly the intended cohort. The candidate's own portal
+(Figure~\ref{fig:ss-portal}) exposes only the self-service side of all this:
+profile, CV upload, applications and assessments.
+
+\begin{figure}[ht]
+\centering
+\screenshotplaceholder{candidate-portal.png}
+\caption[Candidate portal]{The candidate self-service portal: profile, CV
+upload, applications and assessments.}
+\label{fig:ss-portal}
+\end{figure}
+
+\paragraph{Candidate self-service.}
+The portal implements the full candidate journey of the use-case model
+(Section~\ref{sec:analysis-usecases}). A candidate enters either on their own
+initiative through Google sign-in or by accepting an HR invitation, and from
+the settings view manages personal contact details and per-type notification
+preferences. Beyond the CV, the candidate can upload and replace two further
+documents through dedicated routes --- a motivation letter and, for Erasmus
+internships, a learning agreement --- each stored in the same object-storage
+bucket as the CV. Applications are submitted against jobs, internships and
+ambassador programs, and their status is tracked back to the candidate as the
+HR recruiter advances each one. Open positions are browsed from a live feed
+that HR refreshes from the adidas careers portal through a sync action backed
+by the scraper. Finally, a ``Danger Zone'' in the settings view lets the
+candidate delete their CV alone or erase their entire record and all stored
+documents in one operation, alongside a CSV export of their profile ---
+operationalising the GDPR rights of access and erasure directly in the
+product rather than through a manual back-office request.
 
 %----------------------------------------------------------------------------------------
 

@@ -581,7 +581,31 @@ export class UploadUseCases {
     // ─── Business area classification ────────────────────────
     const bizArea = validatedExtraction?.businessAreaClassification;
     const confidence = validatedExtraction?.parsingConfidence;
-    const needsReview = (confidence?.overall ?? 1) < 0.7;
+
+    // Loud-fail triage: alongside the LLM's own self-reported confidence,
+    // run a deterministic check on critical identity fields. A silent
+    // "Unknown" name or a dropped e-mail corrupts deduplication and search,
+    // so we surface it as an explicit flag and force human review rather
+    // than persisting a confident-looking but wrong record unnoticed.
+    const triageFlags: string[] = [];
+    if (extraction.firstName === "Unknown" || extraction.lastName === "Unknown") {
+      triageFlags.push("name_missing");
+    }
+    if (!extraction.email) {
+      triageFlags.push("no_email");
+    }
+
+    const mergedConfidence = confidence
+      ? {
+          ...confidence,
+          flags: Array.from(new Set([...confidence.flags, ...triageFlags])),
+        }
+      : triageFlags.length > 0
+        ? { overall: 0.5, flags: triageFlags }
+        : null;
+
+    const needsReview =
+      (confidence?.overall ?? 1) < 0.7 || triageFlags.length > 0;
 
     // Build candidate base data
     const candidateData: Record<string, unknown> = {
@@ -611,7 +635,7 @@ export class UploadUseCases {
       secondaryBusinessAreas: bizArea?.secondary || [],
       candidateCustomArea: bizArea?.customArea || null,
       // Parsing confidence
-      parsingConfidence: confidence || null,
+      parsingConfidence: mergedConfidence,
       needsReview,
     };
 

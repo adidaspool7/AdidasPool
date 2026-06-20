@@ -130,6 +130,18 @@ CREATE INDEX idx_candidates_overall_cv_score ON candidates(overall_cv_score);
 CREATE INDEX idx_candidates_country          ON candidates(country);
 \end{lstlisting}
 
+Deduplication queries the \texttt{email} index for the high-confidence exact
+match and the name and \texttt{location} columns for the weaker tiers
+(Section~\ref{sec:impl-cv}). One limitation of the current schema is that the
+name comparison is accent-sensitive: PostgreSQL treats \texttt{Jo\~ao} and
+\texttt{Joao} as distinct strings, so the same candidate recorded with and
+without diacritics can slip past the name tiers. Making this robust would
+require enabling the PostgreSQL \texttt{unaccent} extension and adding an
+expression index over the accent-folded name (for example
+\texttt{CREATE INDEX \dots\ ON candidates(unaccent(lower(first\_name)))}), so
+the comparison runs against a normalised form on both sides. This is recorded
+as future work.
+
 %----------------------------------------------------------------------------------------
 \section{Remaining Tables}
 \label{app:db-tables}
