@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@client/components/ui/card";
+import { Progress } from "@client/components/ui/progress";
 import { Badge } from "@client/components/ui/badge";
 import { Button } from "@client/components/ui/button";
 import { Separator } from "@client/components/ui/separator";
@@ -689,6 +690,14 @@ export default function JobsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Sync progress: elapsed time vs. an estimate taken from the previous run's
+  // duration. A full scrape discovers pages as it goes, so the true total is
+  // unknown up front — we approximate progress from elapsed/estimate and cap
+  // it at 95% so the bar never claims completion before the server confirms it.
+  const [syncElapsedMs, setSyncElapsedMs] = useState(0);
+  const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncStartRef = useRef<number>(0);
+  const syncEstimateRef = useRef<number>(60000);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
@@ -832,9 +841,37 @@ export default function JobsPage() {
     }
   }, []);
 
+  const stopSyncTimer = useCallback(() => {
+    if (syncTimerRef.current) {
+      clearInterval(syncTimerRef.current);
+      syncTimerRef.current = null;
+    }
+  }, []);
+
+  const startSyncTimer = useCallback(
+    (alreadyElapsedMs = 0) => {
+      stopSyncTimer();
+      // Seed the estimate from the last run's duration if we have one.
+      if (typeof window !== "undefined") {
+        const stored = Number(localStorage.getItem("lastSyncDurationMs"));
+        if (Number.isFinite(stored) && stored > 0) syncEstimateRef.current = stored;
+      }
+      syncStartRef.current = Date.now() - alreadyElapsedMs;
+      setSyncElapsedMs(alreadyElapsedMs);
+      syncTimerRef.current = setInterval(() => {
+        setSyncElapsedMs(Date.now() - syncStartRef.current);
+      }, 250);
+    },
+    [stopSyncTimer]
+  );
+
   const handleSyncCompleted = useCallback(
     async (result: SyncResult) => {
       setSyncing(false);
+      stopSyncTimer();
+      if (result.durationMs > 0 && typeof window !== "undefined") {
+        localStorage.setItem("lastSyncDurationMs", String(result.durationMs));
+      }
       setSyncResult(result);
       if (result.success) {
         setSearchQuery("");
@@ -850,6 +887,7 @@ export default function JobsPage() {
   const handleSyncFailed = useCallback(
     (result: { error?: string } | null) => {
       setSyncing(false);
+      stopSyncTimer();
       setSyncResult({
         success: false,
         scraped: 0,
@@ -892,6 +930,7 @@ export default function JobsPage() {
 
   // Cleanup polling on unmount
   useEffect(() => stopSyncPolling, [stopSyncPolling]);
+  useEffect(() => stopSyncTimer, [stopSyncTimer]);
 
   // On mount, check if a sync is running or just finished while we were away
   const mountCheckedRef = useRef(false);
@@ -908,6 +947,7 @@ export default function JobsPage() {
 
         if (data.status === "running") {
           setSyncing(true);
+          startSyncTimer();
           localStorage.setItem("activeSyncId", data.syncId);
           pollSyncStatus(data.syncId);
         } else if (
@@ -949,6 +989,7 @@ export default function JobsPage() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncResult(null);
+    startSyncTimer();
     try {
       const res = await fetch("/api/jobs/sync", {
         method: "POST",
@@ -962,9 +1003,11 @@ export default function JobsPage() {
       } else {
         // Unexpected response
         setSyncing(false);
+        stopSyncTimer();
       }
     } catch (err) {
       setSyncing(false);
+      stopSyncTimer();
       setSyncResult({
         success: false,
         scraped: 0,
@@ -1024,6 +1067,34 @@ export default function JobsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Sync progress banner — live while a sync is running */}
+      {syncing && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-100">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-medium">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Syncing jobs from the adidas careers portal…</span>
+            </div>
+            <span className="tabular-nums text-blue-700 dark:text-blue-300">
+              {(syncElapsedMs / 1000).toFixed(0)}s
+            </span>
+          </div>
+          <Progress
+            value={Math.min(
+              95,
+              (syncElapsedMs / Math.max(syncEstimateRef.current, 1)) * 100
+            )}
+            className="mt-3"
+          />
+          <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+            This usually takes about{" "}
+            {(syncEstimateRef.current / 1000).toFixed(0)}s. You can keep working
+            — the sync runs in the background and the results will appear here
+            when it finishes.
+          </p>
+        </div>
+      )}
 
       {/* Sync result banner — shown to all users; closed count is HR-only detail */}
       {syncResult && (
