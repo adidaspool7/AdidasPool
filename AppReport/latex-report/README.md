@@ -24,16 +24,16 @@ latex-report/
 │   └── assets/               # ← COPY from latex-report-example/
 ├── chapters/
 │   ├── ch1/chapter1.tex      # Introduction (drafted)
-│   ├── ch2/chapter2.tex      # State of the Art (skeleton)
-│   ├── ch3/chapter3.tex      # Analysis & Methodology (skeleton)
-│   ├── ch4/chapter4.tex      # Solution Design (skeleton)
-│   ├── ch5/chapter5.tex      # Implementation (skeleton)
-│   ├── ch6/chapter6.tex      # Verification & Validation (skeleton)
-│   └── ch7/chapter7.tex      # Conclusions (skeleton)
+│   ├── ch2/chapter2.tex      # State of the Art (drafted)
+│   ├── ch3/chapter3.tex      # Analysis & Methodology (drafted)
+│   ├── ch4/chapter4.tex      # Solution Design (drafted)
+│   ├── ch5/chapter5.tex      # Implementation (drafted)
+│   ├── ch6/chapter6.tex      # Verification & Validation (drafted)
+│   └── ch7/chapter7.tex      # Conclusions (drafted)
 └── appendices/
-    ├── appendixA.tex         # Detailed DB schema (skeleton)
-    ├── appendixB.tex         # API reference (skeleton)
-    └── appendixC.tex         # Survey & meeting evidence (skeleton)
+    ├── appendixA.tex         # Detailed DB schema (drafted)
+    ├── appendixB.tex         # API reference (drafted)
+    └── appendixC.tex         # Survey & meeting evidence (drafted)
 ```
 
 ## One-time setup
@@ -92,10 +92,10 @@ latexmk -C
 | Chapter | Target pages | Status |
 |---|---|---|
 | 1 — Introduction | 5 | drafted |
-| 2 — State of the Art | 8 | skeleton |
-| 3 — Analysis & Methodology | 10 | skeleton |
-| 4 — Solution Design | 12 | skeleton |
-| 5 — Implementation | 14 | skeleton |
-| 6 — Verification & Validation | 8 | skeleton |
-| 7 — Conclusions | 4 | skeleton |
+| 2 — State of the Art | 8 | drafted |
+| 3 — Analysis & Methodology | 10 | drafted |
+| 4 — Solution Design | 12 | drafted |
+| 5 — Implementation | 14 | drafted |
+| 6 — Verification & Validation | 8 | drafted |
+| 7 — Conclusions | 4 | drafted |
 | **Total** | **61** | **buffer: ~9 pages** |

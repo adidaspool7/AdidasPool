@@ -83,9 +83,9 @@ Recharts, Vitest, GitHub Actions, Vercel).
   intentional (cost comparison only) and the prose frames it as a candidate provider.
   *Action:* leave as-is; confirm the caption makes "comparison only" explicit. ✅ likely fine.
 
-- [ ] **B-2 — Test counts.** Report states 18 test files / 305 cases (Ch6
-  `tab:test-inventory`). Re-run `vitest` before final submission and reconcile the
-  numbers if the suite has grown since.
+- [x] **B-2 — Test counts verified (DONE 2026-06-21).** Ran `npx vitest run`:
+  **18 test files / 305 cases, all passing** — exactly matches Ch6 `tab:test-inventory`.
+  No change needed. Re-run before final submission if the suite grows.
 
 - [ ] **B-3 — "as of" dates.** Internal docs reference 2026-06-06 stack snapshot; the
   report timeline says May–Jun 2026. No action unless a reviewer asks; dates are
@@ -103,11 +103,12 @@ Recharts, Vitest, GitHub Actions, Vercel).
 
 ### D. Housekeeping (nice-to-have)
 
-- [ ] **D-1 — Commit the in-app user-guide paragraph.** `chapters/ch5/chapter5.tex`
-  already contains the `\paragraph{In-app user guide.}` addition (added earlier this
-  session, inside `sec:impl-engagement`). Confirm it is committed.
-- [ ] **D-2 — Refresh `README.md` page-budget tracker.** It still labels Ch2–Ch7 as
-  "skeleton"; they are fully drafted. Update the Status column.
+- [x] **D-1 — In-app user-guide paragraph committed (DONE 2026-06-21).**
+  `chapters/ch5/chapter5.tex` line 557 contains `\paragraph{In-app user guide.}` inside
+  `sec:impl-engagement`; committed (clean working tree, in commit `e33d756` and earlier).
+- [x] **D-2 — README page-budget tracker refreshed (DONE 2026-06-21).** All chapters and
+  appendices in `README.md` now labelled "drafted" (both the folder-layout list and the
+  page-budget table) instead of the stale "skeleton".
 
 ---
 
