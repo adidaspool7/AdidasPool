@@ -84,3 +84,13 @@
 	name={CI/CD},
 	description={Continuous Integration / Continuous Delivery --- a software-delivery practice in which every code change is automatically built, type-checked and tested (CI) and, on success, deployed to a target environment (CD). TalentHub uses GitHub Actions for CI and Vercel for CD}
 }
+
+\newglossaryentry{hallucination}{
+	name={Hallucination},
+	description={In the context of Large Language Models, the generation of plausible-sounding but factually incorrect or entirely invented content. In structured-output tasks such as CV parsing, hallucination manifests as invented field values (e.g.\ a skill or date that does not appear in the source document)}
+}
+
+\newglossaryentry{schemadrift}{
+	name={Schema drift},
+	description={A failure mode of LLM-generated structured output in which the model returns a subtly malformed object --- missing required fields, using unexpected key names, or nesting values incorrectly --- that passes a surface-level check but violates the expected schema and corrupts downstream processing}
+}

@@ -93,7 +93,7 @@ learning to label spans, at the cost of training data and pipeline
 complexity. \textbf{LLM-based} parsing, used in this project, prompts a
 general model to emit a structured object directly. Its advantages are
 flexibility across layouts and languages and near-zero bespoke engineering;
-its risks are hallucination (invented fields), schema drift (subtly malformed
+its risks are \gls{hallucination} (invented fields), \gls{schemadrift} (subtly malformed
 output) and per-call cost and latency. The mitigation adopted here ---
 constraining the model with a strict, tolerant validation schema and a
 provider fallback --- is the practical answer to those risks and is detailed
