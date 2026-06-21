@@ -151,8 +151,7 @@ function HRDashboard() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome to the Talent Intelligence Platform. Overview of your
-          recruitment pipeline.
+          Welcome to TalentHub. Overview of your recruitment pipeline.
         </p>
       </div>
 
