@@ -78,16 +78,16 @@ export default function HomePage() {
           <div className="inline-flex items-center gap-2">
             <img src="/adidas-logo.svg" alt="adidas" className="h-10 w-auto" />
           </div>
-          <h1 className="font-adineue-bold text-4xl uppercase leading-[1.02] tracking-tight text-white sm:text-6xl">
-            adidas HR
-            <br />
-            Talent Intelligence
-            <br />
-            Platform
+          <h1 className="font-adineue-bold text-5xl uppercase leading-[1.02] tracking-tight text-white sm:text-7xl">
+            TalentHub
           </h1>
+          <p className="font-adihaus-bold text-xs uppercase tracking-[0.25em] text-neutral-500">
+            An Integrated HR Platform for Candidate Lifecycle Management
+          </p>
           <p className="font-adihaus-regular mx-auto max-w-2xl text-base text-neutral-400 sm:text-lg">
-            Manage recruitment end-to-end with AI-powered CV parsing,
-            candidate evaluation, smart job matching, and AI-driven interviews.
+            A structured talent pool, automated CV parsing, job-anchored
+            candidate matching, an HR communication and campaign layer, and an
+            AI-driven language and skill assessment module.
           </p>
         </div>
 

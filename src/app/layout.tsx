@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Talent Intelligence Platform",
+  title: "TalentHub",
   description:
-    "Talent Intelligence & Communication Verification Platform — Structure, filter, and assess candidates with AI-powered tools.",
+    "TalentHub — An Integrated HR Platform for Candidate Lifecycle Management.",
 };
 
 export default function RootLayout({
