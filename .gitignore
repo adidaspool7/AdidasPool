@@ -57,3 +57,7 @@ heropage/
 
 *storybook.log
 storybook-static
+
+# Overleaf download artifacts (large zip exports)
+AppReport/latex-report*.zip
+AppReport/latex-report (*).zip
