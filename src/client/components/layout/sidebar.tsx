@@ -122,8 +122,8 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
           <img src="/adidas-logo.svg" alt="adidas" className="h-full w-full" />
         </div>
         <div>
-          <h1 className="text-sm font-semibold">Talent Intelligence</h1>
-          <p className="text-xs text-muted-foreground">Platform v0.2</p>
+          <h1 className="text-sm font-semibold">TalentHub</h1>
+          <p className="text-xs text-muted-foreground">platform v0.3</p>
         </div>
       </div>
 
@@ -364,7 +364,7 @@ export function MobileSidebar() {
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-black p-1">
           <img src="/adidas-logo.svg" alt="adidas" className="h-full w-full" />
         </div>
-        <span className="text-sm font-semibold">Talent Intelligence</span>
+        <span className="text-sm font-semibold">TalentHub</span>
       </div>
     </div>
   );
