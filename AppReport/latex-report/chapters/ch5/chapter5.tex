@@ -362,36 +362,39 @@ Chapter~\ref{cap:conclusions}.
 Once a CV is parsed, the candidate receives a deterministic quality score.
 The engine is a pure domain service: the same input always produces the same
 output, which is the property the client asked for under the heading of
-transparency. The overall score is a weighted sum of four components, each
+transparency. The overall score is a weighted sum of five components, each
 normalised to the range $0$--$100$, as set out in
-Table~\ref{tab:cv-scoring}.
+Table~\ref{tab:cv-scoring}. Language proficiency carries the largest single
+weight, reflecting the platform's purpose as a language-verification layer.
 
 \begin{table}[ht]
 \centering
 \caption[CV scoring components]{Components of the deterministic CV quality score.}
 \label{tab:cv-scoring}
 \small
-\begin{tabular}{p{0.24\linewidth}p{0.12\linewidth}p{0.52\linewidth}}
+\begin{tabular}{p{0.22\linewidth}p{0.10\linewidth}p{0.56\linewidth}}
 \toprule
 \textbf{Component} & \textbf{Weight} & \textbf{Calculation} \\
 \midrule
-Experience relevance & 35\% & LLM-assessed relevance of the experience to the target roles, clamped to $0$--$100$ \\
-Years of experience & 25\% & $\min(100, (\text{years}/10)\times 100)$ --- ten years counts as full marks \\
-Education level & 20\% & Lookup: PhD 100, master 80, bachelor 60, vocational 40, high school 20 \\
-Location match & 20\% & Exact 100, substring 80, unknown 50, mismatch 0 \\
+Languages & 35\% & English proficiency in points (C2 35, C1 30, B2 20, B1 10, A2 5, A1 2), plus a Portuguese bonus (C2 25 down to A1 2) and $+10$ for each additional language at B2 or above (capped at $+30$); the total is clamped to $0$--$100$. A foreign candidate with no English is penalised and flagged for review. \\
+Experience & 25\% & In the generic CV score this is proxied by years of experience; the job-anchored fit (Section~\ref{sec:impl-jobs}) replaces it with LLM-assessed relevance to a specific role. \\
+Education level & 15\% & Lookup: PhD 100, master 80, bachelor 60, vocational 40, high school 20, other 30 \\
+Location match & 15\% & Distance from the adidas Porto site (Maia): same city $\approx 100$, decaying with distance to a floor of 10 within Portugal and Spain, and 0 outside that region \\
+Years of experience & 10\% & $\min(100, (\text{years}/10)\times 100)$ --- ten years counts as full marks \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The formula is $\text{overall} = \sum_i (\text{component}_i \times w_i)$. A
-candidate with seven years of experience, an LLM relevance of 85, a master's
-degree and an exact location match therefore scores
-$85\times0.35 + 70\times0.25 + 80\times0.20 + 100\times0.20 \approx 83$, while
-a one-year bachelor in a different city scores roughly $29$ --- a spread that
-separates the pool without ever obscuring how it was produced. A candidate
-whose overall score falls inside the $45$--$60$ band is flagged as
-\emph{borderline}, marking them as close to the threshold and a natural
-candidate for an improvement track.
+candidate with seven years of experience, a master's degree, based in Porto
+and fluent in English (C1) and Portuguese (C2) --- a language score of $60$ ---
+therefore scores
+$70\times0.25 + 70\times0.10 + 80\times0.15 + 100\times0.15 + 60\times0.35
+\approx 73$, while a one-year bachelor in a different city with only basic
+English scores roughly $16$ --- a spread that separates the pool without ever
+obscuring how it was produced. A candidate whose overall score falls inside
+the $45$--$60$ band is flagged as \emph{borderline}, marking them as close to
+the threshold and a natural candidate for an improvement track.
 
 The same weighted-sum approach scores the language assessment, averaging five
 rubric sub-scores (grammar, vocabulary, clarity, fluency and customer
@@ -550,6 +553,21 @@ cannot use.
 shown before authentication.}
 \label{fig:ss-welcome}
 \end{figure}
+
+\paragraph{In-app user guide.}
+To lower the learning curve and keep support overhead low, the platform ships
+its end-user documentation inside the product rather than as a separate
+artefact. A \emph{User guide} entry in the sidebar opens a role-aware help
+dialog that renders one of two curated guides --- sixteen sections for the HR
+manager and twelve for the candidate --- selected from the same role context
+that drives the rest of the navigation, so each persona sees only the features
+it can actually use. The dialog provides a table of contents with scroll-spy
+highlighting that tracks the reader's position through the document, letting a
+user jump directly to a feature (CV upload, job matching, assessments, data
+export, and so on) and learn it without leaving the page they are working on.
+Because the guide lives next to the running application, it stays consistent
+with the deployed feature set and reinforces the same role boundaries enforced
+by the middleware (Section~\ref{sec:impl-auth}).
 
 \paragraph{Ambassador programs.}
 HR can publish brand-ambassador programs (with a cohort, deadline, location,
