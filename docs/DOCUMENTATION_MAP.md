@@ -4,7 +4,7 @@
 > which is maintained separately). Use this to navigate, and keep it in sync when docs are added, retired,
 > or moved.
 >
-> **Last updated:** 2026-06-06
+> **Last updated:** 2026-06-21
 
 ---
 
@@ -74,12 +74,13 @@
 
 ---
 
-## Audits (historical, with open follow-ups)
+## Audits
 
 | Document | Tag | Purpose / open items |
 |---|---|---|
-| [docs/audit-6-5-2026.md](audit-6-5-2026.md) | 🗄️ | Dead-code/security sweep. ⚠️ **Open CRITICAL:** rotate the leaked Supabase `service_role` key. Also tracks the interview-routes use-case extraction (#2) and `matchCandidatesToJob` N+1 (#3). |
-| [docs/audit-2026-04-26.md](audit-2026-04-26.md) | 🗄️ | Earlier severity-graded audit; most CRITICAL/HIGH items resolved, some MEDIUM/LOW still open. |
+| [docs/audit-7-06-2026.md](audit-7-06-2026.md) | 🟢 | Current authoritative health snapshot (2026-06-07): ~95% feature-complete, tests green, type-safe. Lists the remaining finalization items. **Read this for current state.** |
+| [docs/archive/audit-6-5-2026.md](archive/audit-6-5-2026.md) | 🗄️ | Superseded by the June audit. Dead-code/security sweep; its key items (service-role key rotation, security warnings) were addressed and are reflected in `audit-7-06-2026.md`. |
+| [docs/archive/audit-2026-04-26.md](archive/audit-2026-04-26.md) | 🗄️ | Earlier severity-graded audit; most findings resolved, remainder rolled into later audits. Kept for historical context. |
 
 ---
 
@@ -90,6 +91,8 @@
 | [docs/archive/JOB_ANCHORED_MATCHING_PLAN.md](archive/JOB_ANCHORED_MATCHING_PLAN.md) | 🗄️ | Design reference for job-anchored matching (shipped; live spec in CLAUDE.md). |
 | [docs/archive/TODO_JOB_ANCHORED_MATCHING.md](archive/TODO_JOB_ANCHORED_MATCHING.md) | 🗄️ | Implementation checklist for job-anchored matching (shipped). |
 | [docs/archive/PER_JOB_SHORTLIST_PLAN.md](archive/PER_JOB_SHORTLIST_PLAN.md) | 🗄️ | Per-job shortlist design (shipped; live spec in CLAUDE.md). |
+| [docs/archive/audit-6-5-2026.md](archive/audit-6-5-2026.md) | 🗄️ | Code/security audit (2026-05-06), superseded by `audit-7-06-2026.md`. |
+| [docs/archive/audit-2026-04-26.md](archive/audit-2026-04-26.md) | 🗄️ | Severity-graded audit (2026-04-26), superseded by later audits. |
 
 ---
 
