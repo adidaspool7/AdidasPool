@@ -76,7 +76,12 @@ export default function HomePage() {
         {/* Hero */}
         <div className="space-y-5">
           <div className="inline-flex items-center gap-2">
-            <img src="/adidas-logo.svg" alt="adidas" className="h-10 w-auto" />
+            <a
+              href="https://adidas-pool.vercel.app/welcome"
+              className="inline-flex transition-opacity hover:opacity-80"
+            >
+              <img src="/adidas-logo.svg" alt="adidas" className="h-10 w-auto" />
+            </a>
           </div>
           <h1 className="font-adineue-bold text-5xl uppercase leading-[1.02] tracking-tight text-white sm:text-7xl">
             TalentHub
