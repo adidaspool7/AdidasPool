@@ -231,13 +231,13 @@ semester, with the author acting as Product Owner and the second team
 member, Stratos Demertzoglou, owning the AI Interviewer sidecar (a Python
 \textit{FastAPI} service) end to end. All other modules --- frontend,
 Next.js API routes, database schema, CV parsing pipeline, matching engine,
-notifications, analytics and CI/CD --- were designed and implemented by
+notifications, analytics and \gls{cicd} --- were designed and implemented by
 the author.
 
 The technological choices were guided by the brief: a small two-person
 engineering team, a tight academic deadline, and the need for production-grade
 deployment. The platform is implemented as a Next.js 16 application
-written in TypeScript, deployed on Vercel, and backed by a Supabase
+written in \gls{typescript}, deployed on \gls{vercel}, and backed by a \gls{supabase}
 PostgreSQL database with Supabase Auth (Google OAuth). The codebase
 follows an onion / clean architecture (\gls{onion}) in which the Domain
 layer has zero external dependencies and Use Cases never import from
