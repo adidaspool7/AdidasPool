@@ -296,7 +296,7 @@ Matching is workflow-centric and opaque & Pure, unit-tested \textit{computeJobFi
 Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with grammar, vocabulary and fluency sub-scores (Chapter~\ref{cap:design}) \\
 Compliance is bolted on after the fact & Deletion-aware data model and interaction-history audit trail designed from the schema up (Chapter~\ref{cap:design}) \\
 LLM output is unreliable for production parsing & Strict tolerant validation schema plus provider fallback (Chapter~\ref{cap:implementation}) \\
-Intelligence tooling assumes large data and budgets & Rule-based, free-tier-deployable design that performs identically at any scale (Chapter~\ref{cap:design}) \\
+Intelligence tooling assumes large data and budgets & Provider-agnostic architecture: rule-based matching core has no LLM dependency; LLM-dependent flows (CV parsing, JD extraction, interviews) run on free-tier providers (Groq / OpenAI) and can be re-pointed to a self-hosted model (e.g.\ Llama via Ollama) with a single adapter change (Chapter~\ref{cap:design}) \\
 \bottomrule
 \end{tabular}
 \end{table}
