@@ -109,4 +109,4 @@ It is maintained on its own cadence and is intentionally **not** covered by this
 - When a 🟡 plan ships, move its row to **Archive** (or mark 🗄️ Implemented) and point readers to the live
   spec in [CLAUDE.md](../CLAUDE.md).
 - Keep verifiable numbers (table count, test count, versions) consistent across `README.md`, `CLAUDE.md`,
-  and `ER_DIAGRAM.md`. As of 2026-06-06: **33 tables**, **258 tests across 17 files**.
+  and `ER_DIAGRAM.md`. As of 2026-06-21: **33 tables**, **305 tests across 18 files**.
