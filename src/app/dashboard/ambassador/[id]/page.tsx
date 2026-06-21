@@ -48,6 +48,8 @@ import {
   Check,
   Pencil,
   Trash2,
+  Eye,
+  Video,
 } from "lucide-react";
 
 interface AmbassadorProgram {
@@ -87,6 +89,7 @@ interface AmbassadorApplication {
   university?: string | null;
   yearOfStudy?: string | null;
   previousExperience?: string | null;
+  pitchVideoUrl?: string | null;
   appliedAt?: string | null;
   candidate?: Candidate;
 }
@@ -124,6 +127,7 @@ export default function AmbassadorProgramDetailPage() {
   const [updatingApp, setUpdatingApp] = useState<string | null>(null);
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [viewApp, setViewApp] = useState<AmbassadorApplication | null>(null);
 
   // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
@@ -457,6 +461,7 @@ export default function AmbassadorProgramDetailPage() {
                   <TableHead>Applied</TableHead>
                   <TableHead>CV</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Application</TableHead>
                   <TableHead>Profile</TableHead>
                 </TableRow>
               </TableHeader>
@@ -522,6 +527,17 @@ export default function AmbassadorProgramDetailPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs flex items-center gap-1"
+                        onClick={() => setViewApp(app)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </Button>
                     </TableCell>
                     <TableCell>
                       <Link href={`/dashboard/candidates/${app.candidateId}`}>
@@ -656,6 +672,81 @@ export default function AmbassadorProgramDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View application dialog */}
+      <Dialog open={viewApp !== null} onOpenChange={(o) => !o && setViewApp(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {[viewApp?.candidate?.firstName, viewApp?.candidate?.lastName]
+                .filter(Boolean)
+                .join(" ") || "Application"}
+            </DialogTitle>
+          </DialogHeader>
+          {viewApp && (
+            <div className="space-y-4 mt-2 text-sm">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                {viewApp.candidate?.email && <span>{viewApp.candidate.email}</span>}
+                {viewApp.university && <span>{viewApp.university}</span>}
+                {viewApp.yearOfStudy && <span>Year {viewApp.yearOfStudy}</span>}
+                <span>Applied {formatDate(viewApp.appliedAt)}</span>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Motivation
+                </Label>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm">
+                  {viewApp.motivation?.trim() || "— Not provided"}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Previous experience
+                </Label>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm">
+                  {viewApp.previousExperience?.trim() || "— Not provided"}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Pitch video
+                </Label>
+                {viewApp.pitchVideoUrl ? (
+                  <video
+                    src={viewApp.pitchVideoUrl}
+                    controls
+                    className="w-full rounded-md border bg-black"
+                  />
+                ) : (
+                  <p className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    <Video className="h-4 w-4" /> No pitch video submitted
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                {viewApp.candidate?.rawCvUrl && (
+                  <a
+                    href={viewApp.candidate.rawCvUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button type="button" variant="outline" className="flex items-center gap-1">
+                      <ExternalLink className="h-4 w-4" /> Open CV
+                    </Button>
+                  </a>
+                )}
+                <Link href={`/dashboard/candidates/${viewApp.candidateId}`}>
+                  <Button type="button">View full profile</Button>
+                </Link>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
