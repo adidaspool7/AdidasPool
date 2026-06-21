@@ -134,8 +134,8 @@ export default function AmbassadorApplyPage() {
   // ── Loading ──
   if (pageState === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
+        <Loader2 className="h-8 w-8 animate-spin text-neutral-600" />
       </div>
     );
   }
@@ -143,11 +143,11 @@ export default function AmbassadorApplyPage() {
   // ── Not found ──
   if (pageState === "not-found") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-slate-700">Program not found</h1>
-          <p className="text-slate-500 mt-2">This link may be expired or invalid.</p>
+          <AlertCircle className="h-12 w-12 text-neutral-600 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-white">Program not found</h1>
+          <p className="text-neutral-400 mt-2">This link may be expired or invalid.</p>
         </div>
       </div>
     );
@@ -156,13 +156,13 @@ export default function AmbassadorApplyPage() {
   // ── Closed ──
   if (pageState === "closed") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
         <div className="text-center max-w-sm">
-          <Trophy className="h-12 w-12 text-amber-400 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-slate-700">
+          <Trophy className="h-12 w-12 text-neutral-500 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-white">
             {program?.title}
           </h1>
-          <p className="text-slate-500 mt-2">
+          <p className="text-neutral-400 mt-2">
             This ambassador program is no longer accepting applications.
           </p>
         </div>
@@ -173,14 +173,14 @@ export default function AmbassadorApplyPage() {
   // ── Success ──
   if (pageState === "success") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950 px-4">
         <div className="text-center max-w-md">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">
+          <CheckCircle className="h-16 w-16 text-white mx-auto mb-6" />
+          <h1 className="text-2xl font-bold text-white mb-2">
             Application submitted!
           </h1>
-          <p className="text-slate-500">
-            Thank you for applying to <strong>{program?.title}</strong>. We&apos;ll
+          <p className="text-neutral-400">
+            Thank you for applying to <strong className="text-white">{program?.title}</strong>. We&apos;ll
             review your application and be in touch soon.
           </p>
         </div>
@@ -191,13 +191,13 @@ export default function AmbassadorApplyPage() {
   // ── Error (after attempt) ──
   if (pageState === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950 px-4">
         <div className="text-center max-w-md">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-slate-700 mb-2">
+          <h1 className="text-xl font-semibold text-white mb-2">
             Submission failed
           </h1>
-          <p className="text-slate-500 mb-6">{errorMessage}</p>
+          <p className="text-neutral-400 mb-6">{errorMessage}</p>
           <Button onClick={() => setPageState("form")} variant="outline">
             Try again
           </Button>
@@ -210,16 +210,26 @@ export default function AmbassadorApplyPage() {
   const deadline = formatDeadline(program?.applicationDeadline);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="dark min-h-screen bg-neutral-950 text-white">
+      <header className="border-b border-neutral-800 bg-black">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <a
+            href="https://adidas-pool.vercel.app/welcome"
+            className="inline-flex transition-opacity hover:opacity-80"
+          >
+            <img src="/adidas-logo.svg" alt="adidas" className="h-7 w-auto" />
+          </a>
+        </div>
+      </header>
+      <div className="max-w-2xl mx-auto space-y-6 py-12 px-4">
         {/* Program header */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Trophy className="h-5 w-5 text-amber-500" />
-                  <span className="text-xs font-medium text-amber-600 uppercase tracking-wide">
+                  <Trophy className="h-5 w-5 text-white" />
+                  <span className="text-xs font-medium text-neutral-400 uppercase tracking-[0.2em]">
                     Ambassador Program
                   </span>
                 </div>
@@ -230,20 +240,20 @@ export default function AmbassadorApplyPage() {
                   </Badge>
                 )}
               </div>
-              <Badge className="bg-green-100 text-green-700 border-green-200 shrink-0">
+              <Badge className="bg-neutral-800 text-neutral-200 border-neutral-700 shrink-0">
                 Open
               </Badge>
             </div>
             {program?.description && (
-              <CardDescription className="text-base mt-3 text-slate-600">
+              <CardDescription className="text-base mt-3 text-neutral-400">
                 {program.description}
               </CardDescription>
             )}
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-slate-600">
+          <CardContent className="space-y-2 text-sm text-neutral-400">
             {(program?.location || program?.country) && (
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                <MapPin className="h-4 w-4 text-neutral-500 shrink-0" />
                 <span>
                   {[program.location, program.country]
                     .filter(Boolean)
@@ -253,13 +263,13 @@ export default function AmbassadorApplyPage() {
             )}
             {deadline && (
               <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+                <CalendarDays className="h-4 w-4 text-neutral-500 shrink-0" />
                 <span>Application deadline: {deadline}</span>
               </div>
             )}
             {program?.maxApplicants && (
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-slate-400 shrink-0" />
+                <Users className="h-4 w-4 text-neutral-500 shrink-0" />
                 <span>Limited to {program.maxApplicants} ambassadors</span>
               </div>
             )}
@@ -275,7 +285,7 @@ export default function AmbassadorApplyPage() {
                   <CardTitle className="text-base">What we&apos;re looking for</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-slate-600 whitespace-pre-line">
+                  <p className="text-sm text-neutral-400 whitespace-pre-line">
                     {program.requirements}
                   </p>
                 </CardContent>
@@ -287,7 +297,7 @@ export default function AmbassadorApplyPage() {
                   <CardTitle className="text-base">What you&apos;ll get</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-slate-600 whitespace-pre-line">
+                  <p className="text-sm text-neutral-400 whitespace-pre-line">
                     {program.perks}
                   </p>
                 </CardContent>
@@ -314,19 +324,19 @@ export default function AmbassadorApplyPage() {
                 <div
                   className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                     cvFile
-                      ? "border-green-300 bg-green-50"
-                      : "border-slate-300 hover:border-slate-400"
+                      ? "border-white/40 bg-neutral-800"
+                      : "border-neutral-700 hover:border-neutral-500"
                   }`}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {cvFile ? (
-                    <div className="flex items-center justify-center gap-2 text-green-700">
+                    <div className="flex items-center justify-center gap-2 text-white">
                       <CheckCircle className="h-5 w-5" />
                       <span className="font-medium text-sm">{cvFile.name}</span>
                     </div>
                   ) : (
-                    <div className="text-slate-500 space-y-1">
-                      <Upload className="h-8 w-8 mx-auto text-slate-400" />
+                    <div className="text-neutral-400 space-y-1">
+                      <Upload className="h-8 w-8 mx-auto text-neutral-500" />
                       <p className="text-sm font-medium">
                         Click to upload your CV
                       </p>
@@ -398,30 +408,30 @@ export default function AmbassadorApplyPage() {
               <div className="space-y-2">
                 <Label htmlFor="video-upload">
                   Pitch video{" "}
-                  <span className="text-slate-400 font-normal">(optional — 1 min max)</span>
+                  <span className="text-neutral-500 font-normal">(optional — 1 min max)</span>
                 </Label>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-neutral-500">
                   Record a short 60-second clip introducing yourself and why you&apos;d make a great ambassador. Helps us see your communication style.
                 </p>
                 <div
                   className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
                     videoFile
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-slate-300 hover:border-slate-400"
+                      ? "border-white/40 bg-neutral-800"
+                      : "border-neutral-700 hover:border-neutral-500"
                   }`}
                   onClick={() => videoInputRef.current?.click()}
                 >
                   {videoFile ? (
-                    <div className="flex items-center justify-center gap-2 text-blue-700">
+                    <div className="flex items-center justify-center gap-2 text-white">
                       <Video className="h-5 w-5" />
                       <span className="font-medium text-sm">{videoFile.name}</span>
-                      <span className="text-xs text-blue-500">
+                      <span className="text-xs text-neutral-400">
                         ({(videoFile.size / (1024 * 1024)).toFixed(1)} MB)
                       </span>
                     </div>
                   ) : (
-                    <div className="text-slate-500 space-y-1">
-                      <Video className="h-8 w-8 mx-auto text-slate-400" />
+                    <div className="text-neutral-400 space-y-1">
+                      <Video className="h-8 w-8 mx-auto text-neutral-500" />
                       <p className="text-sm font-medium">Click to upload your pitch video</p>
                       <p className="text-xs">MP4, WebM or MOV — max 100 MB · 1 min recommended</p>
                     </div>
@@ -438,7 +448,7 @@ export default function AmbassadorApplyPage() {
               </div>
 
               {errorMessage && (
-                <p className="text-sm text-red-600 flex items-center gap-2">
+                <p className="text-sm text-red-400 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   {errorMessage}
                 </p>
@@ -459,7 +469,7 @@ export default function AmbassadorApplyPage() {
                 )}
               </Button>
 
-              <p className="text-xs text-slate-400 text-center">
+              <p className="text-xs text-neutral-500 text-center">
                 Your CV will be processed automatically. We&apos;ll contact you via
                 the email address in your CV.
               </p>
@@ -478,7 +488,7 @@ export default function AmbassadorApplyPage() {
                 <AccordionTrigger className="text-sm font-medium text-left">
                   How much time will I need to commit?
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-slate-600">
+                <AccordionContent className="text-sm text-neutral-400">
                   We respect your exams and your schedule. The program is flexible, but we recommend
                   dedicating 3–5 hours per week to stay engaged with your community and tasks.
                 </AccordionContent>
@@ -488,7 +498,7 @@ export default function AmbassadorApplyPage() {
                 <AccordionTrigger className="text-sm font-medium text-left">
                   Where is the program located?
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-slate-600">
+                <AccordionContent className="text-sm text-neutral-400">
                   Our 2026 pilot program is specifically focused on the Porto/Maia ecosystem,
                   targeting students from universities such as UP, IPP, and others.
                 </AccordionContent>
@@ -498,7 +508,7 @@ export default function AmbassadorApplyPage() {
                 <AccordionTrigger className="text-sm font-medium text-left">
                   Will I receive training?
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-slate-600">
+                <AccordionContent className="text-sm text-neutral-400">
                   Yes. Every ambassador begins with a Bootcamp Day at the Porto Hub, covering brand
                   history, content creation workshops, and a deep dive into our corporate culture.
                 </AccordionContent>
@@ -508,7 +518,7 @@ export default function AmbassadorApplyPage() {
                 <AccordionTrigger className="text-sm font-medium text-left">
                   What are the benefits of being an adidas Student Ambassador?
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-slate-600 space-y-3">
+                <AccordionContent className="text-sm text-neutral-400 space-y-3">
                   <p>
                     This program provides a premier platform for students to gain high-value
                     professional experience without compromising their academic priorities. Designed
