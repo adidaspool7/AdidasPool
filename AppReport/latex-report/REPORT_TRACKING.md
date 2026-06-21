@@ -93,10 +93,10 @@ Recharts, Vitest, GitHub Actions, Vercel).
 
 ### C. Build / asset prerequisites (one-time, before compiling)
 
-- [ ] **C-1 — Copy the class file + template assets** (per `README.md` "One-time setup"):
-  `PESTI-style.cls` and `frontmatter/assets/` are copied from `latex-report-example/`.
-  *Verify present before zipping for Overleaf.* (`PESTI-style.cls` is present;
-  confirm `frontmatter/assets/` logos exist.)
+- [x] **C-1 \u2014 Class file + template assets present (DONE 2026-06-21).**
+  `PESTI-style.cls` is present, and `frontmatter/assets/` contains both logos the class
+  references (`isep_logo.pdf`, `logo_dei.pdf`) plus the `screenshots/` folder. The zip for
+  Overleaf will include everything needed to compile.
 
 - [ ] **C-2 — Overleaf compile passes** with pdfLaTeX + biber + makeglossaries, run
   twice for cross-refs. Check the List of Figures/Tables and glossary render.
