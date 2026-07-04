@@ -189,9 +189,9 @@ TOEFL or IELTS --- which can be mapped onto CEFR bands --- CEFR is
 test-agnostic, internationally recognised, and expressed as behavioural
 descriptors rather than tied to a single examination. These properties make
 it the natural rubric for an asynchronous, software-driven assessment: the
-descriptors translate cleanly into the grammar, vocabulary and fluency
-sub-scores the evaluator returns, and the resulting level is immediately
-meaningful to an HR team operating across many languages.
+descriptors translate cleanly into the sub-scores the evaluator returns, and
+the resulting level is immediately meaningful to an HR team operating across
+many languages.
 
 %----------------------------------------------------------------------------------------
 
@@ -314,7 +314,7 @@ gaps mapped to the design commitments adopted in this work.}
 \textbf{Observed gap} & \textbf{Response in this work} \\
 \midrule
 Matching is workflow-centric and opaque & Pure, unit-tested \textit{computeJobFit} function with per-criterion breakdown (\chapref{cap:design}) \\
-Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with grammar, vocabulary and fluency sub-scores (\chapref{cap:design}) \\
+Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with sub-scores (\chapref{cap:design}) \\
 Compliance is bolted on after the fact & Deletion-aware data model and interaction-history audit trail designed from the schema up (\chapref{cap:design}) \\
 LLM output is unreliable for production parsing & Strict tolerant validation schema plus provider fallback (\chapref{cap:implementation}) \\
 Intelligence tooling assumes large data and budgets & Provider-agnostic architecture: rule-based matching core has no LLM dependency; LLM-dependent flows (CV parsing, JD extraction, interviews) run on free-tier LLM providers and can be re-pointed to a self-hosted model (e.g.\ Llama via Ollama) with a single adapter change (\chapref{cap:design}) \\

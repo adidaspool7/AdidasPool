@@ -53,7 +53,12 @@ both frontend and backend}, which removes a separate server, shared-type
 generation and CORS handling. The alternatives --- a separate React/Express
 backend, Angular/NestJS, Vue/Fastify or Remix --- were rejected as either
 duplicative or a poor fit for the component ecosystem and the deployment
-target.
+target. The other structural choices behind this stack --- the move to
+Supabase over a separate ORM/database/storage/auth assembly, the deliberate
+absence of an ORM, and the primary-with-fallback LLM provider strategy --- are
+recorded with the alternatives weighed and the trade-off accepted in each case
+in the design decision log (\secref{sec:design-decisions},
+\tabref{tab:design-decisions}).
 
 %----------------------------------------------------------------------------------------
 
@@ -399,10 +404,9 @@ obscuring how it was produced. A candidate whose overall score falls inside
 the $45$--$60$ band is flagged as \emph{borderline}, marking them as close to
 the threshold and a natural candidate for an improvement track.
 
-One simplification in this component is deliberate: location distance is
-measured from a single hardcoded origin, the adidas GBS site in Maia. The
-rationale for the choice and the point at which it becomes a real limitation
-are examined in \secref{sec:concl-partial}.
+One simplification here is deliberate: location distance is measured from a
+single fixed origin, a choice whose rationale and the point at which it becomes
+a real limitation are examined in \secref{sec:concl-partial}.
 
 The same weighted-sum approach scores the language assessment, averaging the
 three CEFR sub-scores (grammar, vocabulary and fluency) at equal weight, and a
@@ -457,9 +461,9 @@ discussed with the testing lesson in \chapref{cap:validation}.
 \section{AI Interviewer Integration}
 \label{sec:impl-interviewer}
 
-The conversational interviewer itself is the second team member's
-contribution; this section documents only the integration surface owned by
-the Next.js application. On the application side the flow is: an API route
+The conversational interviewer itself is the second team member's contribution
+(\secref{sec:team}); this section documents only the integration surface owned
+by the Next.js application. On the application side the flow is: an API route
 creates an \texttt{interview\_sessions} row and issues a short-lived
 HMAC-SHA256 token (storing only its hash); the browser opens an interview
 popup that streams audio and chat; transcript turns are recorded through a
@@ -553,13 +557,10 @@ recruiter and candidate.
 To lower the learning curve and keep support overhead low, the platform ships
 its end-user documentation inside the product rather than as a separate
 artefact. A \emph{User guide} entry in the sidebar opens a role-aware help
-dialog that renders one of two curated guides --- sixteen sections for the HR
-manager and twelve for the candidate --- selected from the same role context
-that drives the rest of the navigation. The dialog provides a table of contents with scroll-spy
-highlighting that tracks the reader's position through the document, letting a
-user jump directly to a feature (CV upload, job matching, assessments, data
-export, and so on) and learn it without leaving the page they are working on.
-Because the guide lives next to the running application, it stays consistent
+dialog that renders a curated guide for the HR manager or the candidate,
+selected from the same role context that drives the navigation, so a user can
+jump straight to a feature and learn it without leaving the page they are
+working on. Living next to the running application, the guide stays consistent
 with the deployed feature set and reinforces the same role boundaries enforced
 by the middleware (\secref{sec:impl-auth}).
 
@@ -656,9 +657,8 @@ queryable view of provider reliability, latency and token cost.
 
 Every change runs through GitHub Actions, which type-checks the codebase with
 \texttt{tsc -{}-noEmit} and executes the full Vitest suite with coverage,
-uploading the coverage report as an artefact. The canonical local validation
-mirrors the first step, since a full production build depends on
-deployment-only environment variables. Deployment is handled by Vercel, which
+uploading the coverage report as an artefact; that same type-check is the
+canonical local validation step (\secref{sec:val-static}). Deployment is handled by Vercel, which
 builds with Turbopack and provisions a preview deployment per change, so the
 live deployment is always the demonstrable product increment referred to in
 \chapref{cap:analysis}. A repository policy (\texttt{legacy-peer-deps})

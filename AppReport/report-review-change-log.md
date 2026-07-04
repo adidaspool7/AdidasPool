@@ -11,11 +11,12 @@ review passes, not just repetition). -->
 > rather than line numbers (which shift). Severity is the author's call, open to debate.
 >
 > **See [§ Eighth pass — supervisor / examiner feedback](#eighth-pass--supervisor--examiner-feedback--2026-07-04)
-> at the bottom for the most recent review — five external examiner margin
+> at the bottom for the most recent review — six external examiner margin
 > comments (S1 matching correctness/consistency p32, S2 CV-parsing quantitative
 > eval p65, S3 test-coverage figure p80, S4 margin overflow p81, S5 missing
-> limitations LLM-hallucination/external-API p85; **analysis only, all
-> ⏸ Pending, no report text changed**). Earlier:
+> limitations LLM-hallucination/external-API p85, S6 discuss decisions/challenges/
+> trade-offs/alternatives p63; **S3/S4/S5 applied, S1/S2/S6 satisfied by existing
+> prose — 2026-07-04**). Earlier:
 > [§ Seventh pass — prose-quality analysis](#seventh-pass--prose-quality-analysis-repetition--compaction--improvements--2026-06-25)
 > (LLM-naming cleanup, U1 NFR-prose
 > compaction, U2 reference-direction fix, U3 table-wording vary;
@@ -945,23 +946,25 @@ Recompile order: pdfLaTeX → biber → pdfLaTeX ×2.
 
 **Different in kind from passes 1–7.** Those were the author's own
 prose-quality / consistency reviews. This pass records **external supervisor
-(examiner) feedback** left as five margin comments on the near-final compiled
-PDF (pages 32, 65, 80, 81, 85). The feedback targets **evidence of
+(examiner) feedback** left as six margin comments on the near-final compiled
+PDF (pages 32, 63, 65, 80, 81, 85). The feedback targets **evidence of
 effectiveness** and **formatting**, not repetition. Feedback is recorded
 verbatim (Portuguese, as written) with an English gloss, my analysis, severity,
-and disposition. **Analysis only — no report text changed yet; all items
-⏸ Pending the author's decision** on which to action and whether new
-validation data can be produced.
+and disposition. **Updated 2026-07-04: S3/S4/S5 applied to the report; S1/S2/S6
+satisfied by existing prose — the substantive S1/S2 validation studies (Spearman
+$\rho$, precision/recall) are deferred to future work by design, as no recruiter
+ranking data or labelled CV corpus was available.**
 
 ### Feedback items and analysis
 
 | Item | PDF page | Section (report) | Severity | Status |
 |------|----------|------------------|----------|--------|
-| S1. Matching correctness / consistency | 32 | ch4 §design-matching (`computeJobFit`) | **High** | ⏸ Pending |
-| S2. CV-parsing quantitative evaluation | 65 | ch5 §impl-cv | **High** | ⏸ Pending |
-| S3. Test-coverage figure | 80 | ch6 §val-unit | Low (factual) | ⏸ Pending |
-| S4. Text overflows margin | 81 | ch6 (element TBC) | Low (mechanical) | ⏸ Pending |
-| S5. Missing limitations (LLM hallucination, external-API dependency) | 85 | ch7 §concl-limitations | Medium | ⏸ Pending |
+| S1. Matching correctness / consistency | 32 | ch4 §design-matching / ch6 §val-limitations / ch7 | **High** | ✅ Done (reframe) |
+| S2. CV-parsing quantitative evaluation | 65 | ch5 §impl-cv / ch6 §val-limitations / ch7 | **High** | ✅ Done (reframe) |
+| S3. Test-coverage figure | 80 | ch6 §val-unit | Low (factual) | ✅ Done |
+| S4. Text overflows margin | 81 | ch6 (element TBC) | Low (mechanical) | ✅ Done |
+| S5. Missing limitations (LLM hallucination, external-API dependency) | 85 | ch6 §val-limitations / ch7 §concl-limitations | Medium | ✅ Done |
+| S6. Discuss decisions/challenges/trade-offs/alternatives | 63 | ch4 §design-decisions / ch5 | Low | ✅ Done |
 
 ---
 
@@ -997,6 +1000,18 @@ job illustrates agreement and directly answers *"coincidentes com a avaliação
 dos profissionais?"*. Recommendation: do the ρ study if any recruiter access is
 possible; otherwise reframe honestly.
 
+**Resolution (2026-07-04) — ✅ Done (honest reframe; substantive $\rho$ study deferred by design).**
+Option (a) turns out to be **already in the report** — the log row was simply
+never ticked. The consistency-vs-agreement distinction is stated explicitly in
+ch6 §val-limitations ("the matching engine's logic is proven deterministic and
+regression-locked … its rankings were never compared against a recruiter's own
+ordering — no such agreement study was run") and in ch7 §concl-limitations
+("validated for internal consistency but not against external ground truth"),
+with the **Spearman's $\rho$ agreement study named as the deferred step** in
+ch7 §concl-future. Option (b) — actually running the $\rho$ study — is not done
+because no recruiter ranking data was available; it is carried as future work,
+not claimed. **No new prose required.**
+
 #### S2 — page 65 — quantitative evaluation of CV-parsing quality
 
 > *"não tens dados para uma avaliação quantitativa da qualidade do CV Parsing?
@@ -1014,6 +1029,15 @@ This is the single highest-value addition to the report — it converts "the
 pipeline exists" into "the pipeline extracts X% of experiences and Y% of
 languages correctly." If the labelling exercise is infeasible, frame explicitly
 as a limitation + future work, but a small manual eval is far stronger.
+
+**Resolution (2026-07-04) — ✅ Done (honest reframe; ground-truth accuracy table deferred by design).**
+Same situation as S1: the acknowledgment is already in the report. ch6
+§val-limitations states extraction "was not quantified against a labelled
+ground-truth set in precision-and-recall terms", and ch7 §concl-future defers
+the labelled-corpus precision/recall measurement. The ~20–30-CV manual accuracy
+table (option b) was not produced — same root cause (no labelled real
+application data). Reframe complete; substantive metric deferred. Log row never
+ticked; **no new prose required.**
 
 #### S3 — page 80 — test coverage figure
 
@@ -1056,6 +1080,20 @@ indirectly. This aligns with the argument the section already makes.
 > Note: the on-disk `coverage/` artefact may be stale — re-run
 > `vitest run --coverage` before citing these exact figures in the report.
 
+**Resolution (2026-07-04) — ✅ Done.** Coverage was substantially raised this
+session: added ~15 new test files (use-cases, DTOs, `db-utils`, and the
+`resolve-caller` / `require-hr` auth guards); the suite is now **33 files /
+527 cases**. Re-ran `vitest run --coverage`, so the figures in the table above
+are **superseded** — `application/use-cases` is now **85.7% lines** (was ~17%),
+global **46.9%** (was ~24%), domain services **96.2%**, `lib/auth` **100%**.
+Applied to the report: added a **per-layer coverage table** (`tab:coverage-layer`)
+and a **pgfplots bar chart** (`fig:coverage-by-layer`) to ch6 §val-unit, updated
+the suite counts (305→527, 18→33 files) and the inventory table, and **fixed the
+S3 correctness flag** — the "Domain **and** Application" claim is now factually
+true because the application use-cases are genuinely ~86% covered. Also corrected
+the two stray count references (frontmatter, ch3 reliability row). Full breakdown
+in `AppReport/test-coverage-additions.md`.
+
 #### S4 — page 81 — text out of margin
 
 > *"formatted text not good (some text gets our [out] of margin limits)"*
@@ -1089,6 +1127,65 @@ validation + confidence gating, **not eliminated**; (b) the platform depends on
 third-party LLM/Auth/DB providers, creating availability, cost, and
 data-residency exposure, only partially mitigated by the provider fallback.
 
+**Resolution (2026-07-04) --- ✅ Done.** First verified the examiner's premise:
+both concepts are in fact **already discussed across the report** --- hallucination
+in ch2 §sota-parsing / §sota-structured, ch4 §design-cv ("untrusted boundary"),
+ch5 §impl-cv ("schema drift / invented fields"), ch7 §concl-ai, and the glossary;
+external-API dependency in ch4/ch5 (provider fallback), ch3 (reliability NFR),
+ch7 §concl-ai, and **already partly in ch6 §val-limitations** as the free-tier
+cost/rate ceiling. To avoid duplicating that design-mitigation material, applied
+a **minimal targeted edit in ch6 §val-limitations** (the 6.5 section the note is
+attached to) rather than two fresh paragraphs: (a) broadened the external-LLM
+sentence to name the standing dependence on third-party *availability* --- not
+just cost/rate --- and that a simultaneous dual-provider failure halts ingestion
+entirely; (b) added an explicit **residual-hallucination** statement --- schema
+validation is a *structural*, not *semantic*, guarantee, so a well-formed but
+incorrect value (a plausible-yet-wrong employer, date or skill) passes unflagged,
+leaving silently-wrong rather than corrupt records, which only ground-truth
+comparison or human review would catch. This ties directly into the existing
+"not quantified against a labelled ground-truth set" limitation and keeps the
+human-review stance explicit.
+
+#### S6 — page 63 — discuss engineering decisions, challenges, trade-offs, alternatives (ch5)
+
+> *"neste capítulo consegues discutir: decisões de engenharia / desafios
+> encontrados / compromissos assumidos / alternativas consideradas/rejeitadas?"*
+> (In this chapter can you discuss: engineering decisions / challenges
+> encountered / trade-offs assumed / alternatives considered-and-rejected?)
+
+**Assessment — already covered; not new content, at most a cross-reference.**
+Checked the whole report before adding anything (the author's explicit
+question). All four dimensions are present:
+
+- **Decisions + alternatives + trade-offs** — ch4 §design-decisions carries a
+  dedicated **Design Decision Log** table (`tab:design-decisions`) with columns
+  *Decision | Alternative | Rationale/trade-off*: Supabase vs ORM+Neon+Blob+auth,
+  no-ORM vs Prisma/Drizzle, RLS-off vs per-row RLS, rule-based `computeJobFit`
+  vs embedding similarity, Groq+OpenAI fallback vs single provider, FastAPI
+  sidecar vs in-process JS, text UUID vs serial. ch3 §method-risks (Risks and
+  Decision Log) additionally narrates the Prisma/Neon→Supabase migration and its
+  driver.
+- **Challenges** — ch5 §impl-cv covers schema drift, provider outages, silent
+  parse failures, accent-sensitive dedup, and the search-injection vector.
+- **Trade-offs** — ch5 parse-confidence heuristic (0.7 loud-failure threshold),
+  single-origin location simplification, copy-link email fallback, free-tier
+  ceiling; ch7 §concl-ai ORM lesson (manual camelize/snakeify).
+- **Framework alternative rejected** — ch5 §impl-stack ("weighed against five
+  criteria"; React/Express, Angular, Vue, Remix rejected); ch6 Vitest-over-Jest.
+
+**So the Prisma→Supabase story is NOT missing — it is already told three times**
+(ch3 decision log, ch4 `tab:design-decisions`, ch7 ORM lesson). Adding it to ch5
+would duplicate and reopen the P1/R2-class echoes that passes 1–7 removed. The
+only genuine (minor) gap is that this note sits on **page 63 (ch5)** while the
+systematic decision log lives one chapter earlier (ch4), so a reader in ch5
+isn't pointed to it. **Minimal safe fix (optional):** a single cross-reference
+sentence in ch5 §impl-stack pointing to `\secref{sec:design-decisions}` /
+`tab:design-decisions`. No new narrative. **Disposition (2026-07-04): ✅ Done —
+added the one-line cross-reference after the "single most consequential choice"
+paragraph in ch5 §impl-stack, directing the reader to the ch4 Design Decision
+Log for the Supabase / no-ORM / provider-fallback alternatives and trade-offs.
+No content duplicated.**
+
 ### Open questions to the author (blocking full disposition)
 
 1. **Scope** — action just S3/S4/S5 (implementable now), or also draft the
@@ -1118,7 +1215,7 @@ Requested by the author. Findings:
 - **Passes 1–7 are internally consistent and self-describe as applied.** The
   report is at its **post-pass-7 state**; no pass-1–7 item has been reopened by
   this feedback.
-- **No conflict introduced.** None of the five supervisor items contradicts a
+- **No conflict introduced.** None of the six supervisor items contradicts a
   prior disposition. S5 is adjacent to **A5 / R2** (provider-fallback) and the
   P1 Limitations consolidation, but asks for *new* residual-limitation prose,
   not a re-trim — so it is additive, not a reversal.
@@ -1132,9 +1229,15 @@ Requested by the author. Findings:
   a correction of an existing claim.
 
 **Currency verdict:** with this eighth-pass section added, the change-log now
-reflects the current state of the report — i.e. "post-pass-7 prose, plus five
-open supervisor items (S1–S5) pending, none yet applied." The log is up to date;
-the *report* is not yet updated for S1–S5 (by design — analysis only).
+reflects the current state of the report — i.e. "post-pass-7 prose, plus the
+eighth-pass supervisor items, of which **S3, S4 and S5 are applied and S1, S2
+and S6 are satisfied by existing prose (2026-07-04)**." S1 and S2 are answered
+by the honest consistency-vs-ground-truth reframe (ch6 §val-limitations + ch7),
+with the substantive Spearman-$\rho$ / precision-recall studies deferred to
+future work by design (no recruiter/labelled data). S6's four dimensions are
+already covered by the ch4 Design Decision Log, the ch3 decision log, and
+ch5/ch7 — a one-line cross-reference from ch5 to ch4 was added (2026-07-04).
+The S3 correctness flag is resolved. The log and the report are in sync.
 
 ### Validation
 
@@ -1143,3 +1246,226 @@ required. Coverage figures read directly from `coverage/index.html`
 (per-directory summary rows). Feedback text transcribed from the author's
 message. When S1–S5 are actioned, add an "Edits applied" subsection here per the
 pass-4…pass-7 convention.
+
+---
+
+## Ninth pass — full-report editorial read-through — 2026-07-04
+
+**Author-requested deep pass, "before committing".** Re-read all seven chapters
+end-to-end looking for: (a) duplicated text that annoys the reader, (b) parts to
+improve, (c) long/annoying phrasing to condense, (d) project-aware
+add/remove/improve, and (e) — the standing priority — **reduce AI-Interviewer
+detail**, since the conversational FastAPI service is the second team member's
+work and the author does not want to over-detail it. The report is already at
+its post-pass-8 state (well-converged), so this pass targets a small set of
+genuine remaining echoes, not another broad sweep.
+
+### Findings
+
+| Item | Where | Severity | Status |
+|------|-------|----------|--------|
+| **D1. AI-Interviewer ownership disclaimer restated ~8×.** "Conversational service is the second member's; this documents only the integration contract." | ch1 §scope, ch1 §approach, ch1 §team, ch3 §method-boundary, ch4 §design-interviewer, ch5 §impl-interviewer, ch6 "Module ownership note", ch7 §concl-summary | **Medium** (biggest remaining echo; also serves the "less AI detail" goal) | ✅ Done |
+| **D2. CEFR "grammar, vocabulary and fluency sub-scores" phrase ~8×** (grep-confirmed: ch1 obj, ch2 §sota-cefr, ch2 positioning table, ch3 FR-06, ch4 value-objects, ch4 §design-interviewer, ch5 §impl-scoring, ch7 goals). | ch1, ch2 ×2, ch3, ch4 ×2, ch5, ch7 | Low-Medium | ✅ Done |
+| **D3. "Single respondent / directional-not-statistical" caveat** — on grep it is **once per chapter** (ch3 §analysis-pains, ch6 §val-survey, ch7 §concl-limitations), not twice in ch6 as first estimated. | ch3, ch6, ch7 | Low | ✅ Done (ch3 trimmed) |
+| **D4. Single-origin "Maia" location simplification** explained in ch5 scoring-table Location row + adjacent standalone paragraph, then ch7 §concl-partial + ch7 §concl-future. | ch5 ×2, ch7 ×2 | Low | ✅ Done (ch5 para tightened) |
+| **D5. Lazy JD parse / "cached with schema version"** fully restated in ch6 §val-performance (already in ch4 §design-jd + ch5 §impl-jobs). | ch4, ch5, ch6 §val-performance | Low | ✅ Done (ch6 condensed) |
+| **D6. "`tsc --noEmit` canonical because build needs deploy-only env vars"** explained in both ch5 §impl-cicd and ch6 §val-static. | ch5, ch6 | Low | ✅ Done (ch5 xref) |
+| **T1. Trim AI-Interviewer internal detail** (evaluator/system-prompt refs are the 2nd member's). Keep only the author's HMAC token/session contract. | ch4 §design-interviewer | Low-Medium | ✅ Done |
+| **T2. Appendix D reproduces the interviewer system prompts** (both modes) — 2nd member's work; flag for possible removal from the author's report. | Appendix D | Low | ✅ Done (reduced to minimum) |
+| **C1. Over-detailed "In-app user guide" paragraph** (sixteen/twelve sections, scroll-spy). | ch5 §impl-engagement | Low | ✅ Done |
+| **I1. Value-objects `ASSESSMENT_DEFAULT_WEIGHTS`** lists 5 components (grammar/vocab/clarity/fluency/customer-handling) while the language interview uses 3 CEFR sub-scores — reconciled by a following sentence but still a reader-confusion source. **Correction:** this constant is the *author's* general-assessment template (scoring presets), **not** the 2nd member's evaluator. | ch4 tab:value-objects | Low | ✅ Done |
+
+**Note on prior dispositions.** Several cross-chapter AI-Interviewer mentions
+were previously kept as "purpose-distinct" (B3 disposition: ch3 = organizational
+home, ch4 = technical contract). D1 does not reopen that — it consolidates the
+repeated *ownership disclaimer sentence*, keeping the single full statement in
+ch1 §team and reducing the others to a short clause or cross-reference. The
+distinct structural roles (scope delimitation, methodology boundary, design
+contract, test attribution) remain; only the redundant "developed by the second
+member / documents only the integration contract" wording is thinned.
+
+#### D1 — consolidate the AI-Interviewer ownership disclaimer
+
+**Plan.** Canonical full statement stays in **ch1 §team** (the responsibility
+split table). The other seven mentions are reduced to a brief clause or a
+`\secref{sec:team}` cross-reference, removing the repeated "developed by the
+second team member … integration contract only" phrasing while preserving each
+location's distinct structural purpose.
+
+**Edits applied (2026-07-04).**
+
+- **ch1 §team** — unchanged; remains the single full statement of the split.
+- **ch1 §approach** — removed the duplicated name "Stratos Demertzoglou" and the
+  "(a Python FastAPI service)" parenthetical (both live in §team); kept the
+  role-split sentence and its `\secref{sec:team}` pointer.
+- **ch4 §design-interviewer** — "developed by the second team member" → "(the
+  second member's module; \secref{sec:team})", threading to the canonical home.
+- **ch5 §impl-interviewer** — added `(\secref{sec:team})` to the section framer;
+  wording otherwise intact (section legitimately scopes itself to the
+  integration surface).
+- **ch6 Module ownership note** — "was developed by the second team member" →
+  "is the second team member's (\secref{sec:team})"; deleted the redundant
+  closing sentence ("They are part of the shared suite but are attributed
+  accordingly to keep the contribution boundary explicit") — the xref plus
+  "cover only the Next.js side" already convey it.
+- **Left intentionally:** ch1 §scope (genuine scope delimitation, already
+  xrefs §team), ch3 §method-boundary (the *organizational* home for the
+  boundary rationale — purpose-distinct, not the ownership disclaimer), and
+  ch7 §concl-summary (natural authorship statement in the contributions list).
+
+Net effect: every ownership mention now threads to the single canonical home in
+ch1 §team; duplicated specifics (developer name, "Python FastAPI service",
+redundant attribution sentence) removed. No structural mention deleted.
+
+#### D2 — thin the CEFR sub-score enumeration
+
+**Plan.** Spell out "grammar, vocabulary and fluency" exactly twice — at its
+**introduction** (ch1 objectives, item 4) and at the **scoring-mechanism home**
+(ch5 §impl-scoring, where the equal-weight average + banded CEFR lookup are
+defined). Everywhere else reduce to "sub-scores".
+
+**Edits applied (2026-07-04).**
+
+- **ch1 objectives** — kept full (first mention; defines the three sub-scores).
+- **ch5 §impl-scoring** — kept full (mechanism home: equal-weight average, banded
+  lookup, editable weight tables).
+- **ch2 §sota-cefr** — "translate cleanly into the grammar, vocabulary and
+  fluency sub-scores" → "…into the sub-scores".
+- **ch2 positioning table** — "a CEFR level with grammar, vocabulary and fluency
+  sub-scores" → "a CEFR level with sub-scores".
+- **ch3 FR-06 (Behaviour)** — "a CEFR level with grammar, vocabulary and fluency
+  sub-scores, stored for human review" → "a CEFR level with sub-scores, stored
+  for human review".
+- **ch4 value-objects** — "averages the three CEFR sub-scores (grammar,
+  vocabulary and fluency) at equal weight (\secref{sec:impl-scoring})" →
+  dropped the parenthetical (the xref already points to where they're named).
+- **ch4 §design-interviewer** — "a CEFR level with grammar, vocabulary and
+  fluency sub-scores" → "a CEFR level with sub-scores" (also serves T1).
+- **ch7 goals (item 4)** — "level with grammar, vocabulary and fluency
+  sub-scores in language mode" → "level with sub-scores in language mode".
+
+Net: 8 full enumerations → 2 (intro + mechanism); six reduced to "sub-scores".
+
+#### D3 — thin the single-respondent survey caveat
+
+**Correction to the finding.** Grep shows the caveat is **once per chapter**, not
+twice in ch6: ch3 §analysis-pains (line ~66), ch6 §val-survey (close of the
+honest-reading paragraph), ch7 §concl-limitations (first limitation). Each is a
+distinct structural home — methodology setup → validation analysis → formal
+limitations register — consistent with the report's established "purpose-distinct
+cross-chapter mention" philosophy.
+
+**Edits applied (2026-07-04).**
+
+- **ch3 §analysis-pains** — the mention already forward-references ch6, so trimmed
+  it to a lean pointer: "a single-respondent indicator rather than a
+  statistically representative sample --- a constraint made explicit when the
+  responses are analysed in \chapref{cap:validation}" → "a single-respondent
+  indicator --- a constraint analysed in full when the responses are examined in
+  \chapref{cap:validation}". Drops the "statistically representative sample"
+  framing (which ch6 and ch7 both carry).
+- **ch6 §val-survey** — kept (the analysis home; the honest-reading caveat belongs
+  where the survey is actually interpreted).
+- **ch7 §concl-limitations** — kept (formal limitations register; first bullet).
+
+Net: three full statements → one lean forward-reference + two purpose-distinct
+homes; the verbatim "statistically representative/generalisable" echo drops from
+three chapters to two.
+
+#### D4 — tighten the single-origin location note (not delete)
+
+**Tension with S6.** The standalone ch5 paragraph is also exactly the kind of
+implementation-chapter trade-off discussion the examiner's **S6** requested, so
+deleting it would weaken the S6 response. Resolved by **tightening** rather than
+removing.
+
+**Edits applied (2026-07-04).**
+
+- **ch5 §impl-scoring standalone paragraph** — "measured from a single hardcoded
+  origin, the adidas GBS site in Maia. The rationale for the choice and the
+  point at which it becomes a real limitation are examined in …" → "measured
+  from a single fixed origin, a choice whose rationale and the point at which it
+  becomes a real limitation are examined in …". Drops the repeated "adidas GBS
+  site in Maia" (already in the scoring-table Location row directly above, and
+  fully examined in ch7) while keeping the deliberate-trade-off signpost + xref.
+- **Left:** ch5 scoring-table Location row (mechanism), ch7 §concl-partial
+  (limitation home), ch7 §concl-future (future-work item) — purpose-distinct.
+
+#### D5 — condense the JD-parse-cache restatement in ch6 §val-performance
+
+**Edit applied (2026-07-04).** ch6 §val-performance already cross-referenced
+\secref{sec:design-jd} but then re-explained the whole lazy-parse mechanism.
+Condensed: "as designed in \secref{sec:design-jd}, a job description is parsed by
+the Large Language Model only the first time an HR user opens its ranking screen
+and the result is cached with a schema version" → "the lazy, schema-versioned JD
+parse designed in \secref{sec:design-jd} runs the Large Language Model only on
+first use". Keeps the performance point (two caches: JD parse + \texttt{job\_matches})
+while leaning on the design home. ch4 §design-jd and ch5 §impl-jobs unchanged.
+
+#### D6 — point ch5 §impl-cicd at the ch6 §val-static home
+
+**Edit applied (2026-07-04).** Both chapters explained that \texttt{tsc -{}-noEmit}
+is the canonical local validation step because a full production build fails
+locally on deployment-only env vars. Kept the full reasoning in ch6 §val-static
+(the static-analysis home); in ch5 §impl-cicd replaced "The canonical local
+validation mirrors the first step, since a full production build depends on
+deployment-only environment variables" with "that same type-check is the
+canonical local validation step (\secref{sec:val-static})". CI description (GitHub
+Actions type-check + Vitest + coverage artefact) retained.
+
+#### T1 — trim AI-Interviewer internals in ch4 §design-interviewer
+
+**Edit applied (2026-07-04).** Kept the author-owned contract (session creation,
+HMAC-SHA256 token with TTL + hash storage, turn proxying, evaluation persistence,
+the magic-link-window distinction) and the sequence diagram. Condensed the
+internals: "The interview has two modes --- **technical** skill validation and
+**language** assessment --- and the evaluator returns a structured result (for
+the language mode, a CEFR level with sub-scores) that is stored as JSONB. The
+system prompts for both interview modes are reproduced in \appref{app:prompts}"
+→ "The interview runs in one of two modes (technical or language), and the
+sidecar's evaluator returns a structured result that the Next.js side persists as
+JSONB; the conversational internals and the mode prompts are the second member's,
+documented in \appref{app:prompts}". Drops the CEFR-sub-score internal (covered in
+ch1/ch5), keeps the author's persistence fact, and reframes the appendix pointer
+as explicitly the 2nd member's work (sets up the T2 decision).
+
+#### C1 — condense the in-app user-guide paragraph
+
+**Edit applied (2026-07-04).** Dropped the precise section counts ("sixteen
+sections for the HR manager and twelve for the candidate"), the scroll-spy
+table-of-contents mechanics, and the parenthetical feature list ("CV upload, job
+matching, assessments, data export, and so on"). Kept the substance: in-product
+role-aware documentation that stays consistent with the deployed feature set and
+reinforces the middleware role boundaries. ~4 lines saved.
+
+#### I1 — disambiguate the ASSESSMENT_DEFAULT_WEIGHTS row
+
+**Correction + edit applied (2026-07-04).** First corrected the finding: this
+constant is the **author's** general-assessment template (persisted in
+`scoring_presets`), not the second member's evaluator. The confusion is purely
+visual — its "grammar, vocabulary … fluency" components overlap the CEFR
+sub-score names. Prefixed the table row with "General-assessment rubric:" so it
+self-disambiguates at the point of reading, before the existing clarifying
+sentence. No numbers changed.
+
+#### T2 — Appendix D interviewer system prompts (✅ Done — reduced to a minimum)
+
+**Author decision (2026-07-04): reduce to a minimum.** The two full interviewer
+system-prompt listings (`lst:prompt-tech`, `lst:prompt-lang`) were the second
+member's FastAPI-sidecar work. Verified no `\ref` pointed at those labels, then
+removed both listings and merged their two subsections into a single short note
+(`app:prompts-interview`) stating the prompts run in the sidecar, are the second
+member's (\secref{sec:team}), are not reproduced, and that the only Next.js-side
+concern is the schema-validated-JSON→JSONB contract (\secref{sec:design-interviewer}).
+Also updated the appendix intro (now: reproduces only the two Next.js-owned
+prompts — CV parsing + JD extraction; interviewer prompts only summarised),
+trimmed the conventions paragraph (dropped the FastAPI/Pydantic mentions), and
+softened the ch4 §design-interviewer pointer from "documented in" to "summarised
+in \appref{app:prompts}". Appendix D now reproduces only the author's two
+application prompts in full.
+
+### Ninth-pass outcome (2026-07-04)
+
+Applied this session: **D1, D2, D3, D4, D5, D6, T1, T2, C1, I1** — all ten items.
+No item deferred. Report edits are `.tex`/`.md` only — no TS/CI/deploy impact;
+validation is a LaTeX recompile in Overleaf (pdfLaTeX → biber → pdfLaTeX ×2).

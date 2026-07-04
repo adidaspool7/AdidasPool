@@ -5,18 +5,19 @@ The platform delegates four tasks to Large Language Models: parsing a CV into
 structured data, extracting hiring requirements from a job description, and
 conducting the two modes of the AI Interviewer (technical-skill and language).
 Each task is driven by a hand-written, schema-constrained system prompt. This
-appendix reproduces the core of those prompts
-(\secref{app:prompts-application}) and, separately, documents how AI coding
+appendix reproduces the core of the two prompts owned by the Next.js
+application --- CV parsing and job-requirement extraction
+(\secref{app:prompts-application}); the two interviewer prompts are the second
+team member's and are only summarised. It then documents how AI coding
 assistants were used as a bounded tool during development
 (\secref{app:prompts-development}).
 
-Two conventions apply throughout. First, the prompts are reproduced from the
-source files (\texttt{src/server/infrastructure/ai/} for the Next.js services
-and \texttt{ai\_interviewer\_backend/} for the FastAPI sidecar); long enumerated
-value lists and repeated few-shot examples are elided with \texttt{[\ldots]}
-purely to keep each listing to one page. Second, every prompt ends by
-constraining the model to emit JSON only, which the calling code then validates
-with Zod (Next.js) or Pydantic (FastAPI) before it is trusted.
+Two conventions apply to the reproduced prompts. First, they are taken from the
+source files (\texttt{src/server/infrastructure/ai/}); long enumerated value
+lists and repeated few-shot examples are elided with \texttt{[\ldots]} purely to
+keep each listing to one page. Second, every prompt ends by constraining the
+model to emit JSON only, which the calling code then validates with Zod before
+it is trusted.
 
 %----------------------------------------------------------------------------------------
 
@@ -133,74 +134,16 @@ CRITICAL RULES:
   4. Return ONLY valid JSON.
 \end{lstlisting}
 
-\subsection{AI Interviewer --- Technical Mode}
-\label{app:prompts-interview-tech}
+\subsection{AI Interviewer --- Technical and Language Modes}
+\label{app:prompts-interview}
 
-The technical interviewer is assembled from a persona, a guardrails block and a
-flow block, then specialised at run time to the single skill the candidate is
-being assessed on. The guardrails are deliberately strict: the model asks one
-question per turn, never reveals answers, and treats topic drift as a hard
-failure, which is what keeps an assessment focused on exactly one competency.
-
-\begin{lstlisting}[caption={Technical interviewer system prompt (assembled from persona, guardrails and flow).},label={lst:prompt-tech}]
-You are a senior technical interviewer. You are concise, professional, focused,
-and fast-paced.
-
-Strict rules you must always follow:
-1) Only ask deeply technical questions grounded in the candidate's provided
-   projects and skills.
-2) Never drift off-topic; if the candidate does, steer back politely.
-3) Never reveal or provide answers to your own questions, even if asked.
-4) Ask exactly one technical question per turn.
-5) Prefer implementation details: architecture, trade-offs, debugging, complexity,
-   edge cases.
-
-Language-specific scope enforcement (topic drift is a hard failure):
-You are ONLY allowed to test the candidate's knowledge of the {skill_name}
-language itself. Permitted topics: {core_topics}.
-Forbidden domains: {forbidden_topics}. If an answer touches a forbidden domain,
-acknowledge it in one sentence and redirect to a core {skill_name} question.
-
-Interview flow:
-- Start with a project-specific deep question, then follow up on each answer.
-- Stop after at most 10 questions, or once evidence_confidence >= 0.85 with at
-  least 6 questions asked.
-- When ending, append the {END_INTERVIEW} token at the end of the response.
-\end{lstlisting}
-
-\subsection{AI Interviewer --- Language Mode}
-\label{app:prompts-interview-lang}
-
-The language examiner follows a fixed four-phase script --- introduction, five
-oral questions, a verbatim dictation task, and a closing turn --- so that every
-candidate is assessed under the same conditions. It conducts the whole session
-in the language under test and records errors internally rather than correcting
-them mid-conversation, leaving the CEFR judgement to the separate evaluator.
-
-\begin{lstlisting}[caption={Language examiner system prompt (abridged four-phase flow).},label={lst:prompt-lang}]
-You are a friendly, professional CEFR language examiner conducting a structured
-language proficiency assessment on behalf of a recruitment team. Your evaluation
-is rigorous but fair.
-
-Strict rules:
-1) Conduct the entire interview in the assessed language.
-2) Never discuss technical or IT topics.
-3) Do NOT correct grammar mid-conversation -- note errors internally for evaluation.
-4) Ask exactly one question per turn.
-
-Follow this exact 4-phase structure:
-  PHASE 1 - INTRO: greet the candidate by name, explain that there are no right or
-            wrong answers, then ask the first oral question immediately.
-  PHASE 2 - ORAL: ask 5 fixed questions, one per turn (tasks of the role; skills
-            needed; daily challenges; company values; the value they relate to most).
-  PHASE 3 - WRITING: present the reference paragraph verbatim and ask the candidate
-            to type it exactly.
-  PHASE 4 - CLOSING: thank the candidate, explain next steps, append {END_INTERVIEW}.
-
-Maintain an internal, hidden turn state (phase, oral_questions_asked,
-writing_submitted, cefr_signal). A separate evaluator returns the final CEFR level
-with grammar, vocabulary and fluency sub-scores.
-\end{lstlisting}
+The two conversational interviewer prompts --- the technical-skill interviewer
+and the CEFR language examiner --- run inside the FastAPI sidecar
+(\texttt{ai\_interviewer\_backend/}) and are the second team member's work
+(\secref{sec:team}); they are therefore not reproduced in this report. The only
+part relevant to the Next.js application is the contract: each mode ends by
+emitting a structured, schema-validated JSON result that the application
+persists as JSONB, as documented in \secref{sec:design-interviewer}.
 
 %----------------------------------------------------------------------------------------
 

@@ -218,7 +218,7 @@ the Domain layer.}
 \texttt{CEFR\_LEVELS} & The six-level proficiency scale A1--C2 \\
 \texttt{CV\_SCORING\_WEIGHTS} & Language 35\%, experience relevance 25\%, education 15\%, location 15\%, years of experience 10\% \\
 \texttt{EDUCATION\_LEVEL\_SCORES} & High school 20, vocational 40, bachelor 60, master 80, PhD 100 \\
-\texttt{ASSESSMENT\_DEFAULT\_WEIGHTS} & Grammar, vocabulary, clarity, fluency and customer handling at 20\% each \\
+\texttt{ASSESSMENT\_DEFAULT\_WEIGHTS} & General-assessment rubric: grammar, vocabulary, clarity, fluency and customer handling at 20\% each \\
 \texttt{BORDERLINE\_THRESHOLD} & Borderline band: score between 45 and 60 \\
 \texttt{MAGIC\_LINK\_EXPIRY\_HOURS} & Assessment-link validity of 48 hours \\
 \texttt{MAX\_FILE\_SIZE\_MB} / \texttt{MAX\_BULK\_FILES} & Upload limits: 10\,MB per file, 500 files per batch \\
@@ -229,8 +229,7 @@ the Domain layer.}
 \texttt{ASSESSMENT\_DEFAULT\_WEIGHTS} applies to the general assessment
 template --- the customer-service and technical rubrics --- and is distinct
 from the language interview, which instead averages the three \gls{cefr}
-sub-scores (grammar, vocabulary and fluency) at equal weight
-(\secref{sec:impl-scoring}).
+sub-scores at equal weight (\secref{sec:impl-scoring}).
 
 The candidate itself carries a lifecycle status that the domain treats as a
 state machine rather than a free-text label. \figref{fig:status-sm} shows
@@ -515,20 +514,19 @@ requirements from duties-only postings --- is reproduced in
 \subsection{AI Interviewer (FastAPI Sidecar)}
 \label{sec:design-interviewer}
 
-The conversational assessment runs in a separate Python FastAPI service,
-developed by the second team member; the design point relevant here is the
-\emph{contract}. The browser opens an interview popup that talks to the
+The conversational assessment runs in a separate Python FastAPI service (the
+second member's module; \secref{sec:team}). The design point relevant here is
+the \emph{contract}. The browser opens an interview popup that talks to the
 Next.js API routes; those routes create a session, issue a short-lived
 HMAC-SHA256 token (ten-minute TTL, with only its hash stored), proxy the
 conversation turns to the sidecar, and persist the final evaluation. This
 per-session token governs the live interview only and is distinct from the
 48-hour \texttt{MAGIC\_LINK\_EXPIRY\_HOURS} window (\tabref{tab:value-objects})
 that keeps an assessment-invitation link valid until the candidate starts. The
-interview has two modes --- \textbf{technical} skill validation and
-\textbf{language} assessment --- and the evaluator returns a structured
-result (for the language mode, a CEFR level with grammar, vocabulary and
-fluency sub-scores) that is stored as JSONB. The system prompts for both
-interview modes are reproduced in \appref{app:prompts}.
+interview runs in one of two modes (technical or language), and the sidecar's
+evaluator returns a structured result that the Next.js side persists as JSONB;
+the conversational internals and the mode prompts are the second member's,
+summarised in \appref{app:prompts}.
 
 \figref{fig:seq-interview} traces the token and session flow across the
 boundary. The Next.js core owns identity and persistence; the sidecar owns the

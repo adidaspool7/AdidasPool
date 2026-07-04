@@ -266,12 +266,10 @@ arbitrary query.
 \paragraph{Module ownership note.}
 Two suites, \texttt{interview-runtime} (37 cases) and \texttt{interview-token}
 (6 cases), exercise the AI Skill Interviewer integration. The conversational
-FastAPI service itself was developed by the second team member; the tests
-listed here cover the Next.js side of that integration --- session creation,
+FastAPI service itself is the second team member's (\secref{sec:team}); these
+tests cover only the Next.js side of that integration --- session creation,
 HMAC token signing and expiry, transcript-turn persistence, and the
-rubric-validation guardrails applied before an evaluation is stored. They
-are part of the shared suite but are attributed accordingly to keep the
-contribution boundary explicit.
+rubric-validation guardrails applied before an evaluation is stored.
 
 \subsubsection{Requirements Traceability}
 
@@ -481,9 +479,8 @@ often: the \texttt{job\_matches} and \texttt{job\_shortlists} tables for the
 per-job ranking and shortlist screens, and a GIN index on
 \texttt{experiences.fields\_of\_work} so that candidates can be filtered by
 field of work without a full scan. Expensive computation is cached rather
-than repeated: as designed in \secref{sec:design-jd}, a job description is
-parsed by the Large Language Model only the first time an HR user opens its
-ranking screen and the result is cached with a schema version; likewise the
+than repeated: the lazy, schema-versioned JD parse designed in
+\secref{sec:design-jd} runs the Large Language Model only on first use, and the
 top-ranked candidates for a job are persisted as a \texttt{job\_matches} cache
 rather than recomputed on every view.
 
@@ -504,10 +501,14 @@ Validation also surfaced limitations that are reported here honestly rather
 than hidden. The browser-based speech-to-text and text-to-speech used by the
 assessment experience rely on Web Speech APIs available only in
 Chromium-based browsers (Chrome and Edge), so the spoken-interaction path
-degrades on other browsers. The Large Language Model usage runs against a
-provider free tier, which imposes a practical cost-and-rate ceiling on bulk
-CV parsing and is mitigated, but not removed, by the provider fallback
-and the lazy parsing of job descriptions. CV ingestion also reads text
+degrades on other browsers. The platform also depends on \emph{external}
+Large Language Model providers, reached over the network and run against a
+provider free tier: this imposes both a practical cost-and-rate ceiling on
+bulk CV parsing and a standing dependence on third-party availability. The
+Groq-to-OpenAI fallback and the lazy parsing of job descriptions reduce this
+exposure --- turning a primary-provider outage into degraded rather than
+failed parsing --- but they do not remove it, since a simultaneous failure of
+both providers would halt AI-assisted ingestion entirely. CV ingestion also reads text
 directly from the uploaded file with no optical-character-recognition
 fallback, so scanned or image-only PDFs cannot be parsed automatically and are
 instead flagged for manual review. Some \gls{gdpr} obligations are
@@ -525,7 +526,15 @@ own ordering of the same candidates --- no such agreement study was run.
 Second, and separately, the accuracy of CV and job-description extraction was
 verified structurally, through schema conformance and the retry-and-fallback
 path, but was not quantified against a labelled ground-truth set in
-precision-and-recall terms. Both gaps share a single root cause: the project
+precision-and-recall terms. This distinction matters because schema validation
+is a \emph{structural} guarantee, not a \emph{semantic} one: it rejects
+malformed or out-of-vocabulary output, but a \gls{hallucination} that happens
+to be well-formed --- a plausible yet incorrect employer, date or skill that
+satisfies the schema --- passes through unflagged. The residual risk is
+therefore not corrupt records but silently wrong ones, which only a
+ground-truth comparison or human review would catch, and which the platform
+deliberately keeps under human review rather than acting on automatically.
+Both gaps share a single root cause: the project
 had access only to the job descriptions scraped from the adidas careers site,
 not to real application data, and recruiter availability for hand-ranking
 exercises was reduced in the closing phase. They are therefore carried forward
