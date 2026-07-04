@@ -32,7 +32,7 @@ Recharts, Vitest, GitHub Actions, Vercel).
 | `chapters/ch7/chapter7.tex` — Conclusions | Full prose | ✅ Complete | — |
 | `frontmatter/frontmatter.tex` | Abstract, dedication, acknowledgements | ✅ Complete | Abbreviations block intentionally commented out |
 | `frontmatter/glossary.tex` | 8 glossary entries | ✅ Complete | ATS, CEFR, GDPR, LLM, RLS, Onion, PO, Scrum |
-| `appendices/appendixA.tex` — DB schema | 27 ENUMs, 33 tables, candidates DDL | ✅ Complete | Accent dedup noted as future work |
+| `appendices/appendixA.tex` — DB schema | 19 ENUMs, 33 tables, candidates DDL | ✅ Complete | Accent dedup noted as future work |
 | `appendices/appendixB.tex` — API reference | 66 endpoints | ✅ Complete | Endpoint numbering non-sequential (cosmetic) |
 | `appendices/appendixC.tex` — Survey & meeting evidence | Timeline, 9 pain points, 14-item survey | ✅ Complete | Single (authoritative) respondent disclosed |
 

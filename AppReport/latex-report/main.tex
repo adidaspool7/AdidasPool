@@ -16,6 +16,28 @@
 ]{PESTI-style}
 
 \usepackage{longtable} % multi-page API reference table (Appendix B)
+% Make API endpoint paths breakable (Appendix B). Neither \nolinkurl (hyperref)
+% nor an xstring \StrSubstitute reliably broke the longest paths, because the
+% "[id]"/"[skillId]" brackets defeat url-style breaking and xstring's optional
+% argument scanning. \allowbreak after "/" and "]" alone also left the longest
+% path (#7, .../skills/[skillId]/verification) overflowing into the next column.
+% This self-contained tokenizer walks the path one token at a time.
+\makeatletter
+\newcommand{\apiep}[1]{\begingroup\ttfamily\apiep@loop#1\@nil}
+% Walk the path one token at a time. A real \discretionary break is inserted
+% after every character (so a path can ALWAYS wrap and never overflow its
+% column), while "/" and "]" additionally get a zero-penalty break so TeX
+% prefers to wrap at those semantic boundaries when it can.
+\def\apiep@loop#1{%
+  \ifx#1\@nil
+    \endgroup
+  \else
+    #1%
+    \if#1/\penalty0 \else\if#1]\penalty0 \else\discretionary{}{}{}\fi\fi
+    \expandafter\apiep@loop
+  \fi}
+\makeatother
+\usepackage{enumitem}  % description list options (noitemsep, leftmargin, etc.)
 
 % --- Source code listings ---------------------------------------------------
 \usepackage{listings}
@@ -61,6 +83,16 @@
 \renewcommand{\arraystretch}{1.35}
 \setlength{\tabcolsep}{8pt}
 
+% --- Line-breaking safety net -----------------------------------------------
+% Long inline \texttt{} identifiers such as job-requirements-schema and
+% logger-redaction (whose hyphen breakpoints TeX rejected as too loose within
+% default tolerance) and camelCase names like computeJobFit could not be broken
+% and overflowed the right margin. A modest \emergencystretch lets the paragraph
+% breaker relax spacing as a LAST resort to clear overfull lines; well-set
+% paragraphs are untouched (the emergency pass only runs where a line would
+% otherwise exceed the margin).
+\setlength{\emergencystretch}{3em}
+
 % Screenshots live alongside the diagrams in frontmatter/assets/screenshots.
 % Drop PNG/JPG files there using the file names referenced in \includegraphics.
 \graphicspath{{.}{frontmatter/assets/}{frontmatter/assets/screenshots/}}
@@ -81,9 +113,27 @@
 	\endgroup
 }
 
+% \chapref{label} — makes the full "Chapter N" text a single clickable link.
+% Uses \hyperref for the anchor and \ref* for the number (no nested link).
+\newcommand{\chapref}[1]{\hyperref[#1]{Chapter~\ref*{#1}}}
+\newcommand{\appref}[1]{\hyperref[#1]{Appendix~\ref*{#1}}}
+\newcommand{\secref}[1]{\hyperref[#1]{Section~\ref*{#1}}}
+\newcommand{\tabref}[1]{\hyperref[#1]{Table~\ref*{#1}}}
+\newcommand{\figref}[1]{\hyperref[#1]{Figure~\ref*{#1}}}
+
 % --- Citation style (Harvard-like, recommended by the template) -------------
 \usepackage[style=authoryear-comp,backend=biber]{biblatex}
 \addbibresource{mainbibliography.bib}
+
+% --- Microtypography --------------------------------------------------------
+% Character protrusion + font expansion. Protrusion lets punctuation and
+% hyphens hang marginally into the margin, so dense lines of long \texttt{}
+% identifiers (e.g. the schema-suite list: cv-validation,
+% job-requirements-schema, cv-fields-of-work, analytics-catalog) set flush
+% instead of overflowing; expansion micro-adjusts glyph widths so neighbouring
+% lines stop going loose. Complements \emergencystretch (the last-resort safety
+% net). Works with pdfLaTeX on Overleaf.
+\usepackage{microtype}
 
 \makeglossaries
 
@@ -151,5 +201,6 @@
 \input{appendices/appendixA} % Detailed database schema
 \input{appendices/appendixB} % API reference
 \input{appendices/appendixC} % Survey & client meeting evidence
+\input{appendices/appendixD} % Prompt engineering artifacts
 
 \end{document}

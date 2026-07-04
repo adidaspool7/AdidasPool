@@ -1,4 +1,4 @@
-\chapter{Conclusions}
+﻿\chapter{Conclusions}
 \label{cap:conclusions}
 
 This chapter closes the report. It restates what the project contributed,
@@ -13,26 +13,25 @@ future work that follow from them.
 \label{sec:concl-summary}
 
 The work delivered the four contributions claimed in
-Chapter~\ref{cap:introduction}, each backed by a concrete deliverable:
+\chapref{cap:introduction}, each backed by a concrete deliverable:
 
 \begin{itemize}
-	\item A \textbf{reference architecture} for an AI-assisted recruitment
-	platform that respects \gls{gdpr} retention while preserving analytical
-	value --- realised as the onion-structured Next.js application described
-	in Chapter~\ref{cap:design} and deployed to production.
+	\item The \textbf{reference architecture} --- the onion-structured Next.js
+	application described in \chapref{cap:design}, which respects \gls{gdpr}
+	retention while preserving analytical value --- delivered and deployed to
+	production.
 	\item A \textbf{reproducible, auditable job-anchored fit algorithm}
 	(\texttt{computeJobFit}) implemented as a pure function with the most
-	extensive test coverage in the suite (Chapter~\ref{cap:validation}),
-	chosen over opaque embedding ranking precisely because every criterion
-	is explainable.
+	extensive test coverage in the suite (\chapref{cap:validation}), with
+	every scoring criterion individually explainable.
 	\item A \textbf{dual-mode AI interviewer} (technical-skill validation
 	and CEFR language assessment) integrated through a hardened HMAC token
 	contract --- the integration layer being the author's contribution, the
 	conversational service the second member's.
-	\item A \textbf{project-management experience report} from the
-	two-person talent-pool subproject of the BlendEd program, with the author
-	as its Product Owner, documented in
-	Chapter~\ref{cap:analysis} and reflected on below.
+	\item The \textbf{project-management experience report} on the author's
+	Product Owner role in the two-person talent-pool subproject of the
+	BlendEd program --- delivered as the \chapref{cap:analysis} narrative and
+	the reflections below.
 \end{itemize}
 
 %----------------------------------------------------------------------------------------
@@ -40,23 +39,24 @@ Chapter~\ref{cap:introduction}, each backed by a concrete deliverable:
 \section{Goals Achieved}
 \label{sec:concl-goals}
 
-Measured against the seven objectives of Section~\ref{sec:objectives}, the
+Measured against the seven objectives of \secref{sec:objectives}, the
 outcome is as follows:
 
 \begin{enumerate}
 	\item \textbf{Centralise candidate data.} \emph{Achieved} --- a
 	relational, deletion-aware talent pool replaces the spreadsheets
-	(Chapter~\ref{cap:design}).
+	(\chapref{cap:design}).
 	\item \textbf{Automate CV ingestion.} \emph{Achieved} --- the
 	LLM parsing pipeline with provider fallback extracts structured
 	experience, education, languages, skills and field-of-work tags
-	(Chapter~\ref{cap:implementation}).
+	(\chapref{cap:implementation}).
 	\item \textbf{Provide job-anchored matching.} \emph{Achieved} --- the
 	rule-based, per-criterion \texttt{computeJobFit} engine
 	(Chapters~\ref{cap:design} and~\ref{cap:validation}).
-	\item \textbf{Verify language proficiency.} \emph{Achieved} --- the
-	dual-mode AI interview returns a CEFR level with grammar, vocabulary
-	and fluency sub-scores.
+	\item \textbf{Verify candidate proficiency.} \emph{Achieved} --- the
+	dual-mode AI interview validates a chosen competency, returning a CEFR
+	level with grammar, vocabulary and fluency sub-scores in language mode
+	and a rubric-based result in technical-skill mode.
 	\item \textbf{Empower HR communication.} \emph{Achieved} --- the
 	notification and campaign system with a full per-candidate interaction
 	history.
@@ -66,7 +66,7 @@ outcome is as follows:
 	achieved} --- server-side authorisation, a deletion-aware model and
 	self-service account erasure are in place; automating the time-based
 	retention purge remains future work
-	(Section~\ref{sec:concl-future}).
+	(\secref{sec:concl-future}).
 \end{enumerate}
 
 %----------------------------------------------------------------------------------------
@@ -85,13 +85,13 @@ what mattered and building it. The danger was the mirror image of that
 advantage --- when the same person sets priorities and implements them, the
 backlog can quietly bend toward what is interesting to build rather than what
 the client needs. Two practices kept this in check. First, the backlog was
-disciplined to be \emph{client-driven by construction}: every item traced to
-a validated pain point, and MoSCoW prioritisation
-(Section~\ref{sec:method-backlog}) made deferral an explicit, defensible
-decision rather than a silent omission. Second, the fusion of sprint review
-with client acceptance meant that the people who owned the problem signed off
-each increment, which is the closest a one-person product role can get to an
-external check. Within the team, the sprint review was also the moment the
+disciplined to be \emph{client-driven by construction}: the MoSCoW-prioritised,
+pain-point-traceable ordering of \secref{sec:method-backlog} made deferral an
+explicit, defensible decision rather than a silent omission. Second, the
+dedicated client-acceptance session that doubled as the sprint review
+(\secref{sec:method-scrum}) meant that the people who owned the problem signed
+off each increment, which is the closest a one-person product role can get to
+an external check. Within the team, the sprint review was also the moment the
 second developer could push back on product decisions, since the increment
 was concrete and demonstrable rather than abstract. The honest takeaway is
 that combining the roles is workable at this scale only with deliberate
@@ -107,8 +107,8 @@ Domain held no external dependencies and use cases never reached into
 infrastructure, extracting the interviewer behind a typed token contract was
 a boundary change, not a rewrite. The counter-lesson concerns the decision
 to forgo an ORM: the manual \texttt{camelize}/\texttt{snakeify} conversion
-between database and domain was a real, recurring cost, and the May~2026
-audit showed it was also where type safety leaked (rows cast through
+between database and domain was a real, recurring cost, and a later review of
+the codebase showed it was also where type safety leaked (rows cast through
 \texttt{any}). The cost was bounded and the strict compiler largely filled
 the gap, but the experience is a reminder that removing a layer of
 abstraction moves work elsewhere rather than eliminating it.
@@ -127,6 +127,44 @@ re-parse only what was stale. Third, \textbf{fallback providers are a
 reliability mechanism, not a luxury} --- the Groq-to-OpenAI fallback turned a
 single point of failure into a degradation rather than an outage.
 
+\subsection{Working with AI Coding Assistants}
+\label{sec:concl-ai-dev}
+
+AI was also used as a \emph{development tool} during the project --- for
+bounded, author-specified coding tasks, the prompts for which are documented
+in \appref{app:prompts}. Treating that use honestly yielded its own lessons,
+and they were as much about the tool's limits as its leverage.
+
+The first and most consistent observation was that \textbf{the assistant does
+not hold the whole project in mind}. It reasons well about the file or
+function in front of it but loses the wider context --- the layering rules,
+the casing convention at the database boundary, an invariant enforced three
+modules away. Left unguided it tends to \textbf{solve the local problem in the
+simplest way that compiles}, not the way that respects the architecture; a
+plausible fix would, for example, reach from a use case straight into
+infrastructure and quietly violate the dependency rule the whole design
+rests on. The practical consequence is that \textbf{every output requires
+careful validation against the design, not just against the compiler}.
+Generated code was therefore reviewed the way a second developer's pull
+request would be --- checked for boundary violations, hidden assumptions and
+silent scope creep --- and the strict TypeScript compiler plus the test suite
+acted as a backstop rather than a guarantee.
+
+The second lesson was that \textbf{prompting is a skill that improved with
+practice}. Early prompts were broad (``add feature X''), which is exactly when
+the context problem bites hardest: the assistant fills the gaps with
+assumptions. The prompts that worked, and that \secref{app:prompts-development}
+records, share a shape that emerged over the project: state the architectural
+constraints explicitly, name the files and ports involved, specify the
+expected shape of the result, and reduce the task to a bounded piece the
+author had already designed --- so the assistant implemented a decision rather
+than making one. Asking for the smallest reviewable change, rather than a
+whole subsystem, kept each output verifiable. In short, the value of an AI
+assistant on a structured codebase lived less in the model's raw capability
+than in the discipline of the instructions and the validation wrapped around
+it --- the same lesson the product side taught about LLM features, applied to
+the act of building them.
+
 %----------------------------------------------------------------------------------------
 
 \section{Limitations}
@@ -134,33 +172,103 @@ single point of failure into a degradation rather than an outage.
 
 The work has clear limits. The validation survey drew on a small sample from
 a single organisation, so its results are directional rather than
-statistically generalisable. Automated test coverage, though substantial, is
-concentrated in the Domain and Application layers and is thinner over some
-use-case orchestration and the thin infrastructure adapters. The spoken
-assessment relies on browser-native speech recognition and synthesis, which
-restricts it to Chromium-based browsers. CV ingestion extracts text directly
-from the uploaded file and has no optical-character-recognition (OCR)
-fallback, so scanned or image-only PDFs yield too little text to parse and are
-flagged for manual review rather than processed automatically. Bulk imports
+statistically generalisable. Automated test coverage, though substantial
+(527 cases, with line coverage between roughly 80\% and 100\% across the
+domain, application, and authorisation layers), is concentrated where the
+decision logic lives and is deliberately thin over the infrastructure
+adapters --- the data repositories and external-service clients --- which are
+exercised only indirectly through mocked ports. Bulk imports
 are processed serially in a time-bounded background task, which keeps a single
-run to roughly 150--180 CVs and means the 500-file batch cap cannot always
-complete in one window without a durable queue. And although candidates can
-erase their own account on demand, the time-based retention purge is not yet
-automated --- it still depends on a manual trigger rather than running on a
-schedule.
+run to roughly 100--120 CVs and means the 500-file batch cap cannot always
+complete in one window without a durable queue. The AI-assisted ranking and
+the CV and job-description extraction were validated for internal consistency
+but not against external ground truth --- neither the matcher's ordering
+against a recruiter's own ranking nor the parser's output against a labelled
+corpus --- because the project had access only to scraped job descriptions,
+not to real application data, and recruiter time in the closing phase was
+limited; \secref{sec:val-limitations} records both. The remaining operational
+limits surfaced during validation --- the Chromium-only speech path, the
+absence of an OCR fallback for scanned PDFs, the free-tier LLM ceiling, and
+the still-manual retention purge --- are detailed in
+\secref{sec:val-limitations} and frame the future work below.
+
+%----------------------------------------------------------------------------------------
+
+\section{Partially Completed Work}
+\label{sec:concl-partial}
+
+A few capabilities reached the platform in incomplete form and were
+deliberately left partial; \tabref{tab:feature-inventory} marks the principal
+ones as \emph{Partial}. It is worth being explicit about what exists, what is
+missing, and why each was not carried further.
+
+\paragraph{Structured improvement tracks (FR-11).}
+The data foundation exists: when an assessment ends in a failing decision the
+system auto-creates an improvement track with progress entries --- the
+concrete target of the borderline branch of the lifecycle state machine
+(\secref{sec:design-domain}). What is missing is the \emph{candidate-facing}
+flow over that data: a guided view that turns the stored track into targeted,
+navigable development steps. It stayed partial by priority, not technical
+obstacle --- FR-11 was a MoSCoW \emph{Could} (\secref{sec:method-backlog}),
+deferred once the \emph{Must} and \emph{Should} items consumed the sprints ---
+so the remaining work is additive rather than structural.
+
+\paragraph{Bias detection.}
+This remained a placeholder --- a named seam for a fairness module rather than
+a working capability --- for two reasons. It traced to no validated client
+pain point (the backlog was client-driven by construction,
+\secref{sec:concl-po}); and the core fairness risk is already addressed by
+other means, since the assessment is advisory rather than decisive
+(\secref{sec:design-hardening}) and matching is explainable per criterion
+rather than an opaque score (\secref{sec:sota-matching}). A meaningful
+fairness analysis also depends on a volume of historical decision data that a
+six-month retention rule precludes, further weakening the case for building it
+within this iteration.
+
+\paragraph{Live transactional e-mail delivery.}
+The communication module is complete in everything but its final hop. HR can
+compose individual contact messages and rich-text promotional campaigns,
+target them through candidate preferences and segments, and every send is
+recorded as a typed notification in the per-candidate interaction history
+(\secref{sec:impl-notifications}); the Resend provider is wired in behind its
+port. What is left dormant is the act of handing each message to the paid
+provider --- which requires a verified sender domain and, more decisively,
+would incur a per-message cost a student deployment has no budget to carry ---
+so the system routes around it with a copy-link fallback that lets the
+recruiter send the prepared message from their own client. The feature is
+partial only in this switch-flip sense; enabling live delivery is a billing
+and domain-verification decision rather than further engineering.
+
+\paragraph{Single-origin location scoring.}
+The location component of the CV score measures proximity from one hardcoded
+origin --- the adidas GBS site in Maia --- rather than from the site of the job
+actually being filled (\chapref{cap:implementation}). This was a deliberate
+simplification for a single-site deployment: with every modelled role anchored
+to the same office, a fixed origin produced correct relative rankings at a
+fraction of the effort of a configurable one. It becomes a real limitation
+only the moment the platform serves a second office or a remote role, at which
+point the baked-in assumption distorts the score. Lifting it to a per-job
+reference point --- or disabling proximity for remote positions --- is a
+contained change carried forward as future work (\secref{sec:concl-future}).
+
+These items are taken up again as concrete directions in
+\secref{sec:concl-future}.
 
 %----------------------------------------------------------------------------------------
 
 \section{Future Work}
 \label{sec:concl-future}
 
-The most immediate future work is the tracked backlog from the May~2026
-audit: extracting the remaining interview routes behind a use-case layer,
+The most immediate future work is a small tracked backlog of maintainability
+items: extracting the remaining interview routes behind a use-case layer,
 replacing residual \texttt{any} casts at the repository boundary with typed
 row interfaces, and pre-filtering candidates in SQL before the matcher to
-scale matching on large pools. Beyond the audit, several directions stand out:
-automating the time-based retention purge as a scheduled, GDPR-compliant job;
-widening
+scale matching on large pools. Beyond these, several directions stand out:
+automating the time-based retention purge as a scheduled, GDPR-compliant job
+--- paired with a consent-renewal reminder sent one month before a record
+expires, so candidates can opt to stay in the pool rather than lapse by
+default; making the location component configurable rather than fixed to the
+single Maia origin (\secref{sec:concl-partial}); widening
 the analytics widget catalogue so analysts can express more questions safely;
 adding an offline transcription path (for example a Whisper-based fallback)
 so the spoken assessment works on browsers without the Web Speech API; adding
@@ -172,12 +280,24 @@ window; enabling accent-insensitive deduplication through the PostgreSQL
 introducing organisation-level data isolation to make the platform
 multi-tenant.
 
+A distinct and higher-value direction is the \emph{empirical validation of the
+AI-assisted ranking}. In a later phase, run by the client's recruitment and IT
+teams on live application data, recruiters would hand-rank candidate pools for
+real vacancies and their orderings would be compared against
+\texttt{computeJobFit} through a rank-correlation measure such as Spearman's
+$\rho$, with the criterion weights and thresholds then tuned to maximise
+agreement --- the step that would let the tool's rankings be claimed as
+validated against professional judgement rather than merely internally
+consistent. The same exercise would yield a labelled corpus against which CV
+and job-description extraction accuracy could be measured in
+precision-and-recall terms.
+
 %----------------------------------------------------------------------------------------
 
 \section{Closing Remarks}
 \label{sec:concl-closing}
 
-The project set out to help a small HR team manage a structured pool of
+The project set out to help an HR team manage a structured pool of
 candidates efficiently, compliantly and usefully, under the constraint of
 GDPR retention. It delivered a deployed platform that automates CV ingestion,
 matches candidates to specific jobs in an explainable way, verifies language

@@ -7,11 +7,13 @@ file-based Next.js App Router handlers under \texttt{src/app/api/}; each maps
 JSON (except the CSV export), request bodies are validated with Zod, and
 errors follow the convention \texttt{\{ error: "message" \}}. Authorisation is
 enforced at the middleware layer described in
-Section~\ref{sec:design-authz}: every route requires an authenticated
+\secref{sec:design-authz}: every route requires an authenticated
 Supabase session except the public prefixes, and the HR-only subset
 additionally requires \texttt{app\_metadata.role === "hr"}.
 
-\begin{longtable}{@{}r l p{6.4cm} l@{}}
+\begingroup
+\footnotesize
+\begin{longtable}{@{}r l >{\ttfamily\raggedright\arraybackslash\let\texttt\apiep}p{6.4cm} l@{}}
 	\caption{Complete REST API surface (66 endpoints).}
 	\label{tab:api-reference} \\
 	\toprule
@@ -34,76 +36,76 @@ additionally requires \texttt{app\_metadata.role === "hr"}.
 	3  & PATCH  & \texttt{/api/candidates/[id]}           & HR \\
 	4  & POST   & \texttt{/api/candidates/[id]/notes}     & HR \\
 	5  & POST   & \texttt{/api/candidates/rerank}         & HR \\
-	41 & POST   & \texttt{/api/candidates/rescore}        & HR \\
-	42 & POST   & \texttt{/api/candidates/[id]/skills/[skillId]/verification} & HR \\
-	52 & GET    & \texttt{/api/candidates/[id]/shortlists}        & HR \\
-	53 & POST   & \texttt{/api/candidates/[id]/contact}           & HR \\
-	54 & GET    & \texttt{/api/candidates/[id]/interaction-history} & HR \\
+	6  & POST   & \texttt{/api/candidates/rescore}        & HR \\
+	7  & POST   & \texttt{/api/candidates/[id]/skills/}\newline\texttt{[skillId]/verification} & HR \\
+	8  & GET    & \texttt{/api/candidates/[id]/shortlists}        & HR \\
+	9  & POST   & \texttt{/api/candidates/[id]/contact}           & HR \\
+	10 & GET    & \texttt{/api/candidates/[id]/interaction-history} & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Jobs and Matching}} \\
-	6  & GET    & \texttt{/api/jobs}                      & Auth \\
-	7  & POST   & \texttt{/api/jobs}                      & HR \\
-	8  & GET    & \texttt{/api/jobs/[id]}                 & Auth \\
-	9  & PATCH  & \texttt{/api/jobs/[id]}                 & HR \\
-	10 & POST   & \texttt{/api/jobs/sync}                 & HR \\
-	11 & POST   & \texttt{/api/jobs/[id]/match}           & HR \\
-	48 & POST   & \texttt{/api/jobs/[id]/match-candidates} & HR \\
-	49 & POST   & \texttt{/api/jobs/[id]/reparse-requirements} & HR \\
-	50 & GET/POST & \texttt{/api/jobs/[id]/shortlist}     & HR \\
-	51 & DELETE/PATCH & \texttt{/api/jobs/[id]/shortlist/[candidateId]} & HR \\
+	11 & GET    & \texttt{/api/jobs}                      & Auth \\
+	12 & POST   & \texttt{/api/jobs}                      & HR \\
+	13 & GET    & \texttt{/api/jobs/[id]}                 & Auth \\
+	14 & PATCH  & \texttt{/api/jobs/[id]}                 & HR \\
+	15 & POST   & \texttt{/api/jobs/sync}                 & HR \\
+	16 & POST   & \texttt{/api/jobs/[id]/match}           & HR \\
+	17 & POST   & \texttt{/api/jobs/[id]/match-candidates} & HR \\
+	18 & POST   & \texttt{/api/jobs/[id]/reparse-requirements} & HR \\
+	19 & GET/POST & \texttt{/api/jobs/[id]/shortlist}     & HR \\
+	20 & DELETE/PATCH & \texttt{/api/jobs/[id]/shortlist/[candidateId]} & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Assessments and Interview}} \\
-	12 & GET    & \texttt{/api/assessments}              & HR \\
-	13 & POST   & \texttt{/api/assessments}              & HR \\
-	43 & POST   & \texttt{/api/interview/realtime/session} & Auth \\
-	44 & POST   & \texttt{/api/interview/realtime/turn}    & Auth \\
-	45 & POST   & \texttt{/api/interview/realtime/complete} & Auth \\
-	46 & POST   & \texttt{/api/interview/realtime/terminate} & Auth \\
-	47 & POST   & \texttt{/api/interview/proctoring}      & Auth \\
+	21 & GET    & \texttt{/api/assessments}              & HR \\
+	22 & POST   & \texttt{/api/assessments}              & HR \\
+	23 & POST   & \texttt{/api/interview/realtime/session} & Auth \\
+	24 & POST   & \texttt{/api/interview/realtime/turn}    & Auth \\
+	25 & POST   & \texttt{/api/interview/realtime/complete} & Auth \\
+	26 & POST   & \texttt{/api/interview/realtime/terminate} & Auth \\
+	27 & POST   & \texttt{/api/interview/proctoring}      & Auth \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Applications}} \\
-	14 & POST   & \texttt{/api/applications}             & Candidate \\
-	15 & GET    & \texttt{/api/applications}             & Candidate \\
-	16 & PATCH  & \texttt{/api/applications/[id]}         & Candidate \\
-	17 & GET    & \texttt{/api/applications/all}          & HR \\
+	28 & POST   & \texttt{/api/applications}             & Candidate \\
+	29 & GET    & \texttt{/api/applications}             & Candidate \\
+	30 & PATCH  & \texttt{/api/applications/[id]}         & Candidate \\
+	31 & GET    & \texttt{/api/applications/all}          & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Notifications and Campaigns}} \\
-	18 & GET    & \texttt{/api/notifications}            & Auth \\
-	19 & PATCH  & \texttt{/api/notifications}            & Auth \\
-	20 & GET/PATCH & \texttt{/api/notifications/preferences} & Auth \\
-	21 & GET/POST  & \texttt{/api/notifications/campaigns}   & HR \\
-	22 & GET/PATCH & \texttt{/api/notifications/campaigns/[id]} & HR \\
-	23 & POST   & \texttt{/api/notifications/campaigns/[id]/send} & HR \\
-	24 & POST   & \texttt{/api/notifications/campaigns/preview}   & HR \\
+	32 & GET    & \texttt{/api/notifications}            & Auth \\
+	33 & PATCH  & \texttt{/api/notifications}            & Auth \\
+	34 & GET/PATCH & \texttt{/api/notifications/preferences} & Auth \\
+	35 & GET/POST  & \texttt{/api/notifications/campaigns}   & HR \\
+	36 & GET/PATCH & \texttt{/api/notifications/campaigns/[id]} & HR \\
+	37 & POST   & \texttt{/api/notifications/campaigns/[id]/send} & HR \\
+	38 & POST   & \texttt{/api/notifications/campaigns/preview}   & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Uploads and Files}} \\
-	25 & POST   & \texttt{/api/upload}                    & HR \\
-	26 & POST   & \texttt{/api/upload/candidate}          & Candidate \\
-	27 & POST   & \texttt{/api/upload/bulk}               & HR \\
-	28 & POST   & \texttt{/api/upload/bulk/[jobId]}       & HR \\
-	29 & POST   & \texttt{/api/upload/motivation-letter}  & Candidate \\
-	30 & POST   & \texttt{/api/upload/learning-agreement} & Candidate \\
-	31 & POST   & \texttt{/api/upload/image}              & HR \\
-	32 & GET    & \texttt{/api/upload/download}           & Auth \\
-	33 & GET    & \texttt{/api/export/candidates}         & HR \\
+	39 & POST   & \texttt{/api/upload}                    & HR \\
+	40 & POST   & \texttt{/api/upload/candidate}          & Candidate \\
+	41 & POST   & \texttt{/api/upload/bulk}               & HR \\
+	42 & POST   & \texttt{/api/upload/bulk/[jobId]}       & HR \\
+	43 & POST   & \texttt{/api/upload/motivation-letter}  & Candidate \\
+	44 & POST   & \texttt{/api/upload/learning-agreement} & Candidate \\
+	45 & POST   & \texttt{/api/upload/image}              & HR \\
+	46 & GET    & \texttt{/api/upload/download}           & Auth \\
+	47 & GET    & \texttt{/api/export/candidates}         & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Self-Service (Candidate)}} \\
-	34 & GET    & \texttt{/api/me}                        & Candidate \\
-	35 & PATCH  & \texttt{/api/me}                        & Candidate \\
-	59 & GET    & \texttt{/api/me/export}                 & Candidate \\
+	48 & GET    & \texttt{/api/me}                        & Candidate \\
+	49 & PATCH  & \texttt{/api/me}                        & Candidate \\
+	50 & GET    & \texttt{/api/me/export}                 & Candidate \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Scoring}} \\
-	37 & GET    & \texttt{/api/scoring/weights}           & HR \\
-	38 & PUT    & \texttt{/api/scoring/weights}           & HR \\
-	39 & GET/POST & \texttt{/api/scoring/presets}         & HR \\
-	40 & DELETE & \texttt{/api/scoring/presets/[id]}      & HR \\
+	51 & GET    & \texttt{/api/scoring/weights}           & HR \\
+	52 & PUT    & \texttt{/api/scoring/weights}           & HR \\
+	53 & GET/POST & \texttt{/api/scoring/presets}         & HR \\
+	54 & DELETE & \texttt{/api/scoring/presets/[id]}      & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Analytics}} \\
-	36 & GET    & \texttt{/api/analytics}                 & HR \\
-	55 & GET    & \texttt{/api/analytics/catalog}         & HR \\
-	56 & POST   & \texttt{/api/analytics/query}           & HR \\
-	57 & GET/POST & \texttt{/api/analytics/widgets}       & HR \\
-	58 & PATCH/DELETE & \texttt{/api/analytics/widgets/[id]} & HR \\
+	55 & GET    & \texttt{/api/analytics}                 & HR \\
+	56 & GET    & \texttt{/api/analytics/catalog}         & HR \\
+	57 & POST   & \texttt{/api/analytics/query}           & HR \\
+	58 & GET/POST & \texttt{/api/analytics/widgets}       & HR \\
+	59 & PATCH/DELETE & \texttt{/api/analytics/widgets/[id]} & HR \\
 	\addlinespace
 	\multicolumn{4}{@{}l}{\textit{Ambassador Program}} \\
 	60 & GET    & \texttt{/api/ambassador}                & Public \\
@@ -115,6 +117,7 @@ additionally requires \texttt{app\_metadata.role === "hr"}.
 	66 & PATCH  & \texttt{/api/ambassador/[id]/applications/[appId]} & HR \\
 
 \end{longtable}
+\endgroup
 
 The \emph{Access} column summarises the effective authorisation: \emph{Public}
 routes are listed in the middleware \texttt{PUBLIC\_API\_PREFIXES}; \emph{Auth}

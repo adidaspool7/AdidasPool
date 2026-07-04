@@ -1,4 +1,4 @@
-\chapter{Solution Design}
+﻿\chapter{Solution Design}
 \label{cap:design}
 
 This chapter presents the design of TalentHub: the high-level container
@@ -18,8 +18,8 @@ application} hosts both the user interface and the server-side API routes,
 and is the only component a user's browser talks to directly. It depends on
 three \textbf{Supabase} managed services --- PostgreSQL for data,
 Authentication for Google OAuth, and Storage for uploaded CVs --- and on two
-external \textbf{Large Language Model} providers (Groq as primary, OpenAI as
-fallback) for parsing. The conversational \textbf{AI Interviewer} is a
+external \textbf{Large Language Model} providers --- a primary and a
+fallback --- for parsing. The conversational \textbf{AI Interviewer} is a
 separate Python \textit{FastAPI} service: the browser opens an interview
 popup that communicates with the Next.js API routes, which in turn delegate
 the conversation to the sidecar through a signed-token contract. Table
@@ -40,18 +40,18 @@ Authentication & Supabase Auth (Google OAuth) & Identity, session, role claim \\
 Object storage & Supabase Storage & Uploaded CV files \\
 LLM providers & Groq (primary), OpenAI (fallback) & CV and job-description parsing \\
 AI Interviewer & Python FastAPI sidecar & Conversational assessment + CEFR evaluation \\
-Email & Resend & Assessment invitations, outreach \\
+Email & Resend & HR-to-candidate outreach; live delivery gated on sender-domain verification \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Figure~\ref{fig:c4-container} renders the same containers as a context view,
+\figref{fig:c4-container} renders the same containers as a context view,
 making explicit which actor talks to which component and where each external
 dependency sits. The single inward-facing fact it captures is that the
 browser only ever reaches the Next.js application; every managed service and
 external provider is contacted server-side, which is the structural
 precondition for the application-edge authorisation model defended in
-Section~\ref{sec:design-security}.
+\secref{sec:design-security}.
 
 \begin{figure}[ht]
 \centering
@@ -76,9 +76,7 @@ Section~\ref{sec:design-security}.
 \foreach \a in {hr,cand} \draw[-{Stealth}] (\a) -- (web);
 \foreach \b in {llm,ai,db,auth,store} \draw[-{Stealth}, lstcomment] (web) -- (\b);
 \end{tikzpicture}
-\caption[Container view]{Container (context) view of TalentHub. The browser
-reaches only the Next.js application; all managed services and external
-providers are contacted server-side.}
+\caption[Container view]{Container (context) view of TalentHub.}
 \label{fig:c4-container}
 \end{figure}
 
@@ -87,7 +85,8 @@ providers are contacted server-side.}
 \section{Onion / Clean Architecture}
 \label{sec:design-onion}
 
-The code follows an \gls{onion}, chosen and enforced from the start. The
+The code follows an \gls{onion}, chosen and enforced from the start
+\parencite{PalermoOnion2008,Martin2017}. The
 guiding rule is that \emph{dependencies always point inward}: the Domain at
 the centre has zero external dependencies, the Application layer orchestrates
 the Domain, the Infrastructure layer implements the Domain's port interfaces,
@@ -100,12 +99,9 @@ Presentation $\rightarrow$ Application $\rightarrow$ Domain $\leftarrow$
 Infrastructure
 \end{quote}
 
-Figure~\ref{fig:onion} draws this as concentric layers. The dependency-free
-Domain sits at the centre; the Application layer wraps it; Infrastructure and
-Presentation form the outer shell. Crucially, although Infrastructure is drawn
-on the outside, its source-code dependencies point \emph{inward} --- it
-implements port interfaces declared by the Domain --- which is the property
-that keeps databases and LLM providers replaceable.
+\figref{fig:onion} draws this as concentric layers: the dependency-free
+Domain at the centre, the Application layer wrapping it, and Infrastructure
+and Presentation forming the outer shell.
 
 \begin{figure}[ht]
 \centering
@@ -121,9 +117,8 @@ that keeps databases and LLM providers replaceable.
 \draw[-{Stealth}, very thick, lststring] (4.6,-3.0) -- (1.9,-0.7);
 \node[lststring, font=\scriptsize, anchor=west] at (3.0,-3.15) {dependencies point inward};
 \end{tikzpicture}
-\caption[Onion architecture]{The onion architecture as enforced in the
-codebase. All source-code dependencies point inward toward a
-dependency-free Domain; Infrastructure implements the Domain's ports.}
+\caption[Onion architecture]{The onion architecture: a dependency-free Domain
+at the core, with Application, Infrastructure and Presentation around it.}
 \label{fig:onion}
 \end{figure}
 
@@ -147,14 +142,14 @@ dependency-free Domain; Infrastructure implements the Domain's ports.}
 
 This discipline was chosen for testability (Domain and Application are
 tested without mocks of infrastructure), swappability (the migration from an
-ORM-and-Neon stack to Supabase required only new repository implementations,
+\gls{orm}-and-Neon stack to Supabase required only new repository implementations,
 with no domain or use-case changes), and provider flexibility (changing LLM
 provider is a new service implementation behind an existing port). The
 alternatives --- MVC, a permissive three-tier split, microservices, or a
 bag of serverless functions --- were rejected as either too coupled or too
-heavy for a two-person team. The payoff became concrete when the AI
-Interviewer had to be extracted into its own process, which the boundary
-made a contract change rather than a rewrite.
+heavy for a two-person team. This same separation is what later allowed the
+AI Interviewer to be extracted into its own process behind an unchanged
+contract.
 
 \subsection{Dependency Injection and the Composition Root}
 \label{sec:design-di}
@@ -170,23 +165,24 @@ test without changing a line of its code.
 
 The wiring itself is centralised. A single container module instantiates the
 concrete infrastructure implementations and a factory module imports those
-instances to assemble pre-wired use cases. These two files are the only place
-in the codebase that names a concrete repository or service; everywhere else
-depends on interfaces. This arrangement also expresses the Interface
-Segregation Principle directly: \texttt{CandidateUseCases} receives only a
-candidate repository, while \texttt{UploadUseCases} receives the six
-collaborators it genuinely needs (candidate repository, CV parser, storage,
-text extraction, deduplication and parsing-job repositories) and nothing
-more. No use case is given a dependency it does not use, which keeps the
-blast radius of any infrastructure change small and makes the dependency
-graph legible from the constructor signatures alone.
+instances to assemble pre-wired use cases; these two files are the only place
+in the codebase that names a concrete repository or service. The arrangement
+also expresses the Interface Segregation Principle directly: each use case
+receives only the collaborators it genuinely needs ---
+\texttt{CandidateUseCases} a single candidate repository,
+\texttt{UploadUseCases} the six its pipeline requires (candidate repository,
+CV parser, storage, text extraction, deduplication and parsing-job
+repositories) --- and nothing more, which contains the impact of any
+infrastructure change and keeps the dependency graph legible from the
+constructor signatures alone.
 
 %----------------------------------------------------------------------------------------
 
 \section{Domain Model}
 \label{sec:design-domain}
 
-The domain is inherently relational and is centred on two aggregates. A
+The domain is inherently relational and is centred on two aggregates
+\parencite{Evans2003,Vernon2013IDDD}. A
 \textbf{Candidate} owns the facts derived from a CV --- \textit{Experiences}
 (each tagged with one or more fields of work), \textit{Education} entries,
 \textit{Languages} with CEFR levels, \textit{Skills}, \textit{Tags} and
@@ -200,18 +196,19 @@ notifications), \textit{Parsing Jobs} (which track bulk uploads),
 \textit{Ambassador Programs} with their applications, and \textit{Candidate
 Segments} --- giving thirty-three application tables in total.
 The business rules that drive scoring and assessment are not scattered
-through the codebase but are encoded as immutable value objects in the Domain
+through the codebase but are encoded as immutable value objects
+\parencite{Fowler2002PoEAA} in the Domain
 layer, so that changing a weight or a threshold is a single, reviewable edit
-in one file. Table~\ref{tab:value-objects} lists the principal constants and
+in one file. \tabref{tab:value-objects} lists the principal constants and
 the rules they encode. Expressing these as domain constants rather than as
-magic numbers buried in queries is what makes the scoring ``transparent'' in
+hard-coded numeric values scattered through the codebase is what makes the scoring ``transparent'' in
 the sense promised to the client: every component of a score traces back to a
-named weight whose value is visible and version-controlled.
+named constant whose value is visible and version-controlled.
 
 \begin{table}[ht]
 \centering
-\caption[Principal domain value objects]{Principal domain value objects encoding
-business rules in the Domain layer.}
+\caption[Principal domain value objects]{Principal domain value objects in
+the Domain layer.}
 \label{tab:value-objects}
 \small
 \begin{tabular}{p{0.30\linewidth}p{0.60\linewidth}}
@@ -229,14 +226,20 @@ business rules in the Domain layer.}
 \end{tabular}
 \end{table}
 
+\texttt{ASSESSMENT\_DEFAULT\_WEIGHTS} applies to the general assessment
+template --- the customer-service and technical rubrics --- and is distinct
+from the language interview, which instead averages the three \gls{cefr}
+sub-scores (grammar, vocabulary and fluency) at equal weight
+(\secref{sec:impl-scoring}).
+
 The candidate itself carries a lifecycle status that the domain treats as a
-state machine rather than a free-text label. Figure~\ref{fig:status-sm} shows
+state machine rather than a free-text label. \figref{fig:status-sm} shows
 the permitted transitions: a candidate enters as \texttt{NEW}, becomes
 \texttt{PARSED} once the CV pipeline completes, is \texttt{SCREENED} after
 matching or assessment, and then moves to an outcome. A borderline result is
 not a dead end --- it routes the candidate onto an improvement track and back
 for re-evaluation, which is the mechanism behind the develop-and-retain pillar
-of the framework in Chapter~\ref{cap:analysis}. Encoding these as named states
+of the framework in \chapref{cap:analysis}. Encoding these as named states
 with explicit transitions keeps the status filters in the talent pool, the
 notifications fired on change, and the analytics buckets all consistent with a
 single source of truth.
@@ -244,32 +247,40 @@ single source of truth.
 \begin{figure}[ht]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[font=\scriptsize, >=Stealth,
-  st/.style={draw, rounded corners, fill=lstkeyword!18, align=center, minimum height=0.7cm, text width=1.8cm},
-  to/.style={-{Stealth}, draw}]
-\node[st] (new) at (0,0) {NEW};
-\node[st] (par) at (2.8,0) {PARSED};
-\node[st] (scr) at (5.6,0) {SCREENED};
-\node[st] (off) at (8.8,0) {OFFER\_SENT};
-\node[st] (hir) at (11.6,0) {HIRED};
-\node[st] (bor) at (5.6,-2.3) {BORDERLINE};
-\node[st] (imp) at (8.8,-2.3) {ON\_IMPROV. TRACK};
-\node[st] (rej) at (7.2,-4.3) {REJECTED};
-\fill (-1.2,0) circle (2.5pt);
-\draw[to] (-1.2,0) -- (new);
+\begin{tikzpicture}[font=\scriptsize, >=Stealth, node distance=6mm,
+  st/.style={draw, rounded corners, fill=lstkeyword!18, align=center, minimum height=0.85cm, text width=2.0cm},
+  to/.style={-{Stealth}, draw, line width=0.5pt},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt, fill=white, fill opacity=0.85, text opacity=1}]
+% --- states -----------------------------------------------------------------
+\node[st] (new) at (0,0)     {NEW};
+\node[st] (par) at (3.0,0)   {PARSED};
+\node[st] (scr) at (6.0,0)   {SCREENED};
+\node[st] (off) at (9.4,0)   {OFFER\_SENT};
+\node[st] (hir) at (12.6,0)  {HIRED};
+\node[st] (bor) at (6.0,-2.7)  {BORDERLINE};
+\node[st] (imp) at (9.4,-2.7)  {ON\_IMPROV.\\TRACK};
+\node[st] (rej) at (7.7,-5.4)  {REJECTED};
+% --- initial pseudo-state ---------------------------------------------------
+\fill (-1.5,0) circle (2.5pt);
+\draw[to] (-1.5,0) -- (new);
+% --- happy path (top row) ---------------------------------------------------
 \draw[to] (new) -- (par);
 \draw[to] (par) -- (scr);
-\draw[to] (scr) -- node[above]{pass} (off);
-\draw[to] (off) -- node[above]{accepts} (hir);
-\draw[to] (scr) -- node[right]{borderline} (bor);
-\draw[to] (bor) -- node[above]{assign} (imp);
-\draw[to] (imp) to[bend left=18] node[above]{re-evaluate} (scr);
-\draw[to] (scr.south west) to[bend right=12] node[left,pos=0.7]{fail} (rej);
-\draw[to] (off.south) to[bend left=18] node[right]{declines} (rej);
+\draw[to] (scr) -- node[lbl,above]{pass} (off);
+\draw[to] (off) -- node[lbl,above]{accepts} (hir);
+% --- borderline / improvement loop ------------------------------------------
+\draw[to] (scr) -- node[lbl,right]{borderline} (bor);
+\draw[to] (bor) -- node[lbl,above]{assign} (imp);
+\draw[to] (imp.north) to[out=120, in=-25]
+      node[lbl,pos=0.55,above]{re-evaluate} (scr.south east);
+% --- rejection transitions (outer lanes, clear of the middle boxes) ---------
+\draw[to] (scr.south west) to[out=-140, in=165, looseness=1.15]
+      node[lbl,pos=0.5,left]{fail} (rej.west);
+\draw[to] (off.south east) to[out=-40, in=15, looseness=1.15]
+      node[lbl,pos=0.5,right]{declines} (rej.east);
 \end{tikzpicture}}
 \caption[Candidate lifecycle state machine]{Candidate lifecycle as a state
-machine. A borderline outcome routes onto an improvement track and back to
-screening rather than terminating.}
+machine.}
 \label{fig:status-sm}
 \end{figure}
 %----------------------------------------------------------------------------------------
@@ -305,7 +316,7 @@ in route helpers such as \texttt{require-hr.ts} --- rather than in the
 database. This concentrates the authorisation logic in one auditable place,
 at the explicit cost of making the server-side trust boundary critical;
 that cost is precisely why the authentication and route-gating tests of
-Chapter~\ref{cap:validation} are central to the design.
+\chapref{cap:validation} are central to the design.
 
 \paragraph{Relationships and integrity.}
 The schema is centred on the \texttt{candidates} table, from which radiate
@@ -335,13 +346,13 @@ experience corpus. The \texttt{hr\_dashboard\_widgets} table is indexed on
 \texttt{(user\_id, position)} to serve each recruiter's ordered set of custom
 charts in a single scan.
 
-Figure~\ref{fig:er} shows the core of the resulting schema. The two darker
+\figref{fig:er} shows the core of the resulting schema. The two darker
 entities, \texttt{candidates} and \texttt{jobs}, are the aggregates from
 which everything else fans out; the lighter join entities
 (\texttt{job\_applications}, \texttt{job\_matches}, \texttt{job\_shortlists})
 are exactly the genuinely many-to-many relationships protected by composite
 uniqueness. Attributes are omitted here for legibility and are listed in full
-in Appendix~\ref{app:db-schema}.
+in \appref{app:db-schema}.
 
 \begin{figure}[ht]
 \centering
@@ -368,9 +379,7 @@ in Appendix~\ref{app:db-schema}.
 \draw[rl] (ass) -- node[pos=0.82,font=\tiny]{$1$} (ares);
 \end{tikzpicture}}
 \caption[Core entity--relationship diagram]{Core of the relational schema
-(attributes omitted). The \texttt{candidates} and \texttt{jobs} aggregates fan
-out to profile, matching and assessment entities; ``$*$'' marks the many side
-of each one-to-many relationship.}
+(attributes omitted); ``$*$'' marks the many side of each relationship.}
 \label{fig:er}
 \end{figure}
 
@@ -399,18 +408,23 @@ skills, languages and education. The overall fit is the average of the
 excluded rather than counted as zero, so jobs are not penalised for being
 unspecific. A separate \texttt{isEligible} flag is the logical conjunction
 of the applicable ``met'' flags, distinguishing ``ranked but not strictly
-eligible'' from ``eligible''. Because the function is pure and dependency-free
-it is exhaustively unit-tested (Chapter~\ref{cap:validation}), and because
-every criterion yields a per-criterion explanation the ranking is auditable
---- the reason the rule-based approach was preferred over opaque
-embedding similarity. The top results are persisted in a \texttt{job\_matches}
-cache so the ranking screen does not recompute on every view.
+eligible'' from ``eligible''. Each criterion also returns its own explanation,
+so the final ranking is fully traceable rather than a single opaque number.
 
-Figure~\ref{fig:match-flow} traces the orchestration end to end, from the
-lazy parse of the job description to the persisted, ranked cache. The single
-most important property visible in the flow is that scoring is a pure function
-applied per candidate: nothing in the loop depends on external state, which is
-what makes the ranking reproducible and exhaustively testable.
+Two properties of this design are worth stating precisely, because they bound
+what the ranking may and may not claim. Because \texttt{computeJobFit} is a
+pure function, its output is deterministic and reproducible; that consistency,
+together with the per-criterion correctness of each rule, is demonstrated by
+the unit suite in \secref{sec:val-unit}. What the design does \emph{not}
+establish is that the resulting order coincides with an expert recruiter's own
+ranking of the same candidates: that agreement was left unvalidated for want of
+real application data and recruiter time, and is recorded honestly as a
+limitation in \secref{sec:val-limitations}.
+
+\figref{fig:match-flow} traces the orchestration end to end. The element
+worth drawing out is the output cache at the final step: the ranked result is
+persisted to \texttt{job\_matches}, so a recruiter reopening the screen reads the
+stored ranking rather than triggering a full re-score.
 
 \begin{figure}[ht]
 \centering
@@ -425,9 +439,7 @@ what makes the ranking reproducible and exhaustively testable.
 \node[flowstep, below=of s5] (s6) {Persist top-100 to \texttt{job\_matches} cache; render ranked screen};
 \foreach \a/\b in {s1/s2,s2/s3,s3/s4,s4/s5,s5/s6} \draw[arr] (\a) -- (\b);
 \end{tikzpicture}
-\caption[Job-matching orchestration]{Job-matching orchestration. The per-candidate
-scoring step is a pure, dependency-free function, which makes the ranking
-reproducible and unit-testable.}
+\caption[Job-matching orchestration]{Job-matching orchestration, end to end.}
 \label{fig:match-flow}
 \end{figure}
 
@@ -439,25 +451,24 @@ reproducible and unit-testable.}
 \subsection{CV Parsing Pipeline}
 \label{sec:design-cv}
 
-An uploaded CV flows through a fixed sequence: the file is stored in Supabase
-Storage; its text is extracted (from PDF, DOCX or plain text); the text is
-sent to the primary LLM (Groq Llama~3.3 70B) with a structured-output prompt;
-the model's response is validated against a strict Zod schema, with an
-automatic retry on a parse failure; and the validated, de-duplicated result
-is persisted as a Candidate with its experiences, education, languages and
-skills. If Groq fails, the same request is retried against the OpenAI
-fallback. Every extraction call writes one fire-and-forget row to a telemetry
-table (provider, model, success, duration, token counts, whether the
-fallback was used), so the pipeline's reliability and cost can be observed
-without affecting the parse itself.
+At the design level the CV pipeline is organised around a single principle:
+the LLM is an \emph{untrusted boundary} between an unstructured document and a
+typed Candidate aggregate. The file is stored, its text extracted, and that
+text sent to the primary model under a structured-output
+prompt; the response is validated against a strict Zod schema before any of it
+reaches the database, with an automatic retry on a parse failure and a
+fallback to the secondary provider if the primary itself fails. The concrete stage-by-stage
+breakdown, the deduplication tiers and the per-extraction telemetry are
+detailed in \chapref{cap:implementation}.
 
-Figure~\ref{fig:seq-cv} renders this pipeline as an interaction sequence. The
+\figref{fig:seq-cv} renders this pipeline as an interaction sequence. The
 two self-messages on the use case --- text extraction and schema validation
-with its single retry --- are where the ``untrusted boundary'' discipline of
-Section~\ref{sec:sota-structured} is enforced: the model's output is never
-trusted until it has passed the Zod schema.
+with its single retry --- are where the untrusted-boundary discipline of
+\secref{sec:sota-structured} takes concrete form in the design. The full
+structured-output prompt that drives the extraction is reproduced in
+\appref{app:prompts}.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[font=\scriptsize, >=Stealth,
@@ -483,9 +494,8 @@ trusted until it has passed the Zod schema.
 \draw[r] (11.8,-7.5) -- node[above]{ok} (3.4,-7.5);
 \draw[r] (3.4,-8.1) -- node[above]{parsed candidate} (0,-8.1);
 \end{tikzpicture}}
-\caption[CV-parsing sequence]{CV-parsing pipeline as an interaction sequence.
-Text extraction and Zod validation are self-messages on the use case; a Groq
-failure transparently retries against the OpenAI fallback.}
+\caption[CV-parsing sequence]{The CV-parsing pipeline as an interaction
+sequence.}
 \label{fig:seq-cv}
 \end{figure}
 
@@ -497,7 +507,10 @@ dedicated service, into a \emph{versioned} requirements schema. Parsing is
 \textbf{lazy}: a job description is parsed the first time an HR user opens its
 ranking screen, not in bulk, and the result is cached with its schema version
 so it is reused until either the source text or the schema version changes.
-This keeps LLM usage proportional to actual use.
+This keeps LLM usage proportional to actual use. The extractor's prompt ---
+which normalises multilingual education and language terms and infers
+requirements from duties-only postings --- is reproduced in
+\appref{app:prompts}.
 
 \subsection{AI Interviewer (FastAPI Sidecar)}
 \label{sec:design-interviewer}
@@ -507,21 +520,23 @@ developed by the second team member; the design point relevant here is the
 \emph{contract}. The browser opens an interview popup that talks to the
 Next.js API routes; those routes create a session, issue a short-lived
 HMAC-SHA256 token (ten-minute TTL, with only its hash stored), proxy the
-conversation turns to the sidecar, and persist the final evaluation. The
+conversation turns to the sidecar, and persist the final evaluation. This
+per-session token governs the live interview only and is distinct from the
+48-hour \texttt{MAGIC\_LINK\_EXPIRY\_HOURS} window (\tabref{tab:value-objects})
+that keeps an assessment-invitation link valid until the candidate starts. The
 interview has two modes --- \textbf{technical} skill validation and
 \textbf{language} assessment --- and the evaluator returns a structured
 result (for the language mode, a CEFR level with grammar, vocabulary and
-fluency sub-scores) that is stored as JSONB. The narrowness of this token
-contract is what allowed the two developers to work in parallel and is the
-clearest dividend of the onion boundary.
+fluency sub-scores) that is stored as JSONB. The system prompts for both
+interview modes are reproduced in \appref{app:prompts}.
 
-Figure~\ref{fig:seq-interview} traces the token and session flow across the
+\figref{fig:seq-interview} traces the token and session flow across the
 boundary. The Next.js core owns identity and persistence; the sidecar owns the
 conversation. The only thing crossing between them is a short-lived,
 hash-verified token and the structured turns it authorises --- a contract
 small enough to reason about in full.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[font=\scriptsize, >=Stealth,
@@ -549,8 +564,7 @@ small enough to reason about in full.
 \draw[r] (3.8,-9.7) -- node[above]{result} (0,-9.7);
 \end{tikzpicture}}
 \caption[Interview token and session sequence]{Token and session flow between
-the Next.js core and the FastAPI interviewer sidecar. Only a short-lived,
-hash-verified token and the turns it authorises cross the boundary.}
+the Next.js core and the FastAPI interviewer sidecar.}
 \label{fig:seq-interview}
 \end{figure}
 
@@ -580,13 +594,41 @@ candidate data can be removed through standard operations, and only the
 inferences actually needed are stored. A per-candidate interaction history
 provides an audit trail of status changes, emails and campaign outreach, and
 the candidate self-service portal gives data subjects visibility over their
-own record. The right to erasure is exercised directly by the data subject: a
-``Danger Zone'' in the candidate settings deletes the full candidate record
-and its stored documents (CV, motivation letter and learning agreement) from
-object storage in one operation, and the same view offers a CSV export of the
-profile in support of the right of access. The remaining gap --- automating
+own record. The rights of erasure and access are exercised directly by the
+data subject rather than through a back-office request --- the self-service
+controls that erase the full record and its stored documents, or export the
+profile, are described in \secref{sec:impl-engagement}. The remaining gap --- automating
 the time-based purge so that retention is enforced without a manual trigger
---- is recorded as future work in Chapter~\ref{cap:conclusions}.
+--- is recorded as future work in \chapref{cap:conclusions}.
+
+\subsection{Hardening and Transparency}
+\label{sec:design-hardening}
+
+Beyond authorisation, a handful of measures address the common web
+risk classes of the OWASP Top~10 \parencite{OWASPTop10}. Injection is closed at the data edge by
+escaping user search terms before they reach the PostgREST filter
+(\chapref{cap:implementation}); broken access control is mitigated by the
+edge gate above and by setting roles server-side; and the interviewer
+boundary is protected by short-lived, hash-verified HMAC tokens
+(\figref{fig:seq-interview}) so that a leaked token neither persists nor
+reveals a usable secret. Transport and storage encryption (TLS in transit,
+AES-256 at rest) are inherited from the managed platform, the service-role key
+never leaves the server, and the structured logger redacts secret-bearing
+keys so credentials cannot surface in logs.
+
+Transparency is treated as a first-class concern rather than an afterthought.
+A public privacy policy --- reachable before authentication --- names the data
+controller, the lawful basis for each processing purpose, the sub-processors
+and international-transfer safeguards, and the full set of data-subject rights.
+Critically for an AI-assisted tool, it discloses the automated-profiling
+position under \gls{gdpr} Article~22: the match and assessment scores
+\emph{assist} a human reviewer rather than decide automatically, and a manual
+review can be requested. A first-visit consent banner records the visitor's
+choice and links to that policy; because the platform sets only
+strictly-necessary session cookies and no tracking or advertising cookies,
+the banner is informational rather than a processing gate --- a position that
+would tighten into an explicit opt-in the moment analytics cookies were
+introduced.
 
 %----------------------------------------------------------------------------------------
 
@@ -611,10 +653,10 @@ presents two coherent experiences.
 \section{Design Decision Log}
 \label{sec:design-decisions}
 
-Table~\ref{tab:design-decisions} records the principal design decisions, the
+\tabref{tab:design-decisions} records the principal design decisions, the
 alternatives weighed, and the trade-off accepted in each case.
 
-\begin{table}[ht]
+\begin{table}[t]
 \centering
 \caption[Design decision log]{Principal design decisions and their trade-offs.}
 \label{tab:design-decisions}
@@ -623,7 +665,7 @@ alternatives weighed, and the trade-off accepted in each case.
 \toprule
 \textbf{Decision} & \textbf{Alternative} & \textbf{Rationale / trade-off} \\
 \midrule
-Supabase (DB+Auth+Storage) & ORM + separate Neon, Blob, auth & One managed provider; less glue; migration cost paid once \\
+Supabase (DB+Auth+Storage) & ORM + separate Neon, Blob, auth & One managed provider; fewer integration layers; migration cost paid once \\
 No ORM, raw client & Prisma/Drizzle & Full control + transparency; cost is manual key conversion \\
 RLS disabled, app-side authz & Per-row RLS policies & Single auditable authz layer; server trust boundary becomes critical \\
 Rule-based \texttt{computeJobFit} & Embedding similarity & Per-criterion explainability over opaque ranking \\

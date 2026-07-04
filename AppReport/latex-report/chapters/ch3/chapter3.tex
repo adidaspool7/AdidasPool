@@ -1,15 +1,13 @@
-\chapter{Analysis and Methodology}
+﻿\chapter{Analysis and Methodology}
 \label{cap:analysis}
 
-This chapter turns the problem stated in Chapter~\ref{cap:introduction} into
+This chapter turns the problem stated in \chapref{cap:introduction} into
 an analysed, prioritised body of work. It first characterises the
 stakeholders and the two personas TalentHub serves, then revisits the
 client pain points and the instrument used to validate them, sets out the
 language talent framework that the client brief explicitly asked for,
 derives the functional and non-functional requirements that follow from
-those pains, and finally describes the project-management method --- the
-BlendEd program's Scrum process and how it was adapted within the two-person
-talent-pool subproject, in which the author acted as Product Owner.
+those pains, and finally describes the project-management method.
 
 %----------------------------------------------------------------------------------------
 
@@ -21,17 +19,11 @@ and Talent Acquisition team at adidas GBS Porto --- supplied the problem,
 validated the pain points, and acted as acceptance tester through recurring
 review sessions. The \textbf{end users} fall into two roles that the
 application treats as first-class personas. The \textbf{academic
-supervisor}, Prof.\ Nuno Escudeiro, provided methodological guidance and
-assessed the work in its academic context. The \textbf{development team} that
-built TalentHub was a two-person engineering team (Section~\ref{sec:team})
+supervisors}, Prof.\ Nuno Escudeiro and Prof.\ Ana Cl\'audia Rodrigues,
+provided methodological guidance and assessed the work in its academic
+context. The \textbf{development team} that
+built TalentHub was a two-person engineering team (\secref{sec:team})
 that carried both engineering and, in the author's case, product ownership.
-This team was one of four subproject teams in the BlendEd program: alongside
-TalentHub, parallel teams built an onboarding assistant, a
-community-research tool and an employer-branding solution. The wider program
-brought together four product owners (one per subproject, the author among
-them), four developers, two designers, and law, human-resources and marketing
-students, working under a coordinating professor and a Scrum Master who
-facilitated the shared ceremonies across all four teams.
 
 Two personas were used to keep design decisions grounded:
 
@@ -61,14 +53,19 @@ candidate role.
 \section{Pain Points and Survey Validation}
 \label{sec:analysis-pains}
 
-The nine pain points introduced in Table~\ref{tab:pain-points-overview} were
+The nine pain points introduced in \tabref{tab:pain-points-overview} were
 not assumed; they were elicited in discovery sessions, written up in a
-client-facing document, and then validated through a survey distributed to
-adidas GBS Porto employees and HR stakeholders. The survey was designed so
-that \emph{each pain point maps to exactly one question}, which makes the
-later validation in Chapter~\ref{cap:validation} traceable: a question that
+client-facing document, and then probed through a fourteen-item survey in
+which \emph{each pain point is covered by at least one question} (several
+pains contributing more than one, to probe a single friction from
+complementary angles). This keeps the later
+validation in \chapref{cap:validation} traceable: a question that
 scores well is direct evidence that the corresponding pain is real and that
-the feature built to address it is wanted. Table~\ref{tab:survey-mapping}
+the feature built to address it is wanted. The instrument was completed by the
+lead HR stakeholder at adidas GBS Porto, so its results are treated as a
+single-respondent indicator rather than a statistically representative sample
+--- a constraint made explicit when the responses are analysed in
+\chapref{cap:validation}. \tabref{tab:survey-mapping}
 shows the mapping for the questions most relevant to the platform's core.
 
 \begin{table}[ht]
@@ -86,6 +83,7 @@ Hours/week spent reviewing CVs manually & \#5 manual CV extraction & AI CV parsi
 Confidence in verifying language proficiency before interview & \#3 no first-pass screening & CEFR language assessment \\
 Frequency of inconsistent candidate scoring across the team & \#7 no data-driven focus & Structured scoring + templates \\
 Ease of retrieving full interaction history for a candidate & \#4 no structured contact channel & Interaction-history panel \\
+Identifying in-demand skills and sharing pipeline insight with stakeholders & \#7 no data-driven focus & Analytics dashboards + custom widgets \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -95,10 +93,10 @@ core for the first releases: manual CV extraction (\#5), the absence of a
 first-pass language and skill screen (\#3), keeping promising-but-rejected
 candidates engaged (\#9), and recognising repeat applicants under the GDPR
 retention rule (\#2). These four drove the ordering of the product backlog
-(Section~\ref{sec:analysis-pm}). The full survey instrument and its raw
-responses are reproduced in Appendix~\ref{app:survey}, and the analysis of
+(\secref{sec:analysis-pm}). The full survey instrument and its raw
+responses are reproduced in \appref{app:survey}, and the analysis of
 the results is presented as part of validation in
-Section~\ref{sec:val-survey}.
+\secref{sec:val-survey}.
 
 %----------------------------------------------------------------------------------------
 
@@ -135,7 +133,7 @@ language needs of the markets it serves, which is what makes language a
 \emph{role requirement} rather than a generic nice-to-have. English functions
 as the common operating language across every area; the additional ``business
 languages'' attach to the markets a team supports.
-Table~\ref{tab:language-profiles} captures this mapping as the framework's
+\tabref{tab:language-profiles} captures this mapping as the framework's
 core artefact: a per-area profile of the language capabilities that make a
 candidate valuable, expressed in the same CEFR vocabulary the assessment
 module produces.
@@ -143,9 +141,8 @@ module produces.
 \begin{table}[ht]
 \centering
 \caption[Critical language profiles by service area]{Critical language
-profiles by service area (illustrative synthesis from the client brief). All
-areas assume professional English; CEFR bands indicate the working level at
-which the language becomes an asset.}
+profiles by service area (illustrative synthesis from the client brief); CEFR
+bands indicate the working level at which a language becomes an asset.}
 \label{tab:language-profiles}
 \small
 \begin{tabular}{p{0.22\linewidth}p{0.40\linewidth}p{0.28\linewidth}}
@@ -168,7 +165,7 @@ is rarely native fluency: most roles need a \emph{working} business level
 place a candidate into with confidence, whereas self-declared ``fluent /
 intermediate / basic'' labels cannot. Second, the profile is a property of
 the \emph{role}, not of the candidate in the abstract --- which is precisely
-why matching in TalentHub is job-anchored (Chapter~\ref{cap:design}): a
+why matching in TalentHub is job-anchored (\chapref{cap:design}): a
 candidate's languages are scored against the profile a given opening
 requires, not against a universal yardstick.
 
@@ -177,21 +174,24 @@ requires, not against a universal yardstick.
 
 The brief framed the strategy as three obligations --- to \emph{attract},
 \emph{develop} and \emph{retain} language capability sustainably.
-Table~\ref{tab:framework-pillars} maps each pillar to the concrete platform
+\tabref{tab:framework-pillars} maps each pillar to the concrete platform
 capabilities that operationalise it, so the framework is not left as an
 abstraction but is traceable to features that this report later implements
 and validates.
 
 The pillar most under pressure from the regulatory context is \emph{retain}.
-The six-month GDPR retention rule (Section~\ref{sec:sota-gdpr}) works directly
-against sustaining a language-capability pool, because the institutional
-memory of who speaks what is precisely the data the rule forces a team to
-delete. The framework's answer is not to retain data unlawfully but to make
+The six-month GDPR retention rule (\secref{sec:sota-gdpr}) works directly
+against sustaining a language-capability pool, because the record of who
+speaks what is precisely the data the rule forces a team to delete. The framework's answer is not to retain data unlawfully but to make
 the most of the window the law allows: structured capture so that value is
 extracted immediately, an audit trail so re-engagement is compliant and
 documented, and improvement tracks so a borderline German speaker is
-developed rather than lost. This is the precise point at which the strategic
-framework and the deletion-aware data model of Chapter~\ref{cap:design}
+developed rather than lost. A natural extension of this logic --- a
+consent-renewal reminder shortly before expiry, so a promising profile is
+given the chance to stay in the pool rather than lapse silently --- is set out
+as future work in \chapref{cap:conclusions}. This is the
+precise point at which the strategic
+framework and the deletion-aware data model of \chapref{cap:design}
 meet.
 
 \begin{table}[H]
@@ -218,11 +218,9 @@ operationalise them.}
 The framework closes the gap between the strategic brief and the engineering
 that follows. Each pillar generates concrete demands --- recognise languages
 automatically, score them against a role, verify them objectively, develop
-and re-engage compliantly --- and those demands reappear, sharpened, as the
-functional requirements of the next section and as the validated pain points
-of Section~\ref{sec:analysis-pains}. The framework is thus the conceptual
-spine of the project: the pain points say what hurts, the framework says what
-a sustainable answer must do, and the requirements say what to build.
+and re-engage compliantly --- that echo the validated pain points of
+\secref{sec:analysis-pains} and crystallise into the functional requirements
+of the next section.
 
 %----------------------------------------------------------------------------------------
 
@@ -231,10 +229,10 @@ a sustainable answer must do, and the requirements say what to build.
 
 The functional requirements were captured from the client brief and refined
 across sprints; several emerged only once the platform was in real use.
-Table~\ref{tab:functional-requirements} lists them grouped by the module
+\tabref{tab:functional-requirements} lists them grouped by the module
 that satisfies them, together with a \gls{moscow} priority and the delivery
 status at submission. The grouping mirrors the architecture of
-Chapter~\ref{cap:design}, so that each requirement family corresponds to a
+\chapref{cap:design}, so that each requirement family corresponds to a
 coherent slice of the system.
 
 \begin{table}[H]
@@ -265,7 +263,7 @@ FR-18 & adidas careers job and internship synchronisation (scraper) & Should & D
 \midrule
 \multicolumn{4}{l}{\textit{Assessment}} \\
 FR-06 & CEFR-based language assessment & Must & Done \\
-FR-16 & Per-skill verification & Emerged & Done \\
+FR-16 & Per-skill verification & Should & Done \\
 FR-11 & Improvement tracks for borderline candidates & Could & Partial \\
 \midrule
 \multicolumn{4}{l}{\textit{Notifications and Campaigns}} \\
@@ -285,7 +283,7 @@ FR-26 & Account and data deletion (GDPR right to erasure) & Must & Done \\
 FR-12 & Analytics dashboard with recruitment metrics & Could & Done \\
 \midrule
 \multicolumn{4}{l}{\textit{Auth and Roles}} \\
-FR-17 & Authentication and role-based access control & Emerged & Done \\
+FR-17 & Authentication and role-based access control & Must & Done \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -294,7 +292,7 @@ A small number of requirements were deliberately deferred: bias-detection
 (FR-13) and internal-mobility matching (FR-14) were scoped out of the first
 version, and a PDF export (part of FR-08) and the full improvement-track
 workflow (FR-11) remain partial. These choices, and the reasoning behind
-them, are revisited in the limitations of Chapter~\ref{cap:conclusions}.
+them, are revisited in the limitations of \chapref{cap:conclusions}.
 
 \subsection{Detailed Specification of Core Requirements}
 \label{sec:analysis-fr-detail}
@@ -305,59 +303,52 @@ given here, each stated with its rationale, the principal actor and the
 acceptance criteria against which it was signed off during client review.
 
 \paragraph{FR-01 --- Bulk CV upload with automated structured parsing.}
-\textit{Actor:} HR recruiter (and, for single uploads, the candidate).
-\textit{Rationale:} pain point \#5 --- recruiters spend significant time
-extracting basic facts from each CV. \textit{Behaviour:} the user uploads one
-or many files (or a ZIP archive); the system extracts text, sends it to a
-Large Language Model, validates the structured result and persists a
-candidate with experiences, education, languages and skills.
-\textit{Acceptance:} a batch of mixed-format PDFs and DOCX files yields one
-correctly populated candidate per CV; malformed model output never creates a
-corrupt record; and a per-batch progress count is observable while parsing
-proceeds in the background.
+\begin{description}[noitemsep]
+	\item[Actor:] HR recruiter (and, for single uploads, the candidate).
+	\item[Rationale:] pain point \#5 --- recruiters spend significant time extracting basic facts from each CV.
+	\item[Behaviour:] the user uploads one or many files (or a ZIP archive); the system extracts text, sends it to a Large Language Model, validates the structured result and persists a candidate with experiences, education, languages and skills.
+	\item[Acceptance:] a batch of mixed-format PDFs and DOCX files yields one correctly populated candidate per CV; malformed model output never creates a corrupt record; a per-batch progress count is observable while parsing proceeds in the background; and any per-file failures are surfaced to the user with a per-file error log, without aborting the rest of the batch.
+\end{description}
 
 \paragraph{FR-02 --- Persistent, searchable talent pool.}
-\textit{Actor:} HR recruiter. \textit{Rationale:} pain points \#1 and \#7 ---
-candidate data lives in spreadsheets and cannot be sliced. \textit{Behaviour:}
-every parsed or manually created candidate is stored in a relational pool
-that can be filtered by status, country, score range, language and source
-type, and sorted. \textit{Acceptance:} a recruiter can isolate, for example,
-``German-speaking candidates in Portugal with a score above 70'' in a single
-view without opening any document.
+\begin{description}[noitemsep]
+	\item[Actor:] HR recruiter.
+	\item[Rationale:] pain points \#1 and \#7 --- candidate data lives in spreadsheets and cannot be sliced.
+	\item[Behaviour:] every parsed or manually created candidate is stored in a relational pool that can be filtered by status, country, score range, language and source type, and sorted.
+	\item[Acceptance:] a recruiter can isolate, for example, ``German-speaking candidates in Portugal with a score above 70'' in a single view without opening any document.
+\end{description}
 
 \paragraph{FR-05 / FR-03 --- Explainable job-anchored matching and scoring.}
-\textit{Actor:} HR recruiter. \textit{Rationale:} pain point \#3 and the
-\emph{attract} pillar --- candidates must be ranked against a specific role,
-defensibly. \textit{Behaviour:} for a chosen job, the system computes a fit
-score per candidate from seven criteria and exposes a per-criterion
-breakdown and an eligibility flag. \textit{Acceptance:} every ranking can be
-explained criterion by criterion; the same inputs always produce the same
-score; and a criterion the job does not specify is excluded rather than
-penalised.
+\begin{description}[noitemsep]
+	\item[Actor:] HR recruiter.
+	\item[Rationale:] pain point \#3 and the \emph{attract} pillar --- candidates must be ranked against a specific role, defensibly.
+	\item[Behaviour:] for a chosen job, the system computes a fit score per candidate from seven criteria and exposes a per-criterion breakdown and an eligibility flag.
+	\item[Acceptance:] every ranking can be explained criterion by criterion; the same inputs always produce the same score; and a criterion the job does not specify is excluded rather than penalised.
+\end{description}
 
 \paragraph{FR-06 --- CEFR-based language assessment.}
-\textit{Actor:} candidate (invited), HR recruiter (reviewer).
-\textit{Rationale:} the \emph{develop} pillar and pain point \#3 ---
-self-declared proficiency is not trustworthy. \textit{Behaviour:} an invited
-candidate completes an AI-mediated assessment that returns a CEFR level with
-grammar, vocabulary and fluency sub-scores, stored for human review.
-\textit{Acceptance:} the result is reproducible in format, never
-auto-rejects, and is recorded against the candidate's longitudinal history.
+\begin{description}[noitemsep]
+	\item[Actor:] candidate (invited), HR recruiter (reviewer).
+	\item[Rationale:] the \emph{develop} pillar and pain point \#3 --- self-declared proficiency is not trustworthy.
+	\item[Behaviour:] an invited candidate completes an AI-mediated assessment that returns a \gls{cefr} level with grammar, vocabulary and fluency sub-scores, stored for human review.
+	\item[Acceptance:] the result is reproducible in format, never auto-rejects, and is recorded against the candidate's longitudinal history.
+\end{description}
 
 \paragraph{FR-09 --- HR communication with audit trail.}
-\textit{Actor:} HR recruiter (sender), candidate (recipient).
-\textit{Rationale:} pain points \#4 and \#9 and the \emph{retain} pillar.
-\textit{Behaviour:} status changes, contact emails and campaigns are recorded
-as typed notifications and reconstructed as a per-candidate interaction
-timeline. \textit{Acceptance:} any team member can retrieve the complete
-interaction history for a candidate, including who sent what and when.
+\begin{description}[noitemsep]
+	\item[Actor:] HR recruiter (sender), candidate (recipient).
+	\item[Rationale:] pain points \#4 and \#9 and the \emph{retain} pillar.
+	\item[Behaviour:] status changes, contact emails and campaigns are recorded as typed notifications and reconstructed as a per-candidate interaction timeline.
+	\item[Acceptance:] any team member can retrieve the complete interaction history for a candidate, including who sent what and when.
+\end{description}
 
 \paragraph{FR-17 --- Authentication and role-based access control.}
-\textit{Actor:} all users. \textit{Rationale:} emerged once the candidate
-portal and HR dashboard had to coexist. \textit{Behaviour:} Google OAuth
-authentication with an immutable server-set role claim gates HR-only
-operations. \textit{Acceptance:} an unauthenticated API call is rejected with
-\texttt{401} and a non-HR call to an HR-only route with \texttt{403}.
+\begin{description}[noitemsep]
+	\item[Actor:] all users.
+	\item[Rationale:] emerged once the candidate portal and HR dashboard had to coexist.
+	\item[Behaviour:] Google \gls{oauth} authentication with an immutable server-set role claim gates HR-only operations.
+	\item[Acceptance:] an unauthenticated API call is rejected with \texttt{401} (\emph{Unauthorized} --- no valid session) and a non-HR call to an HR-only route with \texttt{403} (\emph{Forbidden} --- authenticated but insufficient role).
+\end{description}
 
 %----------------------------------------------------------------------------------------
 
@@ -376,7 +367,7 @@ every interaction --- while the candidate drives a complete self-service
 journey, from registration (self-initiated or HR-invited) through document
 management, applications to jobs, internships and the ambassador program,
 assessments, and the exercise of data-protection rights such as account
-deletion. Figure~\ref{fig:usecase} shows the principal use cases grouped by
+deletion. \figref{fig:usecase} shows the principal use cases grouped by
 actor.
 
 \begin{figure}[ht]
@@ -438,18 +429,16 @@ actor.
 \draw (llm) -- (u1.south west);
 \draw (ai) -- (c5.south east);
 \end{tikzpicture}}
-\caption[Principal use cases by actor]{Principal use cases grouped by actor.
-The HR recruiter and candidate are human actors; the LLM provider and AI
-Interviewer are external system actors the platform integrates with.}
+\caption[Principal use cases by actor]{Principal use cases grouped by actor.}
 \label{fig:usecase}
 \end{figure}
 
-Table~\ref{tab:usecase-detail} expands three representative use cases into the
+\tabref{tab:usecase-detail} expands three representative use cases into the
 structured form used to drive sprint planning --- a precondition, the main
 success scenario, and the principal alternative or failure path --- so that
 the behaviour expected of the system is unambiguous.
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption[Selected use-case descriptions]{Structured descriptions of three
 representative use cases.}
@@ -476,7 +465,7 @@ Alt & On a parse failure the request is retried against the fallback provider; a
 Actor & Candidate; AI Interviewer (external) \\
 Pre & The candidate holds a valid, unexpired assessment token \\
 Main & (1) candidate opens the interview popup; (2) turns are exchanged with the sidecar; (3) proctoring events are logged; (4) a CEFR result with sub-scores is returned and stored for HR review \\
-Alt & An expired or reused token is rejected; the result never auto-rejects the candidate \\
+Alt & An expired or reused token is rejected \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -487,38 +476,18 @@ Alt & An expired or reused token is rejected; the result never auto-rejects the 
 \label{sec:analysis-nfr}
 
 Beyond what the system does, several quality attributes constrained how it
-had to be built:
+had to be built: \emph{transparency} of every scoring and matching decision;
+\emph{security} and \gls{gdpr} compliance for the personal data it holds;
+\emph{reliability} through continuous integration; \emph{maintainability}
+through the onion architecture's strict dependency rule and end-to-end type
+safety; and the \emph{cost and portability} ceiling of running on free service
+tiers and a serverless host. \tabref{tab:nfr} states each attribute against the
+\gls{isoiec25010} product-quality characteristic \parencite{ISO25010} it
+corresponds to, together with the concrete mechanism that delivers it and how
+it is verified, so that ``quality'' is stated as something testable rather than
+aspirational.
 
-\begin{description}
-	\item[Transparency.] All scoring and matching must be explainable.
-	Decisions are produced by deterministic formulas with per-component
-	breakdowns rather than opaque models, and the system only ranks ---
-	it never auto-rejects a candidate without human review.
-	\item[Security and compliance.] The platform handles personal data
-	under \gls{gdpr}. Access control is enforced server-side; the data
-	model is deletion-aware to support the six-month retention rule; and
-	authorisation for HR-only operations is gated in middleware rather
-	than in the client.
-	\item[Reliability.] Correctness is protected by continuous integration
-	that type-checks and runs the full test suite on every change
-	(Chapter~\ref{cap:validation}).
-	\item[Maintainability.] The codebase follows an onion architecture
-	with a strict dependency rule and end-to-end type safety, so that a
-	two-person team can keep changing it safely.
-	\item[Cost and portability.] The system must run on free service
-	tiers (Groq as the primary \gls{llm} with an OpenAI fallback, Supabase
-	for database, authentication and storage) and deploy to a serverless
-	host. The only hard portability limit is the browser-native
-	speech recognition and synthesis used in assessments, which is
-	available on Chromium-based browsers.
-\end{description}
-
-Table~\ref{tab:nfr} consolidates these attributes against the
-ISO/IEC~25010 product-quality characteristics they correspond to, together
-with the concrete mechanism that delivers each and how it is verified, so
-that ``quality'' is stated as something testable rather than aspirational.
-
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption[Non-functional requirements]{Non-functional requirements mapped to
 ISO/IEC~25010 characteristics, their mechanism and their verification.}
@@ -529,8 +498,8 @@ ISO/IEC~25010 characteristics, their mechanism and their verification.}
 \textbf{Attribute} & \textbf{ISO 25010} & \textbf{Mechanism} & \textbf{Verified by} \\
 \midrule
 Transparency & Functional appropriateness & Deterministic, per-criterion scoring; no auto-reject & \texttt{job-fit}, \texttt{scoring} tests \\
-Security & Security & Server-side authz, deletion-aware model, PII redaction & Auth + redaction suites; audit \\
-Reliability & Reliability & Provider fallback; CI type-check + tests on every push & GitHub Actions; 305 tests \\
+Security & Security & Server-side authz, deletion-aware model, PII redaction & Auth + redaction suites; review \\
+Reliability & Reliability & Provider fallback; CI type-check + tests on every push & GitHub Actions; 527 tests \\
 Maintainability & Maintainability & Onion architecture; strict TypeScript; one composition root & \texttt{tsc -{}-noEmit}; layer mocks \\
 Portability \& cost & Portability & Free-tier managed services; serverless deploy & Production deployment \\
 Usability & Usability & Role-based IA; accessible shadcn/ui primitives & Client acceptance sessions \\
@@ -556,7 +525,8 @@ the backlog was ordered.
 \label{sec:method-scrum}
 
 By-the-book Scrum assigns three distinct accountabilities --- Product Owner,
-Scrum Master and Developers. At program level all three were present: a Scrum
+Scrum Master and Developers \parencite{ScrumGuide2020,SchwaberBeedle2002}. At
+program level all three were present: a Scrum
 Master facilitated the shared ceremonies, and each of the four subprojects
 had its own Product Owner. Within the two-person talent-pool sub-team those
 accountabilities collapsed onto two people, and the adaptation kept the parts
@@ -572,20 +542,28 @@ that add value at that scale:
 	Master of its own and kept internal facilitation lightweight.
 	\item \textbf{Cadence.} Work was organised in short iterations aligned
 	with the academic calendar and the program's sprint boundaries, each
-	delivering a demonstrable increment of the deployed application.
+	delivering a demonstrable increment of the deployed application
+	\parencite{BeckAgileManifesto2001}.
 	\item \textbf{Ceremonies.} Beyond the program-level sprint
 	\emph{planning}, \emph{review} and \emph{retrospective} run with the
 	Scrum Master across all four subprojects, the talent-pool team kept its
-	own lightweight rhythm: an informal \emph{daily} sync kept the two
+		own lightweight rhythm: an informal \emph{weekly} sync kept the two
 	developers aligned, and a dedicated client-acceptance session
-	(Section~\ref{sec:val-manual}) doubled as the subproject's sprint
+	(\secref{sec:val-manual}) doubled as the subproject's sprint
 	review, so that the people who reported the pain points also signed off
 	the increments that addressed them.
 	\item \textbf{Tooling.} The product increment was always the live
 	Vercel deployment. Source control on GitHub, a conventional-commit
 	history (\texttt{feat}, \texttt{fix}, \texttt{docs}, \texttt{refactor})
 	and continuous integration gave each increment an auditable trail, and
-	the meeting minutes (Appendix~\ref{app:survey}) record the ceremonies.
+	the meeting minutes (\appref{app:survey}) record the ceremonies.
+	Communication across the four subproject teams was handled through
+	Discord (structured channels per topic) and WhatsApp (informal
+	coordination), while a shared Figma board served as the programme's
+	living knowledge base --- storing meeting notes, brainstorming
+	artefacts, architectural decisions and cross-team reference material
+	in a single space accessible to all participants regardless of
+	subproject.
 \end{itemize}
 
 The clearest benefit of the adaptation was the fusion of sprint review with
@@ -593,20 +571,20 @@ client acceptance: because the client validated each increment directly
 against the originating pain point, the feedback loop that Scrum prescribes
 was both real and short. The clearest tension --- one person holding both
 the Product Owner and lead-developer roles --- is examined as a lesson in
-Chapter~\ref{cap:conclusions}.
+\chapref{cap:conclusions}.
 
 \subsection{Planning and Timeline}
 \label{sec:method-timeline}
 
 The five-month internship (16~February~--~9~July~2026) was organised into
 seven overlapping work streams aligned with the academic calendar.
-Figure~\ref{fig:gantt} shows the timeline as actually executed: analysis and
+\figref{fig:gantt} shows the timeline as actually executed: analysis and
 architecture front-loaded into the first weeks, a long core-development
 stream through spring, the language-assessment integration layered on top in
 April, and validation, the survey and report writing closing the project.
 The overlaps are deliberate --- testing and deployment ran continuously
 alongside development rather than as a final phase --- which is what the
-continuous-integration discipline of Chapter~\ref{cap:validation} made
+continuous-integration discipline of \chapref{cap:validation} made
 possible.
 
 \begin{figure}[ht]
@@ -634,22 +612,23 @@ possible.
 \node[lststring, font=\scriptsize, anchor=south, rotate=90] at (2.95,-7.2) {Situation point (end Apr)};
 \end{tikzpicture}
 \caption[Project timeline]{Project timeline as executed (February--July
-2026). Bars show overlapping work streams; the dashed line marks the
-end-of-April situation-point review with the client.}
+2026).}
 \label{fig:gantt}
 \end{figure}
 
 \subsection{Product Backlog and Prioritisation}
 \label{sec:method-backlog}
 
-The backlog was kept deliberately client-driven: every item traced back to a
+The backlog was kept deliberately client-driven
+\parencite{Cohn2004UserStories}: every item traced back to a
 pain point, and priority was assigned with \textbf{MoSCoW}
+\parencite{DSDMMoSCoW}
 (Must / Should / Could / Won't) as shown in
-Table~\ref{tab:functional-requirements}. The \emph{Must} items formed the
+\tabref{tab:functional-requirements}. The \emph{Must} items formed the
 core that had to ship for the platform to be useful at all --- the talent
 pool, CV parsing, job-anchored matching and the CEFR assessment --- and they
 map onto the four priority pain points (\#5, \#3, \#9, \#2) identified in
-Section~\ref{sec:analysis-pains}.
+\secref{sec:analysis-pains}.
 
 Ordering was also constrained by dependencies between modules rather than by
 priority alone. The talent pool and the candidate data model had to exist
@@ -669,31 +648,29 @@ the same way rather than handled out of band.
 
 The single most important organisational decision was where to draw the line
 between the two developers. The conversational AI Interviewer was carved out
-as a separate Python \textit{FastAPI} service with a narrow, explicit
-contract to the Next.js core: the core creates a session and issues a
-short-lived HMAC-signed token, the sidecar runs the interview and returns a
-structured evaluation, and the core persists the result. Because the
-interface was small and well defined, the two members could work in parallel
-with minimal coordination, and the sidecar could be developed, deployed and
-tested independently. This clean seam is also what made the onion
-architecture pay off in practice (Chapter~\ref{cap:conclusions}).
+as a separate Python \textit{FastAPI} service behind a narrow, explicit
+contract to the Next.js core, the technical detail of which is given in
+\chapref{cap:design}. What matters here is the organisational payoff: because
+that interface was small and well defined, the two members could work in
+parallel with minimal coordination, and the sidecar could be developed,
+deployed and tested independently --- the clean seam that made the onion
+architecture pay off in practice.
 
 \subsection{Risks and Decision Log}
 \label{sec:method-risks}
 
 The main risks were tracked and mitigated rather than left implicit. The
-dependence on a hosted \gls{llm} was mitigated by a provider fallback (Groq
-as primary, OpenAI as secondary) so that a single outage could not stop CV
-parsing. The risk of \gls{gdpr} misalignment was mitigated by a
+dependence on a hosted \gls{llm} was mitigated by a provider fallback. The risk of \gls{gdpr} misalignment was mitigated by a
 deletion-aware data model and by storing only the inferences actually
-needed. The risk of \textbf{scope creep} --- amplified by the same person
-holding the Product Owner and lead-developer roles --- was contained by the
-MoSCoW discipline and by deferring whole feature families (bias detection,
-internal mobility) explicitly rather than silently. Finally, the risk of
+needed. The risk of \textbf{scope creep} --- amplified by the combined Product Owner
+and lead-developer role, examined as a lesson in \secref{sec:concl-po} --- was
+contained by the MoSCoW discipline (\secref{sec:method-backlog}) and by
+deferring whole feature families (bias detection, internal mobility)
+explicitly rather than silently. Finally, the risk of
 integration drift between core and sidecar was contained by the small, typed
 token contract described above.
 
-Table~\ref{tab:risk-register} records these and the other tracked risks as a
+\tabref{tab:risk-register} records these and the other tracked risks as a
 register, rating each by likelihood and impact (Low/Medium/High) before
 mitigation and naming the response. The register was reviewed at each sprint
 boundary; no risk on it materialised into a project-stopping event, which is
@@ -714,7 +691,7 @@ Scope creep (PO = lead dev) & H & M & MoSCoW discipline; explicit deferral of fe
 Core$\leftrightarrow$sidecar integration drift & M & H & Small typed HMAC token contract; shared session scheme \\
 GDPR misalignment & M & H & Deletion-aware model; minimal inference storage; audit trail \\
 Unreliable LLM-parsed data & H & M & Strict tolerant Zod schemas; single retry; dedup tiering \\
-Leaked credential in history & M & H & Audit, key rotation, removal from migration scripts \\
+Leaked credential in history & M & H & Review, key rotation, removal from migration scripts \\
 Single-developer bus factor & M & M & Onion boundaries; documented contract; conventional commits \\
 Browser speech-API limits & H & L & Documented Chromium constraint; future Whisper fallback \\
 \bottomrule

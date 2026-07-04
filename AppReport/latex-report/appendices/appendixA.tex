@@ -5,13 +5,13 @@ This appendix documents the canonical PostgreSQL schema of the platform.
 The complete DDL is maintained in
 \texttt{supabase/migrations/00000000000000\_schema.sql} in the project
 repository and is the single source of truth for both the production Supabase
-instance and any fresh development database. It consolidates 27 enumerated
+instance and any fresh development database. It consolidates 19 enumerated
 types and 33 tables together with their triggers, indexes and foreign-key
 constraints. Row-Level Security is intentionally disabled on every application
 table; all database access is performed server-side through the service-role
-key, as discussed in Section~\ref{sec:design-security}.
+key, as discussed in \secref{sec:design-security}.
 
-Section~\ref{app:db-enums} lists all enumerated types; Section~\ref{app:db-candidates} shows the central \texttt{candidates} table in full as a representative example of the schema conventions; Section~\ref{app:db-tables} lists the remaining 32 tables with their purpose.
+\secref{app:db-enums} lists all enumerated types; \secref{app:db-candidates} shows the central \texttt{candidates} table in full as a representative example of the schema conventions; \secref{app:db-tables} lists the remaining 32 tables with their purpose.
 
 %----------------------------------------------------------------------------------------
 \section{Enumerated Types}
@@ -19,7 +19,7 @@ Section~\ref{app:db-enums} lists all enumerated types; Section~\ref{app:db-candi
 
 \begin{lstlisting}[language=SQL,
     basicstyle=\ttfamily\footnotesize,
-    caption={All 27 enumerated types.},
+    caption={All 19 enumerated types.},
     label={lst:enums}]
 CREATE TYPE candidate_status AS ENUM (
   'NEW','PARSED','SCREENED','INVITED','ASSESSED',
@@ -33,9 +33,13 @@ CREATE TYPE cefr_level AS ENUM ('A1','A2','B1','B2','C1','C2');
 CREATE TYPE job_status   AS ENUM ('DRAFT','OPEN','CLOSED','ARCHIVED');
 CREATE TYPE job_type     AS ENUM (
   'FULL_TIME','PART_TIME','INTERNSHIP','CONTRACT');
+CREATE TYPE internship_status AS ENUM (
+  'DRAFT','ACTIVE','INACTIVE','FINISHED');
 CREATE TYPE application_status AS ENUM (
   'SUBMITTED','UNDER_REVIEW','INVITED','ASSESSED',
   'SHORTLISTED','REJECTED','WITHDRAWN');
+CREATE TYPE assessment_type AS ENUM (
+  'LISTENING_WRITTEN','SPEAKING','READING_ALOUD','COMBINED');
 CREATE TYPE assessment_status AS ENUM (
   'PENDING','IN_PROGRESS','SUBMITTED','SCORED','REVIEWED','EXPIRED');
 CREATE TYPE interview_session_status AS ENUM (
@@ -43,7 +47,6 @@ CREATE TYPE interview_session_status AS ENUM (
 CREATE TYPE interview_decision  AS ENUM ('PASS','FAIL');
 CREATE TYPE integrity_decision  AS ENUM ('CLEAR','REVIEW','FAIL');
 CREATE TYPE proctoring_severity AS ENUM ('INFO','WARNING','CRITICAL');
-CREATE TYPE interview_mode      AS ENUM ('TECHNICAL','LANGUAGE');
 CREATE TYPE track_status AS ENUM (
   'ENROLLED','IN_PROGRESS','COMPLETED',
   'REASSESSMENT_PENDING','REASSESSED','DROPPED');
@@ -59,9 +62,6 @@ CREATE TYPE parsing_job_status AS ENUM (
   'QUEUED','PROCESSING','COMPLETED','FAILED');
 CREATE TYPE campaign_status AS ENUM (
   'DRAFT','SENT','TERMINATED','ARCHIVED');
-CREATE TYPE ambassador_program_status AS ENUM ('DRAFT','OPEN','CLOSED');
-CREATE TYPE ambassador_application_status AS ENUM (
-  'SUBMITTED','UNDER_REVIEW','ACCEPTED','REJECTED');
 \end{lstlisting}
 
 %----------------------------------------------------------------------------------------
@@ -132,7 +132,7 @@ CREATE INDEX idx_candidates_country          ON candidates(country);
 
 Deduplication queries the \texttt{email} index for the high-confidence exact
 match and the name and \texttt{location} columns for the weaker tiers
-(Section~\ref{sec:impl-cv}). One limitation of the current schema is that the
+(\secref{sec:impl-cv}). One limitation of the current schema is that the
 name comparison is accent-sensitive: PostgreSQL treats \texttt{Jo\~ao} and
 \texttt{Joao} as distinct strings, so the same candidate recorded with and
 without diacritics can slip past the name tiers. Making this robust would
@@ -146,7 +146,7 @@ as future work.
 \section{Remaining Tables}
 \label{app:db-tables}
 
-Table~\ref{tab:db-all-tables} lists all 33 tables with their
+\tabref{tab:db-all-tables} lists all 33 tables with their
 purpose. The full DDL for each is available in the project repository at
 \texttt{supabase/migrations/00000000000000\_schema.sql}.
 
@@ -165,38 +165,38 @@ purpose. The full DDL for each is available in the project repository at
 	\bottomrule
 	\endlastfoot
 
-	\texttt{candidates}                  & Central candidate record; links auth user, CV data, scores, status. \\
-	\texttt{experiences}                 & Work-experience entries per candidate; \texttt{fields\_of\_work} GIN-indexed. \\
-	\texttt{education}                   & Education history per candidate. \\
+	\texttt{ambassador\_applications}    & Candidate applications to ambassador programmes. \\
+	\texttt{ambassador\_programs}        & Brand ambassador recruitment programmes. \\
+	\texttt{assessment\_results}         & Scored results from completed assessments. \\
+	\texttt{assessment\_templates}       & Reusable assessment configuration. \\
+	\texttt{assessments}                 & Assessment invitations sent to candidates. \\
 	\texttt{candidate\_languages}        & Language proficiency records (CEFR level). \\
-	\texttt{skills}                      & Extracted skills per candidate. \\
-	\texttt{candidate\_tags}             & Free-form tags per candidate (upserted, idempotent). \\
 	\texttt{candidate\_notes}            & HR recruiter notes per candidate. \\
-	\texttt{candidate\_segments}         & Named saved filters / cohort definitions. \\
 	\texttt{candidate\_segment\_members} & Membership join between candidates and segments. \\
-	\texttt{jobs}                        & Job/internship listings; \texttt{parsed\_requirements} JSONB (lazy JD parsing). \\
+	\texttt{candidate\_segments}         & Named saved filters / cohort definitions. \\
+	\texttt{candidate\_tags}             & Free-form tags per candidate (upserted, idempotent). \\
+	\texttt{candidates}                  & Central candidate record; links auth user, CV data, scores, status. \\
+	\texttt{education}                   & Education history per candidate. \\
+	\texttt{experiences}                 & Work-experience entries per candidate; \texttt{fields\_of\_work} GIN-indexed. \\
+	\texttt{hr\_dashboard\_widgets}      & Saved custom analytics widgets per HR user. \\
+	\texttt{hr\_profiles}                & HR user profile data. \\
+	\texttt{improvement\_progress}       & Progress entries within an improvement track. \\
+	\texttt{improvement\_tracks}         & Improvement plans auto-created on FAIL assessment. \\
+	\texttt{interview\_proctoring\_events} & Proctoring events (tab-switch, fullscreen exit, etc.). \\
+	\texttt{interview\_sessions}         & AI interview sessions (technical or language mode). \\
+	\texttt{interview\_transcript\_turns}& Per-turn conversation log for each session. \\
+	\texttt{jd\_parsing\_telemetry}      & Fire-and-forget telemetry for each JD parse call. \\
 	\texttt{job\_applications}           & Applications linking candidates to jobs. \\
 	\texttt{job\_matches}                & Cached per-job fit scores (candidate $\times$ job). \\
 	\texttt{job\_shortlists}             & HR working pick-list per job; stores fit snapshot at time of add. \\
-	\texttt{jd\_parsing\_telemetry}      & Fire-and-forget telemetry for each JD parse call. \\
-	\texttt{assessment\_templates}       & Reusable assessment configuration. \\
-	\texttt{assessments}                 & Assessment invitations sent to candidates. \\
-	\texttt{assessment\_results}         & Scored results from completed assessments. \\
-	\texttt{interview\_sessions}         & AI interview sessions (technical or language mode). \\
-	\texttt{interview\_transcript\_turns}& Per-turn conversation log for each session. \\
-	\texttt{interview\_proctoring\_events} & Proctoring events (tab-switch, fullscreen exit, etc.). \\
-	\texttt{improvement\_tracks}         & Improvement plans auto-created on FAIL assessment. \\
-	\texttt{improvement\_progress}       & Progress entries within an improvement track. \\
-	\texttt{notifications}               & All system and HR-triggered notifications. \\
+	\texttt{jobs}                        & Job/internship listings; \texttt{parsed\_requirements} JSONB (lazy JD parsing). \\
 	\texttt{notification\_preferences}   & Per-user notification opt-in/out configuration. \\
-	\texttt{promo\_campaigns}            & Promotional email campaigns with targeting rules. \\
+	\texttt{notifications}               & All system and HR-triggered notifications. \\
 	\texttt{parsing\_jobs}               & Async CV parsing job queue. \\
-	\texttt{scoring\_weights}            & Singleton scoring-weight configuration (HR-tunable). \\
+	\texttt{promo\_campaigns}            & Promotional email campaigns with targeting rules. \\
 	\texttt{scoring\_presets}            & Named scoring-weight presets. \\
+	\texttt{scoring\_weights}            & Singleton scoring-weight configuration (HR-tunable). \\
+	\texttt{skills}                      & Extracted skills per candidate. \\
 	\texttt{sync\_jobs}                  & Job-sync runs from the adidas careers portal scraper. \\
-	\texttt{hr\_dashboard\_widgets}      & Saved custom analytics widgets per HR user. \\
-	\texttt{hr\_profiles}               & HR user profile data. \\
-	\texttt{ambassador\_programs}        & Brand ambassador recruitment programmes. \\
-	\texttt{ambassador\_applications}    & Candidate applications to ambassador programmes. \\
 
 \end{longtable}

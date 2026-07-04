@@ -1,4 +1,4 @@
-\chapter{State of the Art}
+﻿\chapter{State of the Art}
 \label{cap:state-of-the-art}
 
 This chapter situates TalentHub within the existing landscape. It first
@@ -7,7 +7,7 @@ GDPR-constrained team; then reviews the role of artificial intelligence in
 hiring --- CV parsing, candidate--job matching and conversational assessment;
 introduces the language-proficiency framework adopted for assessment; and
 finally summarises the regulatory context that shaped the data model. The
-review motivates the design choices defended in Chapter~\ref{cap:design}.
+review motivates the design choices defended in \chapref{cap:design}.
 
 %----------------------------------------------------------------------------------------
 
@@ -15,13 +15,18 @@ review motivates the design choices defended in Chapter~\ref{cap:design}.
 \label{sec:sota-recruitment}
 
 Applicant Tracking Systems (\gls{ats}) are the dominant category of
-recruitment software. At the enterprise end, suites such as Workday and
-SmartRecruiters integrate requisition management, applicant tracking,
+recruitment software, and over the past two decades e-recruitment has become
+the default mode of hiring in medium and large organisations
+\parencite{Holm2012Erecruitment,LaumerEckhardt2011}. At the enterprise end,
+suites such as Workday and
+SmartRecruiters \parencite{WorkdayRecruiting,SmartRecruiters} integrate requisition
+management, applicant tracking,
 onboarding and analytics across very large organisations; mid-market tools
-such as Greenhouse, Lever and Personio target structured hiring with strong
+such as Greenhouse, Lever and Personio
+\parencite{Greenhouse,Lever,Personio} target structured hiring with strong
 interview-workflow and collaboration features; and lighter products such as
-Recruitee and Manatal aim at smaller teams, increasingly bundling
-AI-assisted sourcing and ranking.
+Recruitee and Manatal \parencite{Recruitee,Manatal} aim at smaller teams, increasingly
+bundling AI-assisted sourcing and ranking.
 
 Two observations follow from this landscape and frame the present work.
 First, the category is broad but its centre of gravity is \emph{workflow}
@@ -35,7 +40,7 @@ described here is therefore positioned not as a competitor to a full ATS but
 as a right-sized talent-intelligence tool for a single multilingual HR team,
 where auditability and compliance are first-class concerns.
 
-Table~\ref{tab:ats-comparison} summarises how representative products in the
+\tabref{tab:ats-comparison} summarises how representative products in the
 three tiers relate to the capabilities this project prioritises. The reading
 is deliberately qualitative: the goal is not to benchmark feature checklists
 but to expose where the market concentrates its effort. Enterprise suites are
@@ -43,14 +48,15 @@ deep on workflow and reporting but treat language verification and
 explainable, per-criterion matching as out of scope or as paid analytics
 modules; mid-market tools add collaboration and structured interviewing;
 lighter products increasingly advertise AI sourcing, but the ranking they
-expose is typically a single opaque score rather than an auditable breakdown.
+expose is typically a single opaque score rather than an auditable breakdown
+\parencite{Faliagka2012Ranking}.
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
-\caption[Recruitment tooling tiers versus prioritised capabilities]{Representative
-recruitment tooling tiers contrasted with the capabilities prioritised by this
-project. ``Partial'' denotes a capability that exists but is opaque, paid, or
-bolted on rather than integral.}
+\caption[Recruitment tooling tiers versus prioritised capabilities]{Recruitment
+tooling tiers contrasted with the capabilities prioritised by this project.
+``Partial'' denotes a capability that exists but is opaque, paid, or bolted on
+rather than integral.}
 \label{tab:ats-comparison}
 \begin{tabular}{p{0.26\linewidth}p{0.15\linewidth}p{0.15\linewidth}p{0.15\linewidth}p{0.15\linewidth}}
 \toprule
@@ -84,40 +90,45 @@ here.
 
 CV parsing --- turning an unstructured document into structured fields ---
 has progressed through three generations. \textbf{Rule-based} parsers
-(commercial engines such as Sovren and RChilli) rely on hand-crafted
+(commercial engines such as Sovren and RChilli \parencite{Sovren,RChilli}) rely on hand-crafted
 patterns and gazetteers; they are fast and predictable but brittle against
 unusual layouts and multilingual content. \textbf{Machine-learning} parsers,
 typically built on transformer encoders such as BERT
 \parencite{Devlin2019BERT}, improve robustness by
 learning to label spans, at the cost of training data and pipeline
-complexity. \textbf{LLM-based} parsing, used in this project, prompts a
+complexity. \textbf{LLM-based} parsing prompts a
 general model to emit a structured object directly. Its advantages are
 flexibility across layouts and languages and near-zero bespoke engineering;
 its risks are \gls{hallucination} (invented fields), \gls{schemadrift} (subtly malformed
-output) and per-call cost and latency. The mitigation adopted here ---
-constraining the model with a strict, tolerant validation schema and a
-provider fallback --- is the practical answer to those risks and is detailed
-in Chapter~\ref{cap:design}.
+output) and per-call cost and latency. The literature's consistent lesson is
+that these risks are mitigated less by the choice of model than by the
+validation and recovery machinery surrounding it --- a strict but tolerant
+schema that coerces malformed output and a fallback path. It
+is this third-generation approach that the present work builds on.
 
 \subsection{Candidate--Job Matching}
 \label{sec:sota-matching}
 
 Two broad approaches dominate automated matching. \textbf{Embedding-based}
 ranking encodes both the candidate and the job as vectors and ranks by
-similarity; it captures fuzzy semantic closeness and requires little manual
-rule-writing, but it is \emph{opaque} --- a recruiter cannot easily see
+similarity; modern person--job-fit research is dominated by such neural
+representation-learning models
+\parencite{Qin2018PersonJobFit,Jiang2020PersonJobFit}. They capture fuzzy
+semantic closeness and require little manual rule-writing, but they are
+\emph{opaque} --- a recruiter cannot easily see
 \emph{why} a candidate ranked highly, which is a serious limitation where
-hiring decisions must be justified and audited. \textbf{Rule-based} fit
+hiring decisions must be justified and audited \parencite{Raghavan2020}.
+\textbf{Rule-based} fit
 scoring evaluates explicit criteria (skills, experience, languages,
 education) and is fully explainable, at the cost of needing the criteria to
-be modelled. Hybrid systems combine the two. This project deliberately
-chooses the rule-based path: as argued in Chapter~\ref{cap:design}, the
-ability to show a per-criterion breakdown and a clear eligibility flag was
-judged more valuable for a compliance-sensitive HR team than the marginal
-recall of opaque similarity.
+be modelled. Hybrid systems combine the two. For a compliance-sensitive
+recruitment setting, the ability to show a per-criterion breakdown and a clear
+eligibility flag is arguably more valuable than the marginal recall of opaque
+similarity --- the consideration that motivates the rule-based direction taken
+in this work.
 
 The explainability argument deserves emphasis because it interacts directly
-with the regulatory context discussed in Section~\ref{sec:sota-gdpr}. Under a
+with the regulatory context discussed in \secref{sec:sota-gdpr}. Under a
 legitimate-interest or consent basis, a candidate may reasonably ask why they
 were or were not advanced; an embedding similarity of, say, $0.83$ is not an
 answer a recruiter can defend, whereas a statement that the candidate met the
@@ -134,13 +145,15 @@ target workflow.
 \label{sec:sota-conversational}
 
 A growing class of products (for example HireVue, Sapia.ai and
-MyInterview) conducts asynchronous, AI-mediated interviews and scores the
+MyInterview \parencite{HireVue,Sapia,MyInterview}) conducts asynchronous, AI-mediated interviews and scores the
 responses. The technical core is prompt engineering for an evaluative task:
 the model must both conduct a coherent conversation and produce a structured,
 rubric-aligned judgement. Such systems raise well-documented concerns around
-fairness and transparency, which reinforce the design stance taken here ---
-the assessment never auto-rejects a candidate; it produces an explainable,
-rubric-based result for human review.
+fairness and transparency \parencite{Raghavan2020,BogenRieke2018}. These
+concerns point to a clear design principle for systems of this kind: the
+assessment should never auto-reject a candidate, but instead produce an
+explainable, rubric-based result for human review --- the stance the present
+work adopts.
 
 \subsection{Structured Output from Language Models}
 \label{sec:sota-structured}
@@ -158,13 +171,13 @@ syntactic errors at the source \parencite{OpenAIStructured2024}.
 \textbf{Schema validation} treats the model as an untrusted boundary: the
 emitted object is parsed against a strict but tolerant schema that coerces
 missing or surplus fields rather than throwing, so that a partially correct
-response degrades gracefully instead of failing. This project combines both
---- a prompt that requests a typed object, a validation schema that silently
-drops values outside a controlled vocabulary, and a single retry --- which is
-what makes LLM parsing dependable enough for production use, as detailed in
-Chapter~\ref{cap:implementation}. The broader lesson from the literature is
-that the reliability of an LLM feature lives less in the model than in the
-contract wrapped around it.
+response degrades gracefully instead of failing. The broader lesson from the
+literature is that the reliability of an LLM feature lives less in the model
+than in the contract wrapped around it: a prompt that requests a typed object,
+a validating schema at the boundary, and a bounded retry together make
+generative output dependable enough for production use. It is this
+contract-first approach, rather than any single model choice, that the present
+work builds on.
 
 For language assessment the platform adopts the Common European Framework of
 Reference for Languages (\gls{cefr}), which defines a six-level scale from A1
@@ -201,13 +214,14 @@ The approach has a known and accepted limitation: the recognition interface
 is fully supported only on Chromium-based browsers (Chrome and Edge), and
 recognition quality varies with accent and microphone conditions. Server-side
 alternatives such as cloud transcription services or self-hosted models
-(for example Whisper) would remove the browser constraint at the cost of
+(for example Whisper \parencite{Radford2022Whisper}) remove the browser constraint at the cost of
 infrastructure, latency and data-handling obligations. For a free-tier,
-privacy-conscious deployment the browser-native path was judged the correct
-trade-off, with a server-side fallback recorded as future work in
-Chapter~\ref{cap:conclusions}. Because the assessment is advisory and never
-auto-rejects, occasional transcription noise lowers convenience but does not
-produce an unfair automated decision.
+privacy-conscious context the browser-native path is an attractive
+trade-off, leaving server-side transcription available as a fallback where
+broader browser coverage is required --- the direction this work takes.
+Where such an assessment is advisory rather than decisive, occasional
+transcription noise lowers convenience but does not produce an unfair
+automated decision.
 
 %----------------------------------------------------------------------------------------
 
@@ -229,15 +243,16 @@ outer ones. All three share a tactical core supplied by Domain-Driven Design
 \parencite{Evans2003}: model the problem with entities and value objects, and
 keep that model independent of frameworks.
 
-These patterns matter here for two concrete reasons. First, they make the
-LLM and database choices reversible --- the application talks to a repository
-port and an AI-service port, not to Supabase or Groq directly, so a provider
-can be swapped without touching use-case logic. Second, they create the clean
-seam along which the two-developer team divided work: the conversational
-assessment could be developed as an external service behind a narrow contract
-precisely because the architecture already treated external capabilities as
-adapters. Chapter~\ref{cap:design} realises this literature as the concrete
-layering, ports and composition root of TalentHub.
+These patterns matter here for two concrete reasons. First, they keep the
+LLM and database choices reversible --- an application that talks to a
+repository port and an AI-service port, rather than to a specific database or
+model provider directly, can swap a provider without touching use-case logic.
+Second, they create a clean seam along which work can be divided: a
+conversational-assessment capability can be built as an external service
+behind a narrow contract precisely because the architecture already treats
+external capabilities as adapters. It is this dependency-inverting style,
+with a framework-independent domain at its centre, that the present work
+adopts.
 
 %----------------------------------------------------------------------------------------
 
@@ -252,13 +267,13 @@ basis} (typically consent or legitimate interest for recruitment);
 \emph{storage limitation} requires that data not be kept longer than needed;
 and data subjects hold rights of \emph{access} and \emph{erasure}. In
 practice, recruitment teams commonly translate storage limitation into a
-fixed retention window --- the ``six-month rule'' that recurred throughout the
-client interviews --- after which candidate data must be deleted. This single
-constraint is what turns institutional memory into a liability and is the
-regulatory pressure the platform is designed around: a deletion-aware data
-model, an interaction-history audit trail, and a candidate self-service view
-that supports the right of access, as developed in
-Chapter~\ref{cap:design}.
+fixed retention window --- a ``six-month rule'' is a frequently cited
+example --- after which candidate data must be deleted. This single
+constraint is the central design pressure for a platform of this kind: it
+means a recruitment platform must treat
+deletion-awareness, an interaction-history audit trail, and a candidate
+self-service view supporting the right of access as first-class concerns
+rather than afterthoughts. That is the stance the present work takes.
 
 %----------------------------------------------------------------------------------------
 
@@ -267,21 +282,27 @@ Chapter~\ref{cap:design}.
 
 The review exposes a consistent gap. Mainstream recruitment software is
 strong on workflow but weak on the three properties this project treats as
-essential: \emph{auditable} candidate--job matching rather than opaque
-ranking; a data model built \emph{around} GDPR retention rather than bolting
+essential: \emph{auditable} candidate--job matching rather than the opaque
+neural ranking that dominates current research
+\parencite{Qin2018PersonJobFit,Jiang2020PersonJobFit} and that sits uneasily
+with the transparency expected of hiring decisions
+\parencite{Raghavan2020,BogenRieke2018}; a data model built \emph{around}
+GDPR retention \parencite{GDPR2016} rather than bolting
 compliance on afterwards; and an \emph{integrated} language-assessment
-pipeline rather than a separate tool. Modern LLMs make the parsing and
+pipeline rather than a separate tool. Modern LLMs
+\parencite{Brown2020GPT3,Touvron2023Llama} make the parsing and
 assessment components feasible for a small team, provided their output is
-constrained and validated, while CEFR supplies a recognised rubric for the
+constrained and validated \parencite{OpenAIStructured2024}, while CEFR
+\parencite{CEFR2001,CEFRCompanion2020} supplies a recognised rubric for the
 language dimension. The remainder of this report shows how these pieces are
 combined into a single coherent product for a multilingual HR team.
 
-Table~\ref{tab:sota-positioning} consolidates this gap analysis into the
+\tabref{tab:sota-positioning} consolidates this gap analysis into the
 specific design commitments that follow from it. Each row pairs an observed
 limitation of the surveyed landscape with the response adopted in this work,
 and points to the chapter where that response is realised. The table thus
 serves as a bridge from the state of the art to the requirements analysis of
-Chapter~\ref{cap:analysis} and the design of Chapter~\ref{cap:design}.
+\chapref{cap:analysis} and the design of \chapref{cap:design}.
 
 \begin{table}[ht]
 \centering
@@ -292,11 +313,11 @@ gaps mapped to the design commitments adopted in this work.}
 \toprule
 \textbf{Observed gap} & \textbf{Response in this work} \\
 \midrule
-Matching is workflow-centric and opaque & Pure, unit-tested \textit{computeJobFit} function with per-criterion breakdown (Chapter~\ref{cap:design}) \\
-Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with grammar, vocabulary and fluency sub-scores (Chapter~\ref{cap:design}) \\
-Compliance is bolted on after the fact & Deletion-aware data model and interaction-history audit trail designed from the schema up (Chapter~\ref{cap:design}) \\
-LLM output is unreliable for production parsing & Strict tolerant validation schema plus provider fallback (Chapter~\ref{cap:implementation}) \\
-Intelligence tooling assumes large data and budgets & Provider-agnostic architecture: rule-based matching core has no LLM dependency; LLM-dependent flows (CV parsing, JD extraction, interviews) run on free-tier providers (Groq / OpenAI) and can be re-pointed to a self-hosted model (e.g.\ Llama via Ollama) with a single adapter change (Chapter~\ref{cap:design}) \\
+Matching is workflow-centric and opaque & Pure, unit-tested \textit{computeJobFit} function with per-criterion breakdown (\chapref{cap:design}) \\
+Language proficiency is self-declared and unverified & Dual-mode AI interview returning a CEFR level with grammar, vocabulary and fluency sub-scores (\chapref{cap:design}) \\
+Compliance is bolted on after the fact & Deletion-aware data model and interaction-history audit trail designed from the schema up (\chapref{cap:design}) \\
+LLM output is unreliable for production parsing & Strict tolerant validation schema plus provider fallback (\chapref{cap:implementation}) \\
+Intelligence tooling assumes large data and budgets & Provider-agnostic architecture: rule-based matching core has no LLM dependency; LLM-dependent flows (CV parsing, JD extraction, interviews) run on free-tier LLM providers and can be re-pointed to a self-hosted model (e.g.\ Llama via Ollama) with a single adapter change (\chapref{cap:design}) \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -1,19 +1,18 @@
-\chapter{Survey Instrument and Client Meeting Evidence}
+﻿\chapter{Survey Instrument and Client Meeting Evidence}
 \label{app:survey}
 
 This appendix documents the empirical basis of the requirements analysis
-(Chapter~\ref{cap:analysis}) and the validation (Chapter~\ref{cap:validation}).
-Section~\ref{app:survey-meeting} summarises the client engagement that
-produced the pain points; Section~\ref{app:survey-instrument} reproduces the
+(\chapref{cap:analysis}) and the validation (\chapref{cap:validation}).
+\secref{app:survey-meeting} summarises the client engagement that
+produced the pain points; \secref{app:survey-instrument} reproduces the
 full survey instrument used to validate them.
 
 \section{Client Engagement and Scrum Cadence}
 \label{app:survey-meeting}
 
 The project was conducted as a five-month internship (16~February~--~9~July
-2026) with adidas Business Services in Porto, a shared-services centre
-employing more than 900 people, of whom roughly 22\% are international,
-operating daily across some 15 business languages. The original client brief
+2026) with adidas Business Services in Porto, the shared-services centre
+profiled in \secref{sec:context}. The original client brief
 asked for a \emph{framework and sustainable strategy} to attract, develop and
 retain language capabilities; the platform documented in this report is the
 concrete proof-of-concept that operationalises that brief.
@@ -34,17 +33,19 @@ concrete proof-of-concept that operationalises that brief.
 		29 Apr 2026   & Client pain-point review; nine pain points consolidated and mapped to survey questions. \\
 		Apr--May 2026 & Testing, deployment and stakeholder validation on the production environment. \\
 		May 2026      & Survey distribution, data collection and analysis. \\
-		May--Jun 2026 & Final report and presentation. \\
+		May--Jul 2026 & Final report and presentation. \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
 These meetings established the Scrum-with-the-client cadence described in
-Section~\ref{sec:method-scrum}: the author acted as Product Owner, translating
+\secref{sec:method-scrum}: the author acted as Product Owner, translating
 client conversations into a prioritised backlog and demonstrating increments
-on the deployed environment. Nine pain points emerged from the engagement and
-are reproduced verbatim below; each maps to one or more platform modules in
-Table~\ref{tab:survey-mapping}.
+on the deployed environment. Nine pain points emerged from the engagement.
+They are reproduced below in the client's own framing --- the raw source
+later consolidated into the overview of \tabref{tab:pain-points-overview} ---
+with each mapping to one or more platform modules in
+\tabref{tab:survey-mapping}.
 
 \begin{enumerate}
 	\item \textbf{Organise candidate information} --- the team sometimes relies on Excel.
@@ -63,77 +64,108 @@ Table~\ref{tab:survey-mapping}.
 
 The survey was designed so that each question describes a problem neutrally,
 without hinting at any solution, so that responses constitute independent
-evidence for the corresponding module. One question was authored per pain
-point, with backup questions where a single phrasing was insufficient.
+evidence for the corresponding module. The nine pain points were expanded
+into a fourteen-item instrument, several pain points contributing more than
+one question so that a single friction could be probed from complementary
+angles. The items are listed below exactly as administered and numbered to
+match the response rows of \tabref{tab:survey-responses}.
 
 \subsection*{Pain-point questionnaire}
 
 \begin{enumerate}
 	\item \textit{Organising candidate information.}\\
-	``What tool does your team primarily use to store and manage candidate
+	``What tool does your HR team primarily use to store and manage candidate
 	information during a recruitment process?''
-	(Excel / Google Sheets / An ATS / Email folders / Shared documents /
-	No structured system)
+	(Excel / Google Sheets / An ATS, e.g.\ Workday or Greenhouse / Email
+	folders / Shared documents / No structured system / Other)
 
 	\item \textit{Knowing if a candidate has applied before (GDPR / six-month rule).}\\
 	``How does your team currently identify whether a candidate has previously
 	applied for a position at adidas Porto?''
-	(Check manually / Rely on the candidate declaring it / No way to verify /
-	Automated system) \\
-	\emph{Backup:} ``Has your team ever lost useful information about a past
-	candidate because data-retention policies required it to be deleted?''
+	(Check manually in our records / Rely on the candidate declaring it / No
+	way to verify / Automated system / Other)
+
+	\item \textit{Data-retention loss.}\\
+	``Has your team ever lost useful information about a past candidate because
+	data-retention policies required it to be deleted?''
+	(Yes, frequently / Yes, occasionally / Rarely / Never / Not sure)
 
 	\item \textit{Language / skills screening.}\\
 	``At what stage of your recruitment process do you currently perform a
 	first formal check of a candidate's language proficiency or technical
 	skills?''
 	(Before the first interview / During the first interview / Only in a
-	dedicated assessment round / No formal check --- we rely on the CV)
+	dedicated assessment round / No formal check --- we rely on the CV / Other)
 
 	\item \textit{Direct contact and communication.}\\
 	``How does your team currently keep candidates informed about their
 	application status or upcoming opportunities?''
-	(Manual individual emails / Automated emails via an ATS / Phone calls /
-	No structured process) \\
-	\emph{Backup:} ``Has your team ever had to re-engage a candidate for a new
-	position after they were not selected for a previous one?''
+	(Individual emails written manually / Automated emails via an ATS / Phone
+	calls / No structured process / Other)
+
+	\item \textit{Re-engaging past candidates.}\\
+	``Has your team ever had to re-engage a candidate for a new position after
+	they were not selected for a previous one? If yes, how did you manage that
+	outreach?''
+	(Yes, and it was easy / Yes, but it was difficult to find their
+	information / No, we do not reuse past candidates / Not applicable / Other)
 
 	\item \textit{Saving time on CV analysis.}\\
-	``When screening a batch of CVs, how long does it typically take your team
-	to extract key information (e.g.\ location, years of experience, languages)
-	from each individual CV?''
-	(Under 1~min / 1--3~min / 3--5~min / More than 5~min) \\
-	\emph{Backup:} ``How often do you open a CV only to find immediately that
-	the candidate does not meet a basic requirement?''
+	``When screening a batch of different CVs, how long does it typically take
+	your team to extract key information (e.g.\ location, years of experience,
+	languages, contacts) from each individual CV?''
+	(Under 1~min / 1--3~min / 3--5~min / More than 5~min)
+
+	\item \textit{Unsuitable-CV frequency.}\\
+	``How often do you open a CV only to find immediately that the candidate
+	does not meet a basic requirement (e.g.\ wrong location, missing
+	language)?''
+	(Almost always / Often / Sometimes / Rarely)
 
 	\item \textit{Analytics and pipeline visibility.}\\
 	``How easy is it for you to get a quick overview of your current
-	recruitment pipeline --- how many candidates are at each stage, or how
-	many applications were received per opening?''
-	(Very easy --- I have a dashboard / Possible but slow / Very difficult /
-	No visibility)
+	recruitment pipeline --- for example, how many candidates are at each
+	stage, or how many applications were received per job opening?''
+	(Very easy --- I have a dashboard / Possible but takes time to compile /
+	Very difficult / No visibility / Other)
 
 	\item \textit{Where to focus recruitment efforts.}\\
 	``When planning a new recruitment campaign, how does your team identify
-	which skills, languages or profiles are most in demand?''
-	(Analyse past data / Rely on managers / Done intuitively / No structured
-	process)
+	which skills, languages or profiles are most in demand across the
+	business?''
+	(Analyse data from past recruitments / Rely on input from managers / Done
+	intuitively / No structured process / Other)
+
+	\item \textit{Share of unqualified CVs.}\\
+	``Roughly what percentage of CVs you receive for a typical open position
+	would you say clearly do not meet the minimum requirements (wrong
+	location, missing language, insufficient experience)?''
+	(Less than 10\% / 10--30\% / 30--60\% / More than 60\%)
 
 	\item \textit{HR tooling and productivity.}\\
 	``On a scale of 1 to 5, how would you rate the degree to which your current
 	recruitment tools help you work more efficiently and reduce repetitive
 	manual tasks?''
-	(1 = very little value $\to$ 5 = significant productivity boost)
+	(1 = they add very little value $\to$ 5 = they significantly boost my
+	productivity)
 
 	\item \textit{Keeping borderline candidates engaged.}\\
 	``What happens to candidates who were not selected for a position but
 	showed potential --- for example strong language skills or relevant
 	experience?''
-	(Keep their profile for future openings / Inform them proactively /
-	Rejected and removed / No structured process)
+	(Keep their profile for future openings / Inform them of other
+	opportunities proactively / Rejected and removed / No structured process /
+	Other)
+
+	\item \textit{Cross-team coordination.}\\
+	``When multiple HR team members are involved in the same candidate's
+	process, how easy is it to know what actions have already been taken ---
+	for example, who contacted them, when, and what was discussed?''
+	(Very easy / Possible but requires effort / Difficult --- we rely on memory
+	or informal communication / No way to track this / Other)
 \end{enumerate}
 
-\subsection*{Original four-question bank (28 April session)}
+\subsection*{Original four-question bank (February draft)}
 
 A shorter instrument, drafted before the full pain-point mapping, framed four
 quantitative questions later folded into the questionnaire above:
@@ -160,7 +192,7 @@ adidas Porto, the same person who framed the original client brief. Because
 the respondent speaks for the HR function that owns the problem, the response
 is treated as a structured validation interview rather than a statistical
 sample; its analysis and the three headline findings are discussed in
-Section~\ref{sec:val-survey}. Table~\ref{tab:survey-responses} reproduces the
+\secref{sec:val-survey}. \tabref{tab:survey-responses} reproduces the
 selected answers verbatim. Notably, the respondent's team already operates an
 enterprise Applicant Tracking System (SAP SuccessFactors), which makes the
 residual friction recorded below particularly significant.
@@ -200,7 +232,7 @@ residual friction recorded below particularly significant.
 \end{longtable}
 
 The three responses with the greatest validating weight are highlighted in
-Section~\ref{sec:val-survey}: the floor productivity rating (Q12) from a
+\secref{sec:val-survey}: the floor productivity rating (Q12) from a
 team that already runs an enterprise ATS; the estimate that 30--60\% of
 received CVs fail the minimum requirements (Q11); and the reliance on
 managerial intuition rather than data for strategic skill planning (Q10).

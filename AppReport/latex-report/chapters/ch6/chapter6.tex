@@ -1,4 +1,4 @@
-\chapter{Verification and Validation}
+﻿\chapter{Verification and Validation}
 \label{cap:validation}
 
 This chapter reports how TalentHub was checked for correctness
@@ -9,7 +9,7 @@ verification effort rests on three complementary layers: static analysis
 through the TypeScript compiler, an automated unit-test suite executed on
 every change, and manual acceptance testing with the client. Validation is
 addressed through a structured survey mapped one-to-one onto the pain points
-of Chapter~\ref{cap:introduction}, and the chapter closes with the security
+of \chapref{cap:introduction}, and the chapter closes with the security
 review that accompanied the project.
 
 %----------------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ review that accompanied the project.
 \label{sec:val-verification}
 
 Verification follows the same boundaries as the \gls{onion} described in
-Chapter~\ref{cap:design}. Each layer is checked with the technique best
+\chapref{cap:design}. Each layer is checked with the technique best
 suited to it: the type system guarantees structural correctness across all
 layers; pure Domain and Application logic is exercised by fast, isolated
 unit tests; and the Presentation boundary (authentication and route gating)
@@ -40,8 +40,8 @@ mode forbids implicit \texttt{any}, enforces null-safety, and makes the
 path aliases (\texttt{@server}, \texttt{@client}, \texttt{@/lib}) resolve
 identically in source and in tests.
 
-A code audit conducted in May~2026 found that the weakest point of the type
-guarantees was the database boundary, where rows were cast through
+A review of the type guarantees found that their weakest point was the
+database boundary, where rows were cast through
 \texttt{camelizeKeys<any>} and lost their types exactly where data crosses
 from PostgreSQL into the Domain. This observation is recorded as a
 maintainability item; it illustrates that type checking is necessary but
@@ -65,33 +65,43 @@ during development. Coverage is produced with \texttt{vitest run
 
 \subsubsection{Suite Composition}
 
-At the time of writing the suite comprises \textbf{18 test files and 305
-test cases, all passing}. Table~\ref{tab:test-inventory} lists every file
+At the time of writing the suite comprises \textbf{33 test files and 527
+test cases, all passing}. \tabref{tab:test-inventory} lists every file
 with its case count, the application layer it targets, and the concern it
-covers. The suite deliberately concentrates on the layers where logic
-lives --- the Domain (pure decision functions) and the Application
-(orchestration) --- while the thin Infrastructure adapters are verified
-indirectly through the use cases that depend on them.
+covers. The suite deliberately concentrates on the layers where
+consequential logic lives --- the Domain (pure decision functions), the
+Application (orchestration, boundary validation, and data-transfer
+transforms), and the server-side authorisation guards --- while the thin
+Infrastructure adapters (data repositories and external-service clients) are
+verified indirectly through the use cases that depend on them.
 
 \begin{table}[ht]
 \centering
 \caption[Automated test inventory]{Automated test inventory at submission
-(18 files, 305 cases, all passing).}
+(33 files, 527 cases, all passing), sorted by case count.}
 \label{tab:test-inventory}
-\small
-\begin{tabular}{p{0.30\linewidth}r p{0.18\linewidth}p{0.32\linewidth}}
+\footnotesize
+\begin{tabular}{p{0.32\linewidth}r p{0.16\linewidth}p{0.32\linewidth}}
 \toprule
 \textbf{File} & \textbf{Cases} & \textbf{Layer} & \textbf{Concern} \\
 \midrule
 \texttt{job-fit} & 47 & Domain & Job-anchored matching engine \\
 \texttt{middleware-auth} & 38 & Presentation & Route gating (401/403) \\
+\texttt{upload-use-cases} & 38 & Application & CV upload + parsing-job pipeline \\
 \texttt{interview-runtime} & 37 & App + Infra & Interview rubric + evidence \\
+\texttt{dtos} & 31 & Application & DTO transforms + request schemas \\
+\texttt{job-use-cases} & 31 & Application & Job CRUD, sync, matching \\
+\texttt{notification-use-cases} & 28 & Application & Notifications + campaigns \\
+\texttt{candidate-use-cases} & 26 & Application & Candidate list / update / notify \\
 \texttt{job-matching-bridge} & 25 & Application & DB-row $\rightarrow$ matcher bridge \\
 \texttt{cv-validation} & 19 & Application & CV extraction schema \\
-\texttt{upload-use-cases} & 18 & Application & CV upload pipeline \\
 \texttt{analytics-catalog} & 16 & Domain & Widget-spec + injection guard \\
 \texttt{notifications-route-auth} & 16 & Presentation & API route authorisation \\
+\texttt{db-utils} & 14 & Infrastructure & snake/camel + JSONB conversion \\
 \texttt{scoring} & 13 & Domain & Scoring + CEFR estimation \\
+\texttt{ambassador-use-cases} & 12 & Application & Ambassador programs \\
+\texttt{profile-use-cases} & 12 & Application & Candidate profile resolution \\
+\texttt{dashboard-widget-use-cases} & 11 & Application & Custom analytics widgets \\
 \texttt{adidas-job-scraper} & 10 & Application & Job-listing scraper \\
 \texttt{logger-redaction} & 10 & Infrastructure & PII redaction in logs \\
 \texttt{text-extraction} & 10 & Infrastructure & PDF/DOCX extraction \\
@@ -99,13 +109,99 @@ indirectly through the use cases that depend on them.
 \texttt{job-requirements-schema} & 9 & Application & JD extractor schema \\
 \texttt{listing-posted-date} & 9 & Domain & Fuzzy posted-date parsing \\
 \texttt{job-shortlist-use-cases} & 8 & Application & Per-job shortlist \\
+\texttt{segment-use-cases} & 8 & Application & Candidate segments \\
+\texttt{require-hr} & 7 & Presentation & HR-only route guard \\
 \texttt{interview-token} & 6 & Infrastructure & HMAC token round-trip \\
+\texttt{application-use-cases} & 5 & Application & Apply / withdraw / status \\
 \texttt{cv-fields-of-work} & 5 & Application & Field-of-work tagging \\
+\texttt{hr-profile-analytics-use-cases} & 5 & Application & HR profile + analytics \\
+\texttt{resolve-caller} & 5 & Presentation & Server auth gate \\
+\texttt{assessment-use-cases} & 4 & Application & Assessment invite + link \\
+\texttt{export-use-cases} & 3 & Application & CSV export mapping \\
 \midrule
-\textbf{Total} & \textbf{305} & & \\
+\textbf{Total} & \textbf{527} & & \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsubsection{Coverage by Layer}
+
+Case counts show \emph{how much} was tested; they do not show \emph{where}
+the testing landed. \tabref{tab:coverage-layer} and
+\figref{fig:coverage-by-layer} report the statement, branch, function, and
+line coverage measured by the V8 provider, broken down by architectural
+layer. The distribution is the quantitative expression of the
+risk-proportional strategy: every layer that holds decision logic --- the
+domain services, the application use cases and their data-transfer schemas,
+and the authorisation guards --- is covered between roughly 80\% and 100\%
+of its lines, whereas the thin infrastructure adapters (data repositories and
+external-service clients, which contain little branching and are reached only
+through mocked ports) are left deliberately low. The whole-codebase line
+figure of 46.9\% is therefore not a uniform average but a blend of
+near-exhaustive coverage where a defect would be costly and near-zero
+coverage where a unit test would merely restate a database query.
+
+\begin{table}[ht]
+\centering
+\caption[Coverage by architectural layer]{Coverage by architectural layer
+(V8 provider, percentages). Decision-bearing layers are covered heavily;
+thin infrastructure adapters are covered indirectly by design.}
+\label{tab:coverage-layer}
+\small
+\begin{tabular}{p{0.44\linewidth}rrrr}
+\toprule
+\textbf{Layer} & \textbf{Stmts} & \textbf{Branch} & \textbf{Funcs} & \textbf{Lines} \\
+\midrule
+Presentation --- authorisation guards & 100 & 100 & 100 & \textbf{100} \\
+Domain services (matching, scoring) & 91.0 & 76.1 & 98.3 & \textbf{96.2} \\
+Application --- use cases & 84.4 & 73.1 & 80.1 & \textbf{85.7} \\
+Application --- DTOs \& errors & 79.1 & 86.5 & 85.7 & \textbf{80.5} \\
+Infrastructure --- security (token) & 89.3 & 89.5 & 87.5 & 89.3 \\
+Infrastructure --- logging & 71.4 & 64.5 & 72.7 & 74.5 \\
+Infrastructure --- text extraction & 73.9 & 62.5 & 80.0 & 73.9 \\
+Infrastructure --- scraping & 35.1 & 31.0 & 25.0 & 33.1 \\
+Infrastructure --- data repositories & 2.5 & 3.1 & 4.3 & 2.7 \\
+\midrule
+\textbf{Whole codebase} & \textbf{45.5} & \textbf{43.3} & \textbf{42.5} & \textbf{46.9} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth, height=7.8cm,
+  xbar, bar width=9pt,
+  xmin=0, xmax=115,
+  xlabel={Line coverage (\%)},
+  symbolic y coords={Data repositories,Scraping,Text extraction,Logging,DTOs \& errors,Application use cases,Security token,Domain services,Auth guards},
+  ytick=data, y tick label style={font=\footnotesize},
+  nodes near coords, nodes near coords style={font=\scriptsize},
+  every node near coord/.append style={anchor=west},
+  enlarge y limits=0.08,
+  xmajorgrids, tick align=inside,
+  ]
+\addplot[fill=lstkeyword!60, draw=lstkeyword] coordinates {
+  (2.7,Data repositories)
+  (33.1,Scraping)
+  (73.9,Text extraction)
+  (74.5,Logging)
+  (80.5,DTOs \& errors)
+  (85.7,Application use cases)
+  (89.3,Security token)
+  (96.2,Domain services)
+  (100,Auth guards)
+};
+\end{axis}
+\end{tikzpicture}
+\caption[Line coverage by architectural layer]{Line coverage by layer
+(V8 provider). The decision-bearing layers --- domain services, application
+use cases and their DTO schemas, and the authorisation guards --- sit between
+80\% and 100\%, while the thin infrastructure adapters are covered only
+indirectly. The whole-codebase line average is 46.9\%.}
+\label{fig:coverage-by-layer}
+\end{figure}
 
 \subsubsection{What is Tested, and Why}
 
@@ -114,9 +210,9 @@ proportional to its risk and to how much consequential logic it contains.
 
 \paragraph{Decision-critical Domain logic (highest priority).}
 The job-anchored matching engine (\texttt{computeJobFit}) is the most
-heavily tested unit, with 47 cases. Because hiring decisions must be
-explainable rather than opaque, the matcher is a pure function with no
-external dependencies, and its tests cover every one of the seven criteria
+heavily tested unit, with 47 cases. Being a pure function with no external
+dependencies, it is straightforward to exercise exhaustively: the tests cover
+every one of the seven criteria
 (field, experience-in-field, seniority, required and preferred skills,
 languages, education), the ``average of applicable criteria only'' rule,
 and the \texttt{isEligible} flag computed as the conjunction of applicable
@@ -142,13 +238,13 @@ new suite tests the loose-date parser, the experience-duration calculation,
 the requirement-building helper, and includes an explicit regression case
 asserting that the job title is carried through. The lesson --- that pure
 logic and the code wiring it together must both be tested --- is revisited
-in Chapter~\ref{cap:conclusions}.
+in \chapref{cap:conclusions}.
 
 \paragraph{Data-integrity boundaries.}
 The platform ingests data from Large Language Models, whose output cannot be
 trusted structurally. Four schema suites (\texttt{cv-validation},
 \texttt{job-requirements-schema}, \texttt{cv-fields-of-work}, and the
-spec validation inside \texttt{analytics-catalog}) assert that
+\texttt{analytics-catalog} spec validation) assert that
 Zod schemas accept well-formed payloads, reject missing required fields,
 normalise values such as URLs and e-mail addresses, and tolerantly discard
 model-invented values that fall outside the canonical vocabulary (for
@@ -160,8 +256,8 @@ Several suites exist purely to defend security and compliance properties:
 (16 cases) assert that unauthenticated callers receive \texttt{401} and
 non-HR callers receive \texttt{403} on protected routes; \texttt{escape-or-term}
 (9 cases) verifies that user search terms are escaped before reaching
-PostgREST \texttt{.or()} filters, closing an injection vector found in the
-audit; \texttt{logger-redaction} (10 cases) confirms that e-mail addresses
+PostgREST \texttt{.or()} filters, closing an injection vector found during a
+security review; \texttt{logger-redaction} (10 cases) confirms that e-mail addresses
 and tokens are masked in structured logs; and the analytics catalog tests
 confirm that the strict widget-specification schema rejects injected keys,
 so that the constrained chart builder can never be coerced into running an
@@ -180,7 +276,7 @@ contribution boundary explicit.
 \subsubsection{Requirements Traceability}
 
 Verification is only meaningful if it can be traced back to what the system
-was supposed to do. Table~\ref{tab:traceability} threads each principal
+was supposed to do. \tabref{tab:traceability} threads each principal
 capability from its design home, through the automated test(s) that pin it,
 to the validation evidence that confirms it mattered to the client. The
 matrix is deliberately three-columned: a capability with a design but no test
@@ -193,7 +289,7 @@ user-facing ones additionally trace to a survey item or an acceptance session.
 \centering
 \caption[Requirements traceability matrix]{Traceability from capability to
 automated test to validation evidence. Survey items are the numbered
-questions of Appendix~\ref{app:survey}.}
+questions of \appref{app:survey}.}
 \label{tab:traceability}
 \small
 \begin{tabular}{p{0.30\linewidth}p{0.34\linewidth}p{0.26\linewidth}}
@@ -208,7 +304,7 @@ CV / CEFR scoring & \texttt{scoring} & Survey Q4 \\
 JD requirement extraction & \texttt{job-requirements-schema} & Survey Q11 \\
 Per-job shortlist & \texttt{job-shortlist-use-cases} & Survey Q14 \\
 Authn \& route RBAC & \texttt{middleware-auth}, \texttt{notifications-route-auth} & Security review \\
-Search-injection safety & \texttt{escape-or-term} & May 2026 audit \\
+Search-injection safety & \texttt{escape-or-term} & Security review \\
 PII redaction in logs & \texttt{logger-redaction} & GDPR review \\
 Interview token contract & \texttt{interview-token}, \texttt{interview-runtime} & Security review \\
 Constrained analytics & \texttt{analytics-catalog} & Survey Q9, Q10 \\
@@ -242,7 +338,7 @@ journey --- uploading and parsing a CV, opening a job and ranking candidates
 against it, shortlisting, contacting a candidate, and reviewing analytics ---
 and recorded the client's feedback against the original pain points. These
 sessions were also the principal vehicle for sprint reviews, doubling as
-both acceptance testing and Scrum ceremony (Section~\ref{sec:analysis-pm}).
+both acceptance testing and Scrum ceremony (\secref{sec:analysis-pm}).
 
 %----------------------------------------------------------------------------------------
 
@@ -251,18 +347,18 @@ both acceptance testing and Scrum ceremony (Section~\ref{sec:analysis-pm}).
 
 Verification establishes that the software behaves as specified; validation
 asks whether the specification actually solves the client's problem. To
-answer this, the nine pain points of Table~\ref{tab:pain-points-overview}
+answer this, the nine pain points of \tabref{tab:pain-points-overview}
 were turned into a fourteen-item survey instrument, so that every reported
 friction could be traced to an explicit question. The instrument was
 completed by the lead HR stakeholder at adidas Porto --- the same person who
 framed the original brief --- and the response is therefore best read as a
-structured validation interview from the client rather than a statistical
-sample. Its value lies in the detail and authority of the source: this is a
+structured validation interview from the client. Its value lies in the detail
+and authority of the source: this is a
 mature shared-services HR function that already operates an enterprise
 Applicant Tracking System (SAP SuccessFactors), which makes the friction it
 still reports all the more telling. The full instrument and the verbatim
-responses are reproduced in Appendix~\ref{app:survey}
-(Table~\ref{tab:survey-responses}).
+responses are reproduced in \appref{app:survey}
+(\tabref{tab:survey-responses}).
 
 Three findings stand out as direct validation of the project's premise.
 First, when asked to rate, on a scale of one to five, how much current
@@ -303,13 +399,13 @@ the respondent finds it easy to get a pipeline overview, can identify repeat
 applicants automatically, and reports extracting key fields from a CV in
 under a minute and rarely opening an unsuitable one. These answers temper any
 claim that the platform replaces an ATS; they instead confirm its actual
-positioning, argued in Chapter~\ref{cap:state-of-the-art}, as a focused
+positioning, argued in \chapref{cap:state-of-the-art}, as a focused
 talent-intelligence and language-verification layer. The validity of the
 findings is bounded by a single respondent from one organisation, so the
 results are read as directional confirmation that the prioritisation was
 correct, not as a statistically generalisable claim.
 
-Figure~\ref{fig:survey-classification} summarises the fourteen survey items
+\figref{fig:survey-classification} summarises the fourteen survey items
 classified by how they bear on the project. The classification is the
 author's reading of the responses, not an additional measurement: six items
 describe a gap the platform is built to fill, five describe work the existing
@@ -334,10 +430,9 @@ cluster is what keeps the platform's claimed scope honest.
 \addplot[fill=lstkeyword!60, draw=lstkeyword] coordinates {(Gap validated,6) (ATS adequate,5) (Contextual,3)};
 \end{axis}
 \end{tikzpicture}
-\caption[Survey items by validation category]{The fourteen survey items
-classified by how they bear on the project (author's classification of the
-Appendix~\ref{app:survey} responses). Gap-validating items: Q3, Q10--Q14;
-ATS-adequate: Q2, Q6--Q9; contextual: Q1, Q4, Q5.}
+\caption[Survey items by validation category]{Survey items by validation
+category. Gap-validating: Q3, Q10--Q14; ATS-adequate: Q2, Q6--Q9; contextual:
+Q1, Q4, Q5.}
 \label{fig:survey-classification}
 \end{figure}
 
@@ -347,19 +442,19 @@ ATS-adequate: Q2, Q6--Q9; contextual: Q1, Q4, Q5.}
 \label{sec:val-security}
 
 Security was treated as a first-class verification concern rather than an
-afterthought, for two reasons: the platform stores special-category
-personal data under \gls{gdpr}, and it disables PostgreSQL \gls{rls} in
+afterthought, for two reasons: the platform stores personal
+data under \gls{gdpr}, and it disables PostgreSQL \gls{rls} in
 favour of enforcing every access decision in server-side code reached
 through the service role. That design choice concentrates the
 authorisation burden in the application, which is precisely why the
 authentication and route-gating suites described above are central to the
 security posture.
 
-A deep code audit in May~2026 produced a prioritised findings log that
-drove concrete remediation. The most serious item was a leaked service-role
+A focused security review of the codebase produced a prioritised findings log
+that drove concrete remediation. The most serious item was a leaked service-role
 credential committed in an obsolete migration script; the file was removed
 and the key rotated in the Supabase dashboard, with the corresponding
-environment variables updated across all deployment targets. The audit also
+environment variables updated across all deployment targets. The review also
 identified --- and the team resolved --- a PostgREST \texttt{.or()} injection
 vector in the search filters, fixed by introducing and unit-testing the
 \texttt{escapeOrTerm} helper and applying it at every call site. Remaining
@@ -386,16 +481,16 @@ often: the \texttt{job\_matches} and \texttt{job\_shortlists} tables for the
 per-job ranking and shortlist screens, and a GIN index on
 \texttt{experiences.fields\_of\_work} so that candidates can be filtered by
 field of work without a full scan. Expensive computation is cached rather
-than repeated: a job description is parsed by the Large Language Model only
-on the first time an HR user opens the ranking screen for that job, and the
-result is persisted with a schema version so that it is reused until the
-source changes; likewise the top-ranked candidates for a job are persisted
-as a \texttt{job\_matches} cache rather than recomputed on every view.
+than repeated: as designed in \secref{sec:design-jd}, a job description is
+parsed by the Large Language Model only the first time an HR user opens its
+ranking screen and the result is cached with a schema version; likewise the
+top-ranked candidates for a job are persisted as a \texttt{job\_matches} cache
+rather than recomputed on every view.
 
 The principal known bottleneck is the candidate fan-out inside
 \texttt{matchCandidatesToJob}, which currently loads the candidate pool and
-evaluates the matcher in application code. The remediation identified during
-the audit --- pre-filtering candidates in SQL through the fields-of-work GIN
+evaluates the matcher in application code. The remediation identified for this
+bottleneck --- pre-filtering candidates in SQL through the fields-of-work GIN
 index so that only plausibly relevant profiles reach the matcher --- is
 recorded as planned work; the existing matcher tests are written so that
 they continue to hold once that optimisation is introduced.
@@ -411,7 +506,7 @@ assessment experience rely on Web Speech APIs available only in
 Chromium-based browsers (Chrome and Edge), so the spoken-interaction path
 degrades on other browsers. The Large Language Model usage runs against a
 provider free tier, which imposes a practical cost-and-rate ceiling on bulk
-CV parsing and is mitigated, but not removed, by the Groq-to-OpenAI fallback
+CV parsing and is mitigated, but not removed, by the provider fallback
 and the lazy parsing of job descriptions. CV ingestion also reads text
 directly from the uploaded file with no optical-character-recognition
 fallback, so scanned or image-only PDFs cannot be parsed automatically and are
@@ -421,5 +516,21 @@ but the time-based retention purge is not yet automated and still depends on
 a manual trigger rather than a schedule. Finally, the constrained analytics builder, while safe by
 construction, exposes a deliberately narrow catalogue of metrics and
 dimensions, so some questions an analyst might ask cannot yet be expressed.
+
+A further pair of limitations concerns the \emph{external} validation of the
+AI-assisted ranking rather than its internal behaviour. First, while the
+matching engine's logic is proven deterministic and regression-locked
+(\secref{sec:val-unit}), its rankings were never compared against a recruiter's
+own ordering of the same candidates --- no such agreement study was run.
+Second, and separately, the accuracy of CV and job-description extraction was
+verified structurally, through schema conformance and the retry-and-fallback
+path, but was not quantified against a labelled ground-truth set in
+precision-and-recall terms. Both gaps share a single root cause: the project
+had access only to the job descriptions scraped from the adidas careers site,
+not to real application data, and recruiter availability for hand-ranking
+exercises was reduced in the closing phase. They are therefore carried forward
+as validation work for a later project phase (\secref{sec:concl-future}) rather
+than claimed here.
+
 These items frame the future work discussed in
-Chapter~\ref{cap:conclusions}.
+\chapref{cap:conclusions}.

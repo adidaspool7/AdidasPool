@@ -1,0 +1,301 @@
+\chapter{Prompt Engineering Artifacts}
+\label{app:prompts}
+
+The platform delegates four tasks to Large Language Models: parsing a CV into
+structured data, extracting hiring requirements from a job description, and
+conducting the two modes of the AI Interviewer (technical-skill and language).
+Each task is driven by a hand-written, schema-constrained system prompt. This
+appendix reproduces the core of those prompts
+(\secref{app:prompts-application}) and, separately, documents how AI coding
+assistants were used as a bounded tool during development
+(\secref{app:prompts-development}).
+
+Two conventions apply throughout. First, the prompts are reproduced from the
+source files (\texttt{src/server/infrastructure/ai/} for the Next.js services
+and \texttt{ai\_interviewer\_backend/} for the FastAPI sidecar); long enumerated
+value lists and repeated few-shot examples are elided with \texttt{[\ldots]}
+purely to keep each listing to one page. Second, every prompt ends by
+constraining the model to emit JSON only, which the calling code then validates
+with Zod (Next.js) or Pydantic (FastAPI) before it is trusted.
+
+%----------------------------------------------------------------------------------------
+
+\section{Application Prompts}
+\label{app:prompts-application}
+
+\subsection{CV Parsing}
+\label{app:prompts-cv}
+
+The CV parser converts the raw text of an uploaded CV into the candidate
+schema. It is called once per CV with \texttt{temperature = 0.1} and
+\texttt{response\_format = json\_object}. The prompt fixes the output shape,
+pins the canonical field-of-work vocabulary, and asks the model to self-report
+a per-field confidence so that low-confidence extractions can be flagged for
+review rather than trusted silently.
+
+\begin{lstlisting}[caption={CV parsing system prompt (abridged).},label={lst:prompt-cv}]
+You are a CV/resume parser. Extract structured information from the
+following CV text.
+
+Return a JSON object with exactly this structure:
+{
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string or null",
+  "location": "city, country or null",
+  "experiences": [
+    { "jobTitle": "string", "company": "string or null",
+      "startDate": "YYYY-MM", "endDate": "YYYY-MM or null",
+      "isCurrent": false, "fieldsOfWork": ["Retail", "Sales"] }
+  ],
+  "education": [
+    { "institution": "string or null", "degree": "string or null",
+      "level": "HIGH_SCHOOL | BACHELOR | MASTER | PHD | VOCATIONAL | OTHER" }
+  ],
+  "languages": [ { "language": "name", "level": "A1..C2 or null" } ],
+  "skills":    [ { "name": "skill", "category": "Technical | Soft Skill | Tool | Language | Other" } ],
+  "estimatedTotalYears": 5.5,
+  "parsingConfidence": {
+    "overall": 0.85, "name": 0.99, "location": 0.70,
+    "flags": ["location_uncertain", "missing_language_levels", "date_gaps", "no_email"]
+  }
+}
+
+Official fields of work (use ONLY these exact strings; do NOT invent others):
+  - Retail   - Sales   - Data   - Design   - Digital   - Finance
+  - Technology   - Supply Chain & Sourcing   - People & Culture   [...]
+
+Rules:
+- firstName and lastName are REQUIRED -- never return null; infer from the
+  email or headers if needed, and only use "Unknown" as a last resort.
+- For all other fields, if not found, use null.
+- Map languages to CEFR (native/fluent = C2, advanced = C1, intermediate = B1-B2,
+  basic = A1-A2).
+- Include not only formal degrees but also certifications, courses and bootcamps,
+  classified as VOCATIONAL or OTHER.
+- For each experience pick 1-3 fieldsOfWork from the list above; return [] rather
+  than invent a value.
+- Use the canonical name of each skill ("JavaScript" not "JS scripting") and split
+  compound entries ("HTML, CSS & JavaScript" -> three skills).
+- For parsingConfidence, honestly assess certainty (0.0-1.0) and add a flag for
+  every uncertainty.
+- Return ONLY valid JSON, no markdown or extra text.
+\end{lstlisting}
+
+\subsection{Job-Description Requirement Extraction}
+\label{app:prompts-jd}
+
+The requirements extractor turns free-text job descriptions --- which arrive in
+several languages and rarely follow a fixed template --- into the versioned
+requirements schema that the matching engine consumes. The prompt is notable
+for two things the domain demanded: it normalises multilingual education and
+language terms to a canonical English enumeration, and it infers requirements
+from a duties-only posting when no explicit ``Requirements'' section exists,
+while still forbidding invented numeric values.
+
+\begin{lstlisting}[caption={Job-requirements extraction system prompt (abridged).},label={lst:prompt-jd}]
+You are a recruitment analyst. Extract structured hiring requirements from the
+job description below.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "fieldsOfWork": string[],                 // subset of the allowed list
+  "seniorityLevel": "INTERN" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "DIRECTOR" | null,
+  "minYearsInField": number | null,
+  "requiredSkills": string[],               // hard requirements only
+  "preferredSkills": string[],              // "nice to have" / "preferred"
+  "requiredLanguages": [{ "language": "English", "cefr": "B2" | null }],
+  "requiredEducationLevel": "HIGH_SCHOOL" | "VOCATIONAL" | "BACHELOR" | "MASTER" | "PHD" | null,
+  "responsibilitiesSummary": string | null  // one or two sentences max
+}
+
+The job description may be written in any language; read it natively, but write
+ALL output strings in English. Translate as needed:
+  - "Atendimento ao cliente" -> "Customer service"
+  - "Gestion de inventario"  -> "Inventory management"
+
+Normalize localized education terms to the enum:
+  - "Licenciatura" / "Licence" / "Laurea triennale" -> BACHELOR
+  - "Mestrado" / "Master" / "Maestria"              -> MASTER
+  - "Tecnico" / "Ausbildung" / "BTS"                -> VOCATIONAL   [...]
+
+Sectionless postings (no explicit Requirements block): infer requiredSkills from
+the duties ("Operate the POS system and handle returns" -> ["POS systems",
+"Returns handling"]); leave preferredSkills, minYearsInField and education null/[]
+unless explicitly stated.
+
+CRITICAL RULES:
+  1. If a field is not stated and cannot be inferred, return null (scalars) or []
+     (arrays). NEVER invent numeric values.
+  2. "required / must have / essential" -> requiredSkills;
+     "preferred / nice to have / a plus" -> preferredSkills.
+  3. Use the canonical skill name so it can be matched against candidate CVs.
+  4. Return ONLY valid JSON.
+\end{lstlisting}
+
+\subsection{AI Interviewer --- Technical Mode}
+\label{app:prompts-interview-tech}
+
+The technical interviewer is assembled from a persona, a guardrails block and a
+flow block, then specialised at run time to the single skill the candidate is
+being assessed on. The guardrails are deliberately strict: the model asks one
+question per turn, never reveals answers, and treats topic drift as a hard
+failure, which is what keeps an assessment focused on exactly one competency.
+
+\begin{lstlisting}[caption={Technical interviewer system prompt (assembled from persona, guardrails and flow).},label={lst:prompt-tech}]
+You are a senior technical interviewer. You are concise, professional, focused,
+and fast-paced.
+
+Strict rules you must always follow:
+1) Only ask deeply technical questions grounded in the candidate's provided
+   projects and skills.
+2) Never drift off-topic; if the candidate does, steer back politely.
+3) Never reveal or provide answers to your own questions, even if asked.
+4) Ask exactly one technical question per turn.
+5) Prefer implementation details: architecture, trade-offs, debugging, complexity,
+   edge cases.
+
+Language-specific scope enforcement (topic drift is a hard failure):
+You are ONLY allowed to test the candidate's knowledge of the {skill_name}
+language itself. Permitted topics: {core_topics}.
+Forbidden domains: {forbidden_topics}. If an answer touches a forbidden domain,
+acknowledge it in one sentence and redirect to a core {skill_name} question.
+
+Interview flow:
+- Start with a project-specific deep question, then follow up on each answer.
+- Stop after at most 10 questions, or once evidence_confidence >= 0.85 with at
+  least 6 questions asked.
+- When ending, append the {END_INTERVIEW} token at the end of the response.
+\end{lstlisting}
+
+\subsection{AI Interviewer --- Language Mode}
+\label{app:prompts-interview-lang}
+
+The language examiner follows a fixed four-phase script --- introduction, five
+oral questions, a verbatim dictation task, and a closing turn --- so that every
+candidate is assessed under the same conditions. It conducts the whole session
+in the language under test and records errors internally rather than correcting
+them mid-conversation, leaving the CEFR judgement to the separate evaluator.
+
+\begin{lstlisting}[caption={Language examiner system prompt (abridged four-phase flow).},label={lst:prompt-lang}]
+You are a friendly, professional CEFR language examiner conducting a structured
+language proficiency assessment on behalf of a recruitment team. Your evaluation
+is rigorous but fair.
+
+Strict rules:
+1) Conduct the entire interview in the assessed language.
+2) Never discuss technical or IT topics.
+3) Do NOT correct grammar mid-conversation -- note errors internally for evaluation.
+4) Ask exactly one question per turn.
+
+Follow this exact 4-phase structure:
+  PHASE 1 - INTRO: greet the candidate by name, explain that there are no right or
+            wrong answers, then ask the first oral question immediately.
+  PHASE 2 - ORAL: ask 5 fixed questions, one per turn (tasks of the role; skills
+            needed; daily challenges; company values; the value they relate to most).
+  PHASE 3 - WRITING: present the reference paragraph verbatim and ask the candidate
+            to type it exactly.
+  PHASE 4 - CLOSING: thank the candidate, explain next steps, append {END_INTERVIEW}.
+
+Maintain an internal, hidden turn state (phase, oral_questions_asked,
+writing_submitted, cefr_signal). A separate evaluator returns the final CEFR level
+with grammar, vocabulary and fluency sub-scores.
+\end{lstlisting}
+
+%----------------------------------------------------------------------------------------
+
+\section{AI-Assisted Development}
+\label{app:prompts-development}
+
+AI coding assistants were used during implementation as a bounded productivity
+tool, not as a substitute for design. Every architectural decision --- the
+onion layering, the port interfaces, the domain value objects, the matching
+algorithm and the database schema --- was made and specified by the author; the
+assistant was then asked to carry out narrow, well-defined tasks within those
+constraints, and its output was reviewed, adapted and tested before being
+committed. The examples below are representative of that usage: each presupposes
+a design that already existed and asks only for a bounded piece of it.
+
+\begin{lstlisting}[caption={Generating a repository implementation against a port the author defined.},label={lst:dev-repo}]
+I have this port interface in the domain layer (paste of ICandidateRepository
+with its method signatures). Write the Supabase implementation in the
+infrastructure layer. Follow my existing conventions: snake_case database
+columns mapped to camelCase via camelizeKeys/snakeifyKeys, IDs from
+generateId() (crypto.randomUUID), and absolutely no business logic in the
+repository -- it only reads and writes rows.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Implementing a pure algorithm from an explicit specification.},label={lst:dev-jobfit}]
+Write a pure, dependency-free function computeJobFit(job, candidate) that scores
+seven criteria: field of work, experience-in-field, seniority, required skills,
+preferred skills, languages and education. The overall score is the average of
+the APPLICABLE criteria only (skip a criterion when the job states no
+requirement for it), and isEligible is the logical AND of applicable.met. It
+must be synchronous and unit-testable with no I/O.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Generating unit tests for code the author wrote.},label={lst:dev-tests}]
+Here is my job-fit.service.ts (paste). Generate Vitest unit tests covering:
+(1) a fully eligible candidate scoring 100; (2) a candidate who fails one
+required skill and is therefore ineligible; (3) a job with no language
+requirement, where the language criterion is SKIPPED rather than failed and so
+does not lower the overall score. Use the existing test style in tests/.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Targeted debugging of a framework-specific error.},label={lst:dev-debug}]
+A Supabase/PostgREST query with the embedded join
+campaign:promo_campaigns(id, title) returns error PGRST200, even though the
+campaign_id column exists. What is the most likely cause, and what is the
+minimal change to fix it?
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Refactoring scattered logging behind a single utility.},label={lst:dev-logging}]
+Across my src/app/api/** route handlers I currently call console.log / console.error
+directly. Replace those calls with my createLogger(scope) utility from
+@server/infrastructure/logging/logger, choosing a sensible scope name per route
+and keeping the existing log levels. Do not change any control flow.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Writing a Zod schema from a fixed JSON contract.},label={lst:dev-zod}]
+The LLM returns a JSON object with exactly these fields (paste of the CV
+extraction shape). Write the matching Zod schema. Make optional/nullable fields
+accept null, coerce the confidence numbers into the range 0..1, and silently
+drop any fieldsOfWork value that is not one of my 16 canonical strings instead
+of failing the whole parse.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Converting database rows to and from API casing.},label={lst:dev-casing}]
+Write two helper functions, camelizeKeys and snakeifyKeys, that recursively
+convert object keys between snake_case and camelCase. They must NOT recurse into
+a fixed set of JSONB columns (parsedData, evaluationRationale, metadata, result,
+breakdown) -- those values are passed through untouched. Include the key list as
+a parameter with that default.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Implementing a small, security-sensitive utility to a spec.},label={lst:dev-token}]
+Implement an HMAC-SHA256 session token for the interview flow. signToken(payload)
+returns a base64url string "body.signature"; verifyToken(token) recomputes the
+HMAC, compares it in constant time, and rejects the token if it is malformed or
+past its 10-minute expiry. The secret is read from an environment variable at
+call time, not at module load. No third-party JWT library.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Building an accessible UI component from shadcn primitives.},label={lst:dev-ui}]
+Build a "Rank candidates" toolbar dropdown in React with my existing shadcn/ui
+Select component. It lists the HR user's open jobs, persists the chosen job id
+in the URL query string, and calls an onSelect callback. Keep it a controlled
+component, keyboard-navigable, and typed -- no new dependencies.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Writing an idempotent SQL migration for a new feature.},label={lst:dev-sql}]
+Write the SQL migration for the per-job shortlist feature: a job_shortlists table
+with a UNIQUE (job_id, candidate_id), an added_by column, a fit_score_at_add
+snapshot, and a notes field. Use TEXT primary keys, add the foreign keys with ON
+DELETE CASCADE, and make every statement idempotent with IF NOT EXISTS so I can
+re-run it safely in the Supabase SQL editor.
+\end{lstlisting}
+
+Used this way --- bounded tasks, explicit specifications, mandatory review ---
+the assistant accelerated boilerplate, test scaffolding and debugging without
+owning any design decision, and every generated unit was covered by the test
+suite reported in \chapref{cap:validation} before it was accepted.

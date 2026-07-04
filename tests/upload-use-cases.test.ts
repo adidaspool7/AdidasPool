@@ -477,6 +477,182 @@ describe("UploadUseCases", () => {
       }));
     });
   });
+
+  // ────────────────────────────────────────────────────────
+  // Ambassador pitch video
+  // ────────────────────────────────────────────────────────
+
+  describe("uploadAmbassadorVideo", () => {
+    function videoFile(name: string, type: string, sizeBytes: number): File {
+      const f = new File([new ArrayBuffer(8)], name, { type });
+      Object.defineProperty(f, "size", { value: sizeBytes });
+      return f;
+    }
+
+    it("rejects a non-video format", async () => {
+      const f = videoFile("clip.gif", "image/gif", 1024);
+      await expect(useCases.uploadAmbassadorVideo(f, "c-1")).rejects.toThrow(/Invalid video format/);
+    });
+
+    it("rejects a video above the size limit", async () => {
+      const f = videoFile("big.mp4", "video/mp4", 200 * 1024 * 1024);
+      await expect(useCases.uploadAmbassadorVideo(f, "c-1")).rejects.toThrow(/too large/);
+    });
+
+    it("stores a valid video under the candidate path", async () => {
+      const f = videoFile("pitch.mp4", "video/mp4", 5 * 1024 * 1024);
+      const { url } = await useCases.uploadAmbassadorVideo(f, "c-1");
+      expect(url).toContain("resume.pdf"); // mock storage returns fixed URL
+      expect(storage.uploadFile).toHaveBeenCalledWith(f, "ambassador-videos/c-1/pitch.mp4");
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Parsing job management
+  // ────────────────────────────────────────────────────────
+
+  describe("parsing job management", () => {
+    it("getParsingJob returns the job or throws when missing", async () => {
+      const job = await useCases.getParsingJob("job-1");
+      expect(job.id).toBe("job-1");
+
+      parsingJobRepo.findById = vi.fn().mockResolvedValue(null);
+      await expect(useCases.getParsingJob("x")).rejects.toThrow(ValidationError);
+    });
+
+    it("getRecentParsingJobs delegates with the limit", async () => {
+      await useCases.getRecentParsingJobs(5);
+      expect(parsingJobRepo.findRecent).toHaveBeenCalledWith(5);
+    });
+
+    it("cancelJob signals a PROCESSING job", async () => {
+      parsingJobRepo.findById = vi.fn().mockResolvedValue({ id: "job-1", status: "PROCESSING" });
+      const res = await useCases.cancelJob("job-1");
+      expect(res.cancelled).toBe(true);
+    });
+
+    it("cancelJob fails a QUEUED job immediately", async () => {
+      parsingJobRepo.findById = vi.fn().mockResolvedValue({ id: "job-1", status: "QUEUED" });
+      const res = await useCases.cancelJob("job-1");
+      expect(res.cancelled).toBe(true);
+      expect(parsingJobRepo.updateStatus).toHaveBeenCalledWith("job-1", "FAILED");
+    });
+
+    it("cancelJob is a no-op for terminal jobs and throws when missing", async () => {
+      parsingJobRepo.findById = vi.fn().mockResolvedValue({ id: "job-1", status: "COMPLETED" });
+      expect((await useCases.cancelJob("job-1")).cancelled).toBe(false);
+
+      parsingJobRepo.findById = vi.fn().mockResolvedValue(null);
+      await expect(useCases.cancelJob("x")).rejects.toThrow(ValidationError);
+    });
+
+    it("recoverStaleJobs delegates the threshold", async () => {
+      await useCases.recoverStaleJobs(30);
+      expect(parsingJobRepo.recoverStaleJobs).toHaveBeenCalledWith(30);
+    });
+
+    it("deleteParsingJob refuses running jobs and deletes terminal ones", async () => {
+      parsingJobRepo.findById = vi.fn().mockResolvedValue({ id: "job-1", status: "PROCESSING" });
+      await expect(useCases.deleteParsingJob("job-1")).rejects.toThrow(/cancel it first/);
+
+      parsingJobRepo.findById = vi.fn().mockResolvedValue({ id: "job-1", status: "COMPLETED" });
+      const res = await useCases.deleteParsingJob("job-1");
+      expect(res.deleted).toBe(true);
+      expect(parsingJobRepo.delete).toHaveBeenCalledWith("job-1");
+
+      parsingJobRepo.findById = vi.fn().mockResolvedValue(null);
+      await expect(useCases.deleteParsingJob("x")).rejects.toThrow(ValidationError);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // prepareBulkUpload / processBulkUpload
+  // ────────────────────────────────────────────────────────
+
+  describe("bulk upload phases", () => {
+    it("prepareBulkUpload creates a parsing job for plain files", async () => {
+      const files = [createMockFile("a.pdf"), createMockFile("b.pdf")];
+      const res = await useCases.prepareBulkUpload(files);
+      expect(res.jobId).toBe("job-1");
+      expect(res.totalFiles).toBe(2);
+      expect(parsingJobRepo.create).toHaveBeenCalledWith({ totalFiles: 2, fileName: "2 files" });
+    });
+
+    it("prepareBulkUpload rejects an empty file list", async () => {
+      await expect(useCases.prepareBulkUpload([])).rejects.toThrow("No files provided");
+    });
+
+    it("processBulkUpload marks PROCESSING then a terminal status", async () => {
+      const { jobId, fileEntries } = await useCases.prepareBulkUpload([createMockFile("a.pdf")]);
+      await useCases.processBulkUpload(jobId, fileEntries);
+      expect(parsingJobRepo.updateStatus).toHaveBeenNthCalledWith(1, jobId, "PROCESSING");
+      const lastStatus = (parsingJobRepo.updateStatus as any).mock.calls.at(-1)[1];
+      expect(["COMPLETED", "FAILED"]).toContain(lastStatus);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Motivation letter / learning agreement
+  // ────────────────────────────────────────────────────────
+
+  describe("uploadMotivationLetter", () => {
+    it("rejects an unsupported file type", async () => {
+      const f = createMockFile("letter.png", "image/png", 0.2);
+      await expect(useCases.uploadMotivationLetter(f)).rejects.toThrow(ValidationError);
+    });
+
+    it("stores the letter, extracts text, and updates the candidate", async () => {
+      const f = createMockFile("letter.pdf", "application/pdf", 0.5);
+      const res = await useCases.uploadMotivationLetter(f, "c-1");
+      expect(res.url).toBeDefined();
+      expect(res.extractedText).toContain("Maria Garcia");
+      expect(candidateRepo.update).toHaveBeenCalledWith(
+        "c-1",
+        expect.objectContaining({ motivationLetterUrl: res.url })
+      );
+    });
+
+    it("swallows text-extraction failures", async () => {
+      extraction.extractText = vi.fn().mockRejectedValue(new Error("bad"));
+      const f = createMockFile("letter.pdf", "application/pdf", 0.5);
+      const res = await useCases.uploadMotivationLetter(f);
+      expect(res.extractedText).toBe("");
+    });
+  });
+
+  describe("uploadLearningAgreement", () => {
+    const updateApplication = vi.fn(async (id: string, data: Record<string, unknown>) => ({ id, ...data }));
+
+    beforeEach(() => updateApplication.mockClear());
+
+    it("rejects an unsupported file type", async () => {
+      const f = createMockFile("la.txt", "text/plain", 0.1);
+      await expect(
+        useCases.uploadLearningAgreement(f, { candidateId: "c-1" }, updateApplication)
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it("requires a target", async () => {
+      const f = createMockFile("la.pdf", "application/pdf", 0.5);
+      await expect(
+        useCases.uploadLearningAgreement(f, {}, updateApplication)
+      ).rejects.toThrow(/applicationId or candidateId/);
+    });
+
+    it("attaches to an application when applicationId is given", async () => {
+      const f = createMockFile("la.pdf", "application/pdf", 0.5);
+      const res = await useCases.uploadLearningAgreement(f, { applicationId: "app-1" }, updateApplication);
+      expect(res.targetType).toBe("application");
+      expect(updateApplication).toHaveBeenCalledWith("app-1", { learningAgreementUrl: res.url });
+    });
+
+    it("attaches to a candidate when only candidateId is given", async () => {
+      const f = createMockFile("la.pdf", "application/pdf", 0.5);
+      const res = await useCases.uploadLearningAgreement(f, { candidateId: "c-1" }, updateApplication);
+      expect(res.targetType).toBe("candidate");
+      expect(candidateRepo.update).toHaveBeenCalledWith("c-1", { learningAgreementUrl: res.url });
+    });
+  });
 });
 
 // ─── ValidationError class ──────────────────────────────────────

@@ -1,7 +1,7 @@
-\chapter{Implementation}
+﻿\chapter{Implementation}
 \label{cap:implementation}
 
-This chapter describes how the design of Chapter~\ref{cap:design} was built.
+This chapter describes how the design of \chapref{cap:design} was built.
 It states the technology stack and its rationale, the layout of the
 codebase, and then walks through the principal modules of TalentHub --- the
 talent pool, the CV parsing pipeline, jobs and matching, the AI interviewer
@@ -19,7 +19,9 @@ developer experience, type-safety integration with TypeScript, compatibility
 with Vercel's serverless runtime, and the ability to run on free or student
 tiers. The stack deliberately avoids heavyweight enterprise infrastructure
 (Kubernetes, message queues, microservices) in favour of a right-sized
-single application. Table~\ref{tab:tech-stack} summarises the choices.
+single application built on Next.js \parencite{NextjsDocs}, TypeScript
+\parencite{Bierman2014TypeScript} and Supabase \parencite{SupabaseDocs}.
+\tabref{tab:tech-stack} summarises the choices.
 
 \begin{table}[ht]
 \centering
@@ -32,12 +34,12 @@ single application. Table~\ref{tab:tech-stack} summarises the choices.
 \midrule
 Framework & Next.js 16 (App Router), TypeScript & One codebase for UI and API; file-based routing; Vercel-native \\
 UI & shadcn/ui + Tailwind CSS & Accessible primitives without a heavy framework \\
-Authentication & Supabase Auth (Google OAuth) & Managed identity; role claim in the JWT \\
+Authentication & Supabase Auth (Google OAuth) & Managed identity; role claim in the \gls{jwt} \\
 Database & Supabase PostgreSQL (no ORM) & Relational domain; direct typed client \\
 Storage & Supabase Storage & Uploaded CV files \\
 LLM & Groq Llama 3.3 70B (primary), OpenAI GPT-4o (fallback) & Free-tier primary with a reliability fallback \\
 Validation & Zod & Runtime validation of all external/LLM input \\
-Email & Resend & Assessment invitations and outreach \\
+Email & Resend & HR-to-candidate outreach (live delivery pending sender-domain verification) \\
 Charts & Recharts & Analytics dashboards \\
 Testing & Vitest + V8 coverage & Fast, ESM-native unit testing \\
 Interviewer & Python FastAPI (sidecar) & Separate process for conversational AI \\
@@ -83,14 +85,14 @@ Outside \texttt{src/}, \texttt{tests/} holds the Vitest suite,
 \texttt{supabase/migrations/} the canonical schema, and \texttt{scripts/}
 the operational backfill utilities.
 
-Table~\ref{tab:feature-inventory} gives a consolidated view of the
+\tabref{tab:feature-inventory} gives a consolidated view of the
 implemented feature set, so that the per-module sections that follow can be
 read against the whole. The platform reached a state in which the
 requirements designated \emph{must-have} and \emph{should-have} in
-Chapter~\ref{cap:analysis} are implemented; two items (a structured
+\chapref{cap:analysis} are implemented; two items (a structured
 improvement-track flow and a dedicated bias-detection module) remain
 placeholders and are carried forward as future work in
-Chapter~\ref{cap:conclusions}.
+\chapref{cap:conclusions}.
 
 \begin{table}[ht]
 \centering
@@ -128,26 +130,24 @@ free-text recruiter notes. A use case in the Application layer orchestrates
 each operation and delegates persistence to a candidate repository through
 its port, so the route handlers stay thin and the business rules stay
 testable. Search terms supplied by the user are escaped before they reach the
-PostgREST \texttt{.or()} filter (Section~\ref{sec:impl-code}), closing the
-injection vector found during the audit.
+PostgREST \texttt{.or()} filter (\secref{sec:impl-code}), closing the
+injection vector found during a security review.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{talent-pool.png}
-\caption[HR talent pool]{The HR talent pool: searchable, filterable candidate
-list with quality and (job-anchored) fit columns.}
+\includegraphics[width=0.95\linewidth]{figure5_1}
+\caption[HR talent pool]{The HR talent pool.}
 \label{fig:ss-pool}
 \end{figure}
 
-Figure~\ref{fig:ss-profile} shows the per-candidate view a recruiter opens
+\figref{fig:ss-profile} shows the per-candidate view a recruiter opens
 from the pool, consolidating the parsed profile, recruiter notes and the
 interaction-history timeline in one place.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{candidate-profile.png}
-\caption[Candidate profile]{Candidate profile, consolidating parsed CV data,
-recruiter notes, shortlist membership and interaction history.}
+\includegraphics[width=0.95\linewidth]{figure5_2}
+\caption[Candidate profile]{The candidate profile view.}
 \label{fig:ss-profile}
 \end{figure}
 
@@ -172,12 +172,15 @@ information, experiences (each with a job title, company, dates, current-role
 flag and a field-of-work tag), education, self-declared language levels and
 categorised skills, using the provider's JSON mode. Two failure modes
 dominate and are handled explicitly: \textbf{schema drift}, where the model
-returns slightly malformed or invented fields --- absorbed by the tolerant
-Zod schema and the single retry --- and \textbf{provider rate limits or
-outages}, absorbed by retrying the same request against the OpenAI fallback.
+returns slightly malformed or invented fields --- absorbed by the schema's
+tolerant coercion rather than a hard rejection --- and \textbf{provider rate limits or
+outages}, absorbed by retrying the same request against the fallback provider.
 A telemetry row is written per extraction for observability. For bulk
 uploads, a \texttt{parsing\_jobs} row tracks parsed, failed and total counts
-so that HR can monitor progress by polling.
+so that HR can monitor progress by polling; any per-file failures are
+recorded in an \texttt{error\_log} array (filename and error message per
+entry) and surfaced in the upload UI as an expandable list, without
+aborting the rest of the batch.
 
 The deduplication stage (step seven) deserves a closer look because the same
 person frequently re-applies across campaigns, and silently creating a
@@ -192,7 +195,7 @@ is that the comparison is currently accent-sensitive, so spellings that differ
 only in diacritics (for example \emph{Jo\~ao} versus \emph{Joao}) are not
 recognised as the same person; closing this gap requires accent-insensitive
 matching at the database level, as noted in
-Appendix~\ref{app:db-candidates}. On a confirmed merge the candidate's related
+\appref{app:db-candidates}. On a confirmed merge the candidate's related
 records (experiences, education, languages and skills) are replaced wholesale
 in a single operation rather than appended, so re-uploading an updated CV
 refreshes the profile instead of accumulating stale rows. Bulk processing
@@ -204,9 +207,8 @@ processing for more than ten minutes as failed.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{cv-upload.png}
-\caption[CV upload]{CV upload entry point. A single self-upload or an HR bulk
-/ ZIP upload both feed the same nine-stage parsing pipeline.}
+\includegraphics[width=0.95\linewidth]{figure5_3}
+\caption[CV upload]{The CV upload entry point.}
 \label{fig:ss-upload}
 \end{figure}
 
@@ -217,9 +219,8 @@ Automated extraction is never perfect, and the failure that matters is the
 \emph{silent} one: a CV that parses into a plausible-looking record with the
 wrong name, a dropped e-mail or mis-attributed dates pollutes deduplication,
 search and every downstream score without anyone noticing. The pipeline
-therefore attaches a \textbf{parse-confidence} object to every extraction and
-uses it to route uncertain results to a human rather than trusting them
-blindly. Two complementary signals feed it.
+therefore attaches a \textbf{parse-confidence} object to every extraction, fed
+by two complementary signals.
 
 The first is the model's own self-assessment. The structured-output prompt
 asks the model to return, alongside the extracted fields, an
@@ -270,9 +271,9 @@ pipeline records, a representative call carries roughly 1{,}800 input
 tokens (the structured-output system prompt plus a one-to-two-page CV) and
 returns roughly 900 output tokens of JSON. Job-description extraction is
 comparable but slightly cheaper and far less frequent, so CV volume is the
-right unit to reason about. Table~\ref{tab:parse-cost} applies the mid-2026
+right unit to reason about. \tabref{tab:parse-cost} applies the mid-2026
 published list prices of three small/fast models to that token profile, and
-Figure~\ref{fig:parse-cost} plots the cumulative cost as the number of parsed
+\figref{fig:parse-cost} plots the cumulative cost as the number of parsed
 CVs grows.
 
 \begin{table}[ht]
@@ -286,10 +287,10 @@ exclude the AI Interviewer.}
 \toprule
 \textbf{Model} & \textbf{\$/CV} & \textbf{1k CVs} & \textbf{10k CVs} & \textbf{100k CVs} \\
 \midrule
-OpenAI GPT-4o-mini & 0.0008 & 0.81 & 8.10 & 81 \\
-Groq Llama 3.3 70B \textit{(primary)} & 0.0018 & 1.77 & 17.73 & 177 \\
-Anthropic Claude 3.5 Haiku & 0.0050 & 5.04 & 50.40 & 504 \\
-OpenAI GPT-4o \textit{(fallback)} & 0.0135 & 13.50 & 135 & 1350 \\
+OpenAI GPT-4o-mini & 0.00081 & 0.81 & 8.10 & 81 \\
+Groq Llama 3.3 70B \textit{(primary)} & 0.00177 & 1.77 & 17.73 & 177 \\
+Anthropic Claude 3.5 Haiku & 0.00504 & 5.04 & 50.40 & 504 \\
+OpenAI GPT-4o \textit{(fallback)} & 0.01350 & 13.50 & 135 & 1350 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -319,11 +320,7 @@ OpenAI GPT-4o \textit{(fallback)} & 0.0135 & 13.50 & 135 & 1350 \\
 \end{axis}
 \end{tikzpicture}
 \caption[Parsing cost scaling]{Cumulative CV-parsing cost as volume grows, for
-three candidate providers. The lines are linear because cost scales directly
-with tokens; what differs is the slope. The production fallback (GPT-4o) is
-omitted from the plot for readability --- at roughly \$1{,}350 per
-100{,}000 CVs it is about seven times the primary, which is precisely why
-it is reserved for failover rather than used as the default.}
+three candidate providers.}
 \label{fig:parse-cost}
 \end{figure}
 
@@ -334,25 +331,23 @@ hundred dollars on the primary model, and under a hundred on GPT-4o-mini.
 Second, the slopes diverge sharply with scale, so provider choice is a
 genuine architectural lever rather than a rounding error once the platform is
 shared across teams or sites. Third, the Groq-primary / OpenAI-fallback design
-(Section~\ref{sec:concl-ai}) is defensible on cost as well as reliability: the
-primary sits in the low-cost band with a generous free tier and high
-throughput, while the markedly more expensive fallback is engaged only when
-the primary is rate-limited or unavailable, bounding the worst case rather
-than paying for it continuously.
+(\secref{sec:concl-ai}) is defensible on cost as well as reliability. The
+primary sits firmly in the low-cost band: as \tabref{tab:parse-cost} shows,
+GPT-4o-mini is in fact marginally cheaper per CV, but Groq was chosen for its
+generous free tier and high throughput, which keep both options negligible at
+single-team volume. The fallback deliberately uses the larger GPT-4o ---
+markedly more expensive per token --- but it is engaged only when the primary
+is rate-limited or unavailable, so the platform bounds its worst-case cost
+rather than paying that premium continuously.
 
-Cost is only one axis of scalability; wall-clock time is the other. Bulk
-uploads are processed serially in a background task started after the HTTP
-response is returned (Section~\ref{sec:impl-cv}), with a short throttle
-between files to stay within the provider's rate limits. Budgeting each CV
-conservatively at around five seconds end-to-end --- text extraction, a single
-LLM call and the inter-file throttle combined --- a background run completed
-within a safe fifteen-minute window processes on the order of 150--180 CVs.
-This comfortably covers a single recruiter's realistic intake, but it means
-the hard cap of 500 files per batch cannot always finish inside one
-background window; very large imports should be split across batches, or
-offloaded to a durable queue with a dedicated worker. That durable-queue
-architecture is recorded as future work in
-Chapter~\ref{cap:conclusions}.
+Cost is only one axis of scalability; wall-clock time is the other. Because
+bulk uploads are processed serially in the background task of
+\secref{sec:impl-cv} and each CV takes roughly five seconds end-to-end, a
+single run within the ten-minute stale-job window handles on the order of
+100--120 CVs --- enough for a recruiter's realistic intake, but short of the
+500-file batch cap, which very large imports must therefore split across
+batches or offload to a durable queue (recorded as future work in
+\chapref{cap:conclusions}).
 
 %----------------------------------------------------------------------------------------
 
@@ -364,8 +359,16 @@ The engine is a pure domain service: the same input always produces the same
 output, which is the property the client asked for under the heading of
 transparency. The overall score is a weighted sum of five components, each
 normalised to the range $0$--$100$, as set out in
-Table~\ref{tab:cv-scoring}. Language proficiency carries the largest single
-weight, reflecting the platform's purpose as a language-verification layer.
+\tabref{tab:cv-scoring}. Language proficiency carries the largest weight of any
+single criterion ($35\%$), reflecting the platform's purpose as a
+language-verification layer. Two of the components touch professional
+experience from different angles: the $25\%$ \emph{Experience} weight stands
+in for role-relevant experience --- only meaningful once a specific job is in
+play, where the job-anchored fit (\secref{sec:impl-jobs}) replaces it with
+\gls{llm}-assessed relevance --- while the $10\%$ \emph{Years of experience}
+weight rewards raw tenure. In the generic, job-agnostic score the former is
+proxied by the latter, which is why the worked example below scores both
+alike.
 
 \begin{table}[ht]
 \centering
@@ -377,7 +380,7 @@ weight, reflecting the platform's purpose as a language-verification layer.
 \textbf{Component} & \textbf{Weight} & \textbf{Calculation} \\
 \midrule
 Languages & 35\% & English proficiency in points (C2 35, C1 30, B2 20, B1 10, A2 5, A1 2), plus a Portuguese bonus (C2 25 down to A1 2) and $+10$ for each additional language at B2 or above (capped at $+30$); the total is clamped to $0$--$100$. A foreign candidate with no English is penalised and flagged for review. \\
-Experience & 25\% & In the generic CV score this is proxied by years of experience; the job-anchored fit (Section~\ref{sec:impl-jobs}) replaces it with LLM-assessed relevance to a specific role. \\
+Experience & 25\% & In the generic CV score this is proxied by years of experience; the job-anchored fit (\secref{sec:impl-jobs}) replaces it with LLM-assessed relevance to a specific role. \\
 Education level & 15\% & Lookup: PhD 100, master 80, bachelor 60, vocational 40, high school 20, other 30 \\
 Location match & 15\% & Distance from the adidas Porto site (Maia): same city $\approx 100$, decaying with distance to a floor of 10 within Portugal and Spain, and 0 outside that region \\
 Years of experience & 10\% & $\min(100, (\text{years}/10)\times 100)$ --- ten years counts as full marks \\
@@ -387,21 +390,26 @@ Years of experience & 10\% & $\min(100, (\text{years}/10)\times 100)$ --- ten ye
 
 The formula is $\text{overall} = \sum_i (\text{component}_i \times w_i)$. A
 candidate with seven years of experience, a master's degree, based in Porto
-and fluent in English (C1) and Portuguese (C2) --- a language score of $60$ ---
+and fluent in English (C1) and Portuguese (C2) --- a language score of $55$ ---
 therefore scores
-$70\times0.25 + 70\times0.10 + 80\times0.15 + 100\times0.15 + 60\times0.35
-\approx 73$, while a one-year bachelor in a different city with only basic
+$70\times0.25 + 70\times0.10 + 80\times0.15 + 100\times0.15 + 55\times0.35
+\approx 71$, while a one-year bachelor in a different city with only basic
 English scores roughly $16$ --- a spread that separates the pool without ever
 obscuring how it was produced. A candidate whose overall score falls inside
 the $45$--$60$ band is flagged as \emph{borderline}, marking them as close to
 the threshold and a natural candidate for an improvement track.
 
-The same weighted-sum approach scores the language assessment, averaging five
-rubric sub-scores (grammar, vocabulary, clarity, fluency and customer
-handling) at equal weight, and a banded lookup maps the resulting number onto
+One simplification in this component is deliberate: location distance is
+measured from a single hardcoded origin, the adidas GBS site in Maia. The
+rationale for the choice and the point at which it becomes a real limitation
+are examined in \secref{sec:concl-partial}.
+
+The same weighted-sum approach scores the language assessment, averaging the
+three CEFR sub-scores (grammar, vocabulary and fluency) at equal weight, and a
+banded lookup maps the resulting number onto
 a CEFR level (for instance, $\geq 78$ maps to C1 and $\geq 65$ to B2). Both
 the component weights and the assessment weights are domain value objects
-(Section~\ref{sec:design-domain}) and are persisted in editable
+(\secref{sec:design-domain}) and are persisted in editable
 \texttt{scoring\_weights} and \texttt{scoring\_presets} tables, so a recruiter
 can retune the model without a code change.
 
@@ -414,7 +422,7 @@ Jobs are created and edited by HR or ingested by a scraper that collects
 real listings from the adidas careers portal (used to populate a realistic
 demonstration dataset). Because a full portal sync can take the better part of
 a minute, it reuses the same fire-and-forget pattern as the bulk CV upload
-(Section~\ref{sec:impl-cv}): the route returns \texttt{202\,Accepted} with a
+(\secref{sec:impl-cv}): the route returns \texttt{202\,Accepted} with a
 sync identifier and runs the scrape through the Next.js \texttt{after()}
 primitive, recording progress in a \texttt{sync\_jobs} row that the client
 polls. The work therefore continues server-side regardless of the browser, so
@@ -424,29 +432,23 @@ the portal: scraped jobs that are no longer listed are marked closed, while
 manually-created jobs are left untouched. When an HR user first opens a job's
 ranking screen,
 its description is parsed lazily into the versioned requirements schema and
-cached. The orchestrator \texttt{matchCandidatesToJob} then loads the
-candidate pool with their experiences, languages, education and skills,
-builds the per-field experience vector each candidate needs, runs the pure
-\texttt{computeJobFit} for every candidate, and persists the top results into
-the \texttt{job\_matches} cache. The \texttt{match-candidates} screen renders
+cached. The orchestrator \texttt{matchCandidatesToJob} then runs the matching
+flow designed in \secref{sec:design-matching} (\figref{fig:match-flow}) ---
+loading the candidate pool, running the pure \texttt{computeJobFit} for each,
+and persisting the top results into the \texttt{job\_matches} cache. The \texttt{match-candidates} screen renders
 the ranking with the per-criterion breakdown, and a per-job
 \texttt{job\_shortlists} table records the recruiter's working pick list,
 snapshotting the fit score at the moment a candidate is added so that later
 re-ranking does not rewrite history.
 
-A subtle implementation point lives in the bridge that converts a persisted
-database row into the matcher's input type. An early version read the wrong
-property for the job title, which silently emptied the evidence text used for
-title-based seniority matching; the defect was invisible because the pure
-matcher itself was correct. It is now fixed and locked by the
-\texttt{job-matching-bridge} tests of Chapter~\ref{cap:validation}, and it is
-the concrete basis for the testing lesson in Chapter~\ref{cap:conclusions}.
+A subtle defect in the bridge that converts a persisted database row into the
+matcher's input type --- and the regression suite that now locks it down --- is
+discussed with the testing lesson in \chapref{cap:validation}.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{job-ranking.png}
-\caption[Job-anchored ranking]{The job-anchored ranking screen, showing fit
-scores with the per-criterion breakdown and the eligibility flag.}
+\includegraphics[width=0.95\linewidth]{figure5_5}
+\caption[Job-anchored ranking]{The job-anchored ranking screen.}
 \label{fig:ss-ranking}
 \end{figure}
 
@@ -472,10 +474,8 @@ production.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{ai-interview.png}
-\caption[AI interview]{The candidate-facing AI interview popup, with camera,
-live speech transcript and chat. The conversational engine is the second
-team member's contribution; the figure shows the integration surface.}
+\includegraphics[width=0.95\linewidth]{figure5_6}
+\caption[AI interview]{The candidate-facing AI interview popup.}
 \label{fig:ss-interview}
 \end{figure}
 
@@ -510,22 +510,19 @@ validated specification, and a single universal renderer turns the resulting
 \texttt{\{label, value\}} series into a bar, line, area, pie or stat chart.
 Saved widgets are stored per user. This design gives HR analytical freedom
 while making it impossible to express an injected or malformed query
-(Chapter~\ref{cap:validation}).
+(\chapref{cap:validation}).
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{analytics-dashboard.png}
-\caption[Analytics dashboard]{The analytics dashboard: seven built-in charts
-above the user's saved custom widgets.}
+\includegraphics[width=0.95\linewidth]{figure5_7}
+\caption[Analytics dashboard]{The analytics dashboard.}
 \label{fig:ss-analytics}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{analytics-widget-builder.png}
-\caption[Custom-widget builder]{The constrained custom-widget builder: metric,
-dimension, chart type and filters are picked from a validated catalogue with a
-live preview.}
+\includegraphics[width=0.95\linewidth]{figure5_8}
+\caption[Custom-widget builder]{The constrained custom-widget builder.}
 \label{fig:ss-widget}
 \end{figure}
 
@@ -535,7 +532,7 @@ live preview.}
 \label{sec:impl-engagement}
 
 Beyond the core screening pipeline, TalentHub implements the attract-and-retain
-side of the framework (Chapter~\ref{cap:analysis}) through four further
+side of the framework (\chapref{cap:analysis}) through six further
 modules.
 
 \paragraph{Welcome and onboarding page.}
@@ -543,14 +540,12 @@ At the request of the client's design team, the application opens on a branded
 welcome page that orients each visitor before authentication and, after Google
 sign-in, routes them to the dashboard appropriate to their role. It states the
 platform's purpose in adidas terms and presents the two entry paths ---
-recruiter and candidate --- so that neither persona is shown controls it
-cannot use.
+recruiter and candidate.
 
 \begin{figure}[ht]
 \centering
-\screenshotplaceholder{welcome-page.png}
-\caption[Welcome page]{The branded welcome page requested by the design team,
-shown before authentication.}
+\includegraphics[width=0.95\linewidth]{figure5_9}
+\caption[Welcome page]{The branded welcome page.}
 \label{fig:ss-welcome}
 \end{figure}
 
@@ -560,14 +555,13 @@ its end-user documentation inside the product rather than as a separate
 artefact. A \emph{User guide} entry in the sidebar opens a role-aware help
 dialog that renders one of two curated guides --- sixteen sections for the HR
 manager and twelve for the candidate --- selected from the same role context
-that drives the rest of the navigation, so each persona sees only the features
-it can actually use. The dialog provides a table of contents with scroll-spy
+that drives the rest of the navigation. The dialog provides a table of contents with scroll-spy
 highlighting that tracks the reader's position through the document, letting a
 user jump directly to a feature (CV upload, job matching, assessments, data
 export, and so on) and learn it without leaving the page they are working on.
 Because the guide lives next to the running application, it stays consistent
 with the deployed feature set and reinforces the same role boundaries enforced
-by the middleware (Section~\ref{sec:impl-auth}).
+by the middleware (\secref{sec:impl-auth}).
 
 \paragraph{Ambassador programs.}
 HR can publish brand-ambassador programs (with a cohort, deadline, location,
@@ -578,11 +572,10 @@ the talent pool stay in sync. Programs move through a draft/open/closed
 lifecycle and applications through a submitted/under-review/accepted/rejected
 flow.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
-\screenshotplaceholder{ambassador-programs.png}
-\caption[Ambassador programs]{HR management of brand-ambassador programs and
-their applications.}
+\includegraphics[width=0.5\linewidth]{figure5_10}
+\caption[Ambassador programs]{HR management of brand-ambassador programs.}
 \label{fig:ss-ambassador}
 \end{figure}
 
@@ -590,7 +583,7 @@ their applications.}
 When an assessment ends in a failing decision, the system auto-creates an
 improvement track for the candidate, with progress entries that record
 targeted development. This is the mechanism behind the borderline branch of
-the lifecycle state machine (Section~\ref{sec:design-domain}); the structured
+the lifecycle state machine (\secref{sec:design-domain}); the structured
 candidate-facing flow over it remains the partial item carried to future work.
 
 \paragraph{Candidate segments.}
@@ -598,20 +591,19 @@ HR can group candidates into named segments for targeted outreach and
 analysis, with each segment holding an explicit membership set. Segments feed
 the preference-aware campaign targeting described above, letting a campaign
 reach exactly the intended cohort. The candidate's own portal
-(Figure~\ref{fig:ss-portal}) exposes only the self-service side of all this:
+(\figref{fig:ss-portal}) exposes only the self-service side of all this:
 profile, CV upload, applications and assessments.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
-\screenshotplaceholder{candidate-portal.png}
-\caption[Candidate portal]{The candidate self-service portal: profile, CV
-upload, applications and assessments.}
+\includegraphics[width=0.95\linewidth]{figure5_11}
+\caption[Candidate portal]{The candidate self-service portal.}
 \label{fig:ss-portal}
 \end{figure}
 
 \paragraph{Candidate self-service.}
 The portal implements the full candidate journey of the use-case model
-(Section~\ref{sec:analysis-usecases}). A candidate enters either on their own
+(\secref{sec:analysis-usecases}). A candidate enters either on their own
 initiative through Google sign-in or by accepting an HR invitation, and from
 the settings view manages personal contact details and per-type notification
 preferences. Beyond the CV, the candidate can upload and replace two further
@@ -653,7 +645,7 @@ factory that replaced raw \texttt{console} calls across the API routes. It
 emits scoped, structured records and redacts personally identifiable
 information --- e-mail addresses and tokens are masked --- so that logs
 shipped to the hosting platform do not leak candidate data, a property pinned
-by the redaction tests of Chapter~\ref{cap:validation}. The CV and
+by the redaction tests of \chapref{cap:validation}. The CV and
 job-description parsers additionally write per-call telemetry rows, giving a
 queryable view of provider reliability, latency and token cost.
 
@@ -669,7 +661,7 @@ mirrors the first step, since a full production build depends on
 deployment-only environment variables. Deployment is handled by Vercel, which
 builds with Turbopack and provisions a preview deployment per change, so the
 live deployment is always the demonstrable product increment referred to in
-Chapter~\ref{cap:analysis}. A repository policy (\texttt{legacy-peer-deps})
+\chapref{cap:analysis}. A repository policy (\texttt{legacy-peer-deps})
 keeps installs reproducible by pinning peers explicitly where they are only
 transitively required.
 
