@@ -1469,3 +1469,61 @@ application prompts in full.
 Applied this session: **D1, D2, D3, D4, D5, D6, T1, T2, C1, I1** — all ten items.
 No item deferred. Report edits are `.tex`/`.md` only — no TS/CI/deploy impact;
 validation is a LaTeX recompile in Overleaf (pdfLaTeX → biber → pdfLaTeX ×2).
+
+---
+
+## Tenth pass — cross-reference & naming consistency sweep — 2026-07-04
+
+Full re-read of all seven chapters + Appendix D after the ninth-pass edits,
+looking specifically for consistency slips the prose passes don't catch
+(cross-reference macros, entity naming, residual enumerations).
+
+| Finding | Location | Severity | Status |
+|---|---|---|---|
+| **X1. Raw `\ref` instead of the `\tabref` macro** | ch4 §design-overview | Low | ✅ Done |
+| **X2. Stray "AI Skill Interviewer" (vs canonical "AI Interviewer")** | ch6 §val-unit module-ownership note | Low | ✅ Done |
+| **X3. CEFR triad still spelled out in ch1 objectives** | ch1 §objectives item 4 | Low | ✅ Done (trimmed to "with sub-scores") |
+| **X4. `Chapters~\ref{}...\ref{}` plural dual-chapter ref** | ch7 §concl-goals item 3 | Low | Kept (intentional plural form) |
+
+#### X1 — raw `\ref` → `\tabref` (ch4 §design-overview)
+
+**Edit applied (2026-07-04).** The container-table sentence read "Table
+\ref{tab:containers} summarises the containers…", the only bare `\ref` for a
+table anywhere in the chapters (every other table reference uses the
+`\tabref{}` macro, which renders "Table~N"). Replaced with
+`\tabref{tab:containers}` so the whole report goes through the same
+cross-reference macros uniformly.
+
+#### X2 — "AI Skill Interviewer" → "AI Interviewer" (ch6)
+
+**Edit applied (2026-07-04).** The module-ownership note called the integration
+"the AI Skill Interviewer integration"; the canonical entity name used
+everywhere else (ch1 §team, ch4 §design-interviewer, ch5 §impl-interviewer, the
+container table) is "AI Interviewer". Normalised to "the AI Interviewer
+integration". (Appendix D's "technical-skill interviewer" is a different,
+legitimate usage — it names the *technical mode*, not the entity — and was left.)
+
+#### X3 — CEFR "grammar, vocabulary and fluency" triad in ch1 objectives (✅ Done — trimmed)
+
+The ninth-pass D2 sweep kept the CEFR sub-score enumeration canonical in
+**ch5 §impl-scoring** (where the averaging is computed) and reduced it to "with
+sub-scores" everywhere it was merely echoed. One full triad survived outside
+impl-scoring: **ch1 §objectives item 4**. **Edit applied (2026-07-04):** trimmed
+"a CEFR level with grammar, vocabulary and fluency sub-scores" → "a CEFR level
+with sub-scores", so the enumeration now lives in exactly one home (impl-scoring).
+(ch4 §value-objects' "grammar, vocabulary, clarity, fluency and customer
+handling" is a *different*, five-item general-assessment rubric, not the CEFR
+triad — correctly disambiguated by I1, and left as-is.)
+
+#### X4 — `Chapters~\ref{cap:design} and~\ref{cap:validation}` (ch7, kept)
+
+Not an error: `\chapref` renders the singular "Chapter~N", whereas this is a
+deliberate *plural* dual reference ("Chapters~N and~M"). Using bare `\ref` here
+is the correct way to keep the plural; left unchanged.
+
+### Tenth-pass outcome (2026-07-04)
+
+Applied: **X1, X2, X3** (macro + naming + single-home consistency). Kept: **X4**
+(intentional plural). No prose-content or structural changes — this pass was
+purely a consistency sweep. Report edits are `.tex`/`.md` only;
+validation is a LaTeX recompile in Overleaf.
