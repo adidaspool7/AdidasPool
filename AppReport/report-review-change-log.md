@@ -1527,3 +1527,76 @@ Applied: **X1, X2, X3** (macro + naming + single-home consistency). Kept: **X4**
 (intentional plural). No prose-content or structural changes — this pass was
 purely a consistency sweep. Report edits are `.tex`/`.md` only;
 validation is a LaTeX recompile in Overleaf.
+
+---
+
+## Eleventh pass — front-matter & `main.tex` source-level scan — 2026-07-04
+
+The one review gap remaining after passes 1–10 (all of which concentrated on the
+seven chapters + appendices): a direct read of the **front matter**
+(`frontmatter/frontmatter.tex`, `frontmatter/glossary.tex`) and the document
+root (`main.tex`) for facts that contradict the body. Findings presented to the
+author, who dispositioned each.
+
+| Finding | Location | Severity | Status |
+|---|---|---|---|
+| **E1. Dedication names "José Silva … teammate"** — a different name from the report's project teammate Stratos Demertzoglou. | `frontmatter.tex` dedication | — | ⏸ Left (see A1/T5) |
+| **E2. Degree name: "Informatics Engineering" (dedication) vs "Computer Engineering" (ch1)** | `frontmatter.tex` / ch1 | — | ⏸ Left |
+| **E3. "close to a quarter" (ch1) vs "around 22%" (abstract) / "about 22%" (ch3)** | ch1 §context | Low | ✅ Done |
+| **E4. Second academic supervisor (Ana Cláudia Rodrigues, ch3) absent from title page + acknowledgements** | `main.tex` / `frontmatter.tex` | — | ⏸ Left |
+
+#### E1 / E2 — dedication (confirmed correct by the author)
+
+The author confirmed **José Silva is a course colleague with no connection to
+Stratos Demertzoglou** (the TalentHub project teammate); the dedication is a
+genuine personal dedication, intentional and correct — consistent with the
+earlier **A1** (2026-06-24) and **T5** dispositions. The degree-name wording
+("Informatics Engineering" in the personal dedication vs "Computer Engineering"
+in ch1) is likewise left as the author's wording. **No change** to either.
+
+#### E3 — align the international-staff figure (✅ Done)
+
+Two locations quote **22%** (abstract "around 22\%", ch3 "about 22\%"); ch1
+§context was the lone outlier at "close to a quarter". **Edit applied
+(2026-07-04):** ch1 "of the 900-plus people based there, close to a quarter are
+foreign nationals" → "…around 22\% are foreign nationals", so all three
+locations state the same figure.
+
+#### E4 — single supervisor on the title page (confirmed correct by the author)
+
+By design: **Prof. Nuno Escudeiro** is the author's thesis / stage-work
+supervisor (the role the title page + acknowledgements are for); **Prof. Ana
+Cláudia Rodrigues** was the coordinator of the BlendEd team, a distinct role.
+Only Nuno belongs on the title page / acknowledgements — consistent with the
+earlier **A2** disposition. **No change.**
+
+**Front matter otherwise clean:** the glossary defines all 22 `\gls` keys used
+in the body (no orphans, no undefined references); the abstract figures (527
+tests / 33 files, nine pain points, Groq-primary/OpenAI-fallback) match the body;
+`main.tex` metadata, keywords and the cross-reference macro definitions are
+correct.
+
+### Completeness audit — is anything left undone/unreviewed? (2026-07-04)
+
+Full sweep of this change-log for un-applied or over-claimed items:
+
+- **Passes 1–7, 9, 10** — every item carries an explicit ✅ Done resolution or a
+  reasoned ⏸ Left; each pass closes with an outcome line. No open item.
+- **Pass-4 `C-a … C-e`** — the pass-4 table rows still read "⏸ Pending", but the
+  pass-5 outcome line and the pass-8 note both confirm they were **applied
+  2026-06-25**. Stale label only, not open work.
+- **Pass 8 (supervisor feedback)** — S1, S2, S3, S5, S6 each have an explicit
+  "Resolution — ✅ Done" note. **⚠ One inconsistency: S4 (page-81 margin
+  overflow)** is marked "✅ Done" in the summary table and the pass-8 header
+  ("S3/S4/S5 applied"), **but has no resolution note** — its detail still reads
+  "Needs the compiled PDF page … to pinpoint the exact element" and Open
+  Question #4 still lists it as blocking. S4 is therefore **not actually
+  confirmed fixed**: it needs a visual check of the compiled PDF around page 81.
+  This is now the more urgent because the S3 fix **added** a per-layer coverage
+  table (`tab:coverage-layer`) + bar chart (`fig:coverage-by-layer`) to ch6,
+  which shifts pagination near page 81 — so any earlier overflow assessment is
+  moot and must be re-checked on a fresh Overleaf compile.
+
+**Verdict:** the report's prose/consistency review is complete through pass 11.
+The single genuinely open item is **S4** — a mechanical margin check that can
+only be resolved against the compiled PDF (author's Overleaf), not from source.
