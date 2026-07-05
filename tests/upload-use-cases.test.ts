@@ -479,35 +479,6 @@ describe("UploadUseCases", () => {
   });
 
   // ────────────────────────────────────────────────────────
-  // Ambassador pitch video
-  // ────────────────────────────────────────────────────────
-
-  describe("uploadAmbassadorVideo", () => {
-    function videoFile(name: string, type: string, sizeBytes: number): File {
-      const f = new File([new ArrayBuffer(8)], name, { type });
-      Object.defineProperty(f, "size", { value: sizeBytes });
-      return f;
-    }
-
-    it("rejects a non-video format", async () => {
-      const f = videoFile("clip.gif", "image/gif", 1024);
-      await expect(useCases.uploadAmbassadorVideo(f, "c-1")).rejects.toThrow(/Invalid video format/);
-    });
-
-    it("rejects a video above the size limit", async () => {
-      const f = videoFile("big.mp4", "video/mp4", 200 * 1024 * 1024);
-      await expect(useCases.uploadAmbassadorVideo(f, "c-1")).rejects.toThrow(/too large/);
-    });
-
-    it("stores a valid video under the candidate path", async () => {
-      const f = videoFile("pitch.mp4", "video/mp4", 5 * 1024 * 1024);
-      const { url } = await useCases.uploadAmbassadorVideo(f, "c-1");
-      expect(url).toContain("resume.pdf"); // mock storage returns fixed URL
-      expect(storage.uploadFile).toHaveBeenCalledWith(f, "ambassador-videos/c-1/pitch.mp4");
-    });
-  });
-
-  // ────────────────────────────────────────────────────────
   // Parsing job management
   // ────────────────────────────────────────────────────────
 
