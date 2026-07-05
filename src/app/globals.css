@@ -285,3 +285,9 @@
   font-family: "Adihaus DIN CN", "Adihaus DIN", "Helvetica Neue", Arial, sans-serif;
   font-weight: 400;
 }
+
+/* In-app user-guide search highlight (CSS Custom Highlight API) */
+::highlight(guide-search) {
+  background-color: #fde047;
+  color: #000;
+}
