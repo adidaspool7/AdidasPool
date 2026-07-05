@@ -48,6 +48,26 @@ interface ProgramInfo {
 
 type PageState = "loading" | "not-found" | "closed" | "form" | "submitting" | "success" | "error";
 
+/* ── Three vertical stripes on the right edge (matches /welcome2 hero) ── */
+function ThreeStripes() {
+  return (
+    <div
+      className="pointer-events-none fixed right-0 top-0 z-20 flex h-full gap-[14px] pr-[40px]"
+      aria-hidden
+    >
+      {[0.14, 0.1, 0.06].map((opacity, i) => (
+        <div
+          key={i}
+          className="h-full w-[35px]"
+          style={{
+            background: `linear-gradient(to bottom, rgba(255,255,255,${opacity * 0.3}) 0%, rgba(255,255,255,${opacity}) 15%, rgba(255,255,255,${opacity}) 85%, rgba(255,255,255,${opacity * 0.3}) 100%)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function AmbassadorApplyPage() {
   const params = useParams<{ programId: string }>();
   const programId = params.programId;
@@ -133,7 +153,7 @@ export default function AmbassadorApplyPage() {
   // ── Loading ──
   if (pageState === "loading") {
     return (
-      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
+      <div className="dark min-h-screen flex items-center justify-center bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-neutral-600" />
       </div>
     );
@@ -142,11 +162,11 @@ export default function AmbassadorApplyPage() {
   // ── Not found ──
   if (pageState === "not-found") {
     return (
-      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
+      <div className="dark min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-neutral-600 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white">Program not found</h1>
-          <p className="text-neutral-400 mt-2">This link may be expired or invalid.</p>
+          <h1 className="font-adineue-bold text-2xl uppercase tracking-tight text-white">Program not found</h1>
+          <p className="font-adihaus-regular text-white/60 mt-2">This link may be expired or invalid.</p>
         </div>
       </div>
     );
@@ -155,13 +175,13 @@ export default function AmbassadorApplyPage() {
   // ── Closed ──
   if (pageState === "closed") {
     return (
-      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950">
+      <div className="dark min-h-screen flex items-center justify-center bg-black">
         <div className="text-center max-w-sm">
           <Trophy className="h-12 w-12 text-neutral-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white">
+          <h1 className="font-adineue-bold text-2xl uppercase tracking-tight text-white">
             {program?.title}
           </h1>
-          <p className="text-neutral-400 mt-2">
+          <p className="font-adihaus-regular text-white/60 mt-2">
             This ambassador program is no longer accepting applications.
           </p>
         </div>
@@ -172,13 +192,13 @@ export default function AmbassadorApplyPage() {
   // ── Success ──
   if (pageState === "success") {
     return (
-      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950 px-4">
+      <div className="dark min-h-screen flex items-center justify-center bg-black px-4">
         <div className="text-center max-w-md">
           <CheckCircle className="h-16 w-16 text-white mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="font-adineue-bold text-3xl uppercase tracking-tight text-white mb-2">
             Application submitted!
           </h1>
-          <p className="text-neutral-400">
+          <p className="font-adihaus-regular text-white/60">
             Thank you for applying to <strong className="text-white">{program?.title}</strong>. We&apos;ll
             review your application and be in touch soon.
           </p>
@@ -190,13 +210,13 @@ export default function AmbassadorApplyPage() {
   // ── Error (after attempt) ──
   if (pageState === "error") {
     return (
-      <div className="dark min-h-screen flex items-center justify-center bg-neutral-950 px-4">
+      <div className="dark min-h-screen flex items-center justify-center bg-black px-4">
         <div className="text-center max-w-md">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white mb-2">
+          <h1 className="font-adineue-bold text-2xl uppercase tracking-tight text-white mb-2">
             Submission failed
           </h1>
-          <p className="text-neutral-400 mb-6">{errorMessage}</p>
+          <p className="font-adihaus-regular text-white/60 mb-6">{errorMessage}</p>
           <Button onClick={() => setPageState("form")} variant="outline">
             Try again
           </Button>
@@ -209,50 +229,49 @@ export default function AmbassadorApplyPage() {
   const deadline = formatDeadline(program?.applicationDeadline);
 
   return (
-    <div className="dark min-h-screen bg-neutral-950 text-white">
-      <header className="border-b border-neutral-800 bg-black">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className="dark min-h-screen bg-black text-white">
+      <ThreeStripes />
+      <header className="border-b border-white/10 bg-black">
+        <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-5">
           <a
             href="https://adidas-pool.vercel.app/welcome"
             className="inline-flex transition-opacity hover:opacity-80"
           >
-            <img src="/adidas-logo.svg" alt="adidas" className="h-7 w-auto" />
+            <img src="/adidas-logo.svg" alt="adidas" className="h-8 w-auto" />
           </a>
+          <span className="font-adihaus-bold text-xs uppercase tracking-[0.3em] text-white/70 sm:text-sm">
+            adidas GBS Porto
+          </span>
         </div>
       </header>
       <div className="max-w-2xl mx-auto space-y-6 py-12 px-4">
-        {/* Program header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Trophy className="h-5 w-5 text-white" />
-                  <span className="text-xs font-medium text-neutral-400 uppercase tracking-[0.2em]">
-                    Ambassador Program
-                  </span>
-                </div>
-                <CardTitle className="text-2xl">{program?.title}</CardTitle>
-                {program?.cohort && (
-                  <Badge variant="secondary" className="mt-2">
-                    {program.cohort}
-                  </Badge>
-                )}
-              </div>
-              <Badge className="bg-neutral-800 text-neutral-200 border-neutral-700 shrink-0">
-                Open
-              </Badge>
-            </div>
-            {program?.description && (
-              <CardDescription className="text-base mt-3 text-neutral-400">
-                {program.description}
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-neutral-400">
+        {/* Program hero */}
+        <section className="border-b border-white/10 pb-10">
+          <div className="flex items-center justify-between gap-4">
+            <p className="font-adihaus-bold text-sm uppercase tracking-[0.2em] text-white/40">
+              Student Ambassador Program
+            </p>
+            <Badge className="bg-white text-black border-transparent shrink-0 rounded-none font-adihaus-bold uppercase tracking-widest text-[10px]">
+              Open
+            </Badge>
+          </div>
+          <h1 className="font-adineue-bold mt-5 text-4xl uppercase leading-[1.03] tracking-tight sm:text-5xl">
+            {program?.title}
+          </h1>
+          {program?.cohort && (
+            <Badge variant="secondary" className="mt-4 rounded-none">
+              {program.cohort}
+            </Badge>
+          )}
+          {program?.description && (
+            <p className="font-adihaus-regular mt-5 text-base leading-relaxed text-white/80">
+              {program.description}
+            </p>
+          )}
+          <div className="mt-6 space-y-2 text-sm text-white/60">
             {(program?.location || program?.country) && (
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-neutral-500 shrink-0" />
+                <MapPin className="h-4 w-4 text-white/40 shrink-0" />
                 <span>
                   {[program.location, program.country]
                     .filter(Boolean)
@@ -262,41 +281,41 @@ export default function AmbassadorApplyPage() {
             )}
             {deadline && (
               <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-neutral-500 shrink-0" />
+                <CalendarDays className="h-4 w-4 text-white/40 shrink-0" />
                 <span>Application deadline: {deadline}</span>
               </div>
             )}
             {program?.maxApplicants && (
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-neutral-500 shrink-0" />
+                <Users className="h-4 w-4 text-white/40 shrink-0" />
                 <span>Limited to {program.maxApplicants} ambassadors</span>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {/* Requirements & Perks */}
         {(program?.requirements || program?.perks) && (
           <div className="grid gap-4 sm:grid-cols-2">
             {program?.requirements && (
-              <Card>
+              <Card className="rounded-none border-white/15 bg-white/[0.02]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">What we&apos;re looking for</CardTitle>
+                  <CardTitle className="font-adihaus-bold text-base uppercase tracking-wide">What we&apos;re looking for</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-neutral-400 whitespace-pre-line">
+                  <p className="font-adihaus-regular text-sm text-white/70 whitespace-pre-line">
                     {program.requirements}
                   </p>
                 </CardContent>
               </Card>
             )}
             {program?.perks && (
-              <Card>
+              <Card className="rounded-none border-white/15 bg-white/[0.02]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">What you&apos;ll get</CardTitle>
+                  <CardTitle className="font-adihaus-bold text-base uppercase tracking-wide">What you&apos;ll get</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-neutral-400 whitespace-pre-line">
+                  <p className="font-adihaus-regular text-sm text-white/70 whitespace-pre-line">
                     {program.perks}
                   </p>
                 </CardContent>
@@ -306,10 +325,10 @@ export default function AmbassadorApplyPage() {
         )}
 
         {/* Application form */}
-        <Card>
+        <Card className="rounded-none border-white/15 bg-white/[0.02]">
           <CardHeader>
-            <CardTitle>Apply now</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-adineue-bold text-2xl uppercase tracking-tight">Apply now</CardTitle>
+            <CardDescription className="font-adihaus-regular">
               Upload your CV and tell us a bit about yourself.
             </CardDescription>
           </CardHeader>
@@ -435,7 +454,7 @@ export default function AmbassadorApplyPage() {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-14 rounded-none bg-white text-black hover:bg-neutral-200 font-adihaus-bold uppercase tracking-widest text-sm"
                 disabled={pageState === "submitting"}
               >
                 {pageState === "submitting" ? (
@@ -457,9 +476,9 @@ export default function AmbassadorApplyPage() {
         </Card>
 
         {/* FAQ */}
-        <Card>
+        <Card className="rounded-none border-white/15 bg-white/[0.02]">
           <CardHeader>
-            <CardTitle className="text-lg">Frequently asked questions</CardTitle>
+            <CardTitle className="font-adineue-bold text-xl uppercase tracking-tight">Frequently asked questions</CardTitle>
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
