@@ -41,6 +41,18 @@ assigned to the HR / Talent Acquisition area at adidas GBS Porto with a
 deliberately broad brief: to identify recurring frictions in the recruitment
 workflow and to propose a tool that improves them.
 
+The four subprojects were conceived to interlock as stages of a single
+candidate journey rather than as independent tools. The community-research
+and employer-branding subprojects sit at the front of the funnel, attracting
+and engaging potential candidates and steering them towards the platform;
+TalentHub then owns the middle of the journey --- application, CV parsing,
+analysis, job-anchored matching, language and skill verification, and
+candidate communication; and the onboarding assistant picks up at the end,
+supporting a candidate who is about to be, or has just been, hired. TalentHub
+is therefore one component of the broader language-and-talent \emph{framework}
+the team was asked to design, and its boundaries with the adjacent subprojects
+are deliberate rather than accidental.
+
 adidas Business in Portugal provides shared services to other adidas
 companies across Europe. Its Porto site is large and strongly
 international --- of the 900-plus people based there, around 22\%
@@ -186,9 +198,11 @@ that turns a heterogeneous stream of CVs into a structured, analysable and
 contactable talent pool, plus the language and skill verification that the
 existing process lacks. Out of scope is the transactional machinery of a full
 \gls{ats} --- requisition approval chains, offer management and payroll ---
-together with any feature that would auto-reject a candidate
-without human review, which both the client's risk appetite and the
-regulatory analysis of \chapref{cap:state-of-the-art} rule out.
+and the onboarding of hired employees, which a parallel sub-team owned as its
+own sub-project within the same \gls{blended} programme. Also out of scope is
+any feature that would auto-reject a candidate without human review, which both
+the client's risk appetite and the regulatory analysis of
+\chapref{cap:state-of-the-art} rule out.
 
 \begin{table}[ht]
 \centering
@@ -202,11 +216,11 @@ does not do.}
 \midrule
 Structured, GDPR-aware talent pool & Requisition and headcount-approval workflows \\
 Automated CV ingestion and parsing & Offer management, contracts and payroll \\
-Candidate application lifecycle (apply, status progression, shortlisting) & Onboarding of hired employees\footnote{Onboarding was addressed as a dedicated sub-project by a parallel sub-team within the same \gls{blended} programme.} \\
+Candidate application lifecycle (apply, status progression, shortlisting) & Onboarding of hired employees \\
 Explainable job-anchored matching & Automatic rejection without human review \\
 CEFR language and technical-skill verification & Replacement of the corporate \gls{ats} (SAP SuccessFactors) \\
 HR communication, campaigns and audit trail & Cross-organisation, multi-tenant operation \\
-Recruitment analytics and custom widgets & \\
+Recruitment analytics and custom widgets & Free-form SQL access or a full business-intelligence suite \\
 \bottomrule
 \end{tabular}
 \end{table}

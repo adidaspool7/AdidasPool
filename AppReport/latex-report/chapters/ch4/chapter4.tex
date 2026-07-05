@@ -17,7 +17,8 @@ managed services and one specialised sidecar. The \textbf{Next.js
 application} hosts both the user interface and the server-side API routes,
 and is the only component a user's browser talks to directly. It depends on
 three \textbf{Supabase} managed services --- PostgreSQL for data,
-Authentication for Google OAuth, and Storage for uploaded CVs --- and on two
+Authentication for Google OAuth, and Storage for candidate documents (CVs,
+motivation letters and, for Erasmus internships, learning agreements) --- and on two
 external \textbf{Large Language Model} providers --- a primary and a
 fallback --- for parsing. The conversational \textbf{AI Interviewer} is a
 separate Python \textit{FastAPI} service: the browser opens an interview
@@ -37,7 +38,7 @@ the conversation to the sidecar through a signed-token contract.
 Web application & Next.js 16 / TypeScript on Vercel & UI, API routes, use cases, repositories \\
 Database & Supabase PostgreSQL & Persistent relational store \\
 Authentication & Supabase Auth (Google OAuth) & Identity, session, role claim \\
-Object storage & Supabase Storage & Uploaded CV files \\
+Object storage & Supabase Storage & Candidate documents (CVs, letters, agreements) \\
 LLM providers & Groq (primary), OpenAI (fallback) & CV and job-description parsing \\
 AI Interviewer & Python FastAPI sidecar & Conversational assessment + CEFR evaluation \\
 Email & Resend & HR-to-candidate outreach; live delivery gated on sender-domain verification \\
@@ -192,8 +193,7 @@ notifications), \textit{Parsing Jobs} (which track bulk uploads),
 \textit{Ambassador Programs} with their applications, and \textit{Candidate
 Segments} --- giving thirty-three application tables in total.
 The business rules that drive scoring and assessment are not scattered
-through the codebase but are encoded as immutable value objects
-\parencite{Fowler2002PoEAA} in the Domain
+through the codebase but are encoded as immutable value objects in the Domain
 layer, so that changing a weight or a threshold is a single, reviewable edit
 in one file. \tabref{tab:value-objects} lists the principal constants and
 the rules they encode. Expressing these as domain constants rather than as
@@ -593,7 +593,13 @@ data subject rather than through a back-office request --- the self-service
 controls that erase the full record and its stored documents, or export the
 profile, are described in \secref{sec:impl-engagement}. The remaining gap --- automating
 the time-based purge so that retention is enforced without a manual trigger
---- is recorded as future work in \chapref{cap:conclusions}.
+--- is recorded as future work in \chapref{cap:conclusions}. Concretely, it
+would run as a scheduled job --- a daily Vercel Cron or Supabase scheduled
+function --- that finds every candidate whose retention window has elapsed
+(measured from the close of their last application) and, in a single
+transaction, either hard-deletes or anonymises the record together with its
+stored documents, having first sent a one-month advance notice so the candidate
+can renew consent and stay in the pool rather than lapse by default.
 
 Recognising a repeat applicant \emph{after} their profile has been erased is
 likewise treated as future work rather than an implemented feature. Within the
@@ -661,11 +667,11 @@ presents two coherent experiences.
 \tabref{tab:design-decisions} records the principal design decisions, the
 alternatives weighed, and the trade-off accepted in each case.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption[Design decision log]{Principal design decisions and their trade-offs.}
+\caption[Design decision log]{Principal design decisions.}
 \label{tab:design-decisions}
-\small
+\footnotesize
 \begin{tabular}{p{0.24\linewidth}p{0.26\linewidth}p{0.38\linewidth}}
 \toprule
 \textbf{Decision} & \textbf{Alternative} & \textbf{Rationale / trade-off} \\
@@ -677,6 +683,12 @@ Rule-based \texttt{computeJobFit} & Embedding similarity & Per-criterion explain
 Groq primary, OpenAI fallback & Single provider & Outage becomes degradation, not failure \\
 FastAPI sidecar for interviewer & In-process JS & Clean language/process boundary; parallel development \\
 Text UUID primary keys & DB serial / native uuid & Opaque, collision-resistant, distributed-safe IDs \\
+Next.js App Router (full-stack) & Separate SPA + standalone API backend & One deployable with server components and colocated API routes; cost is framework lock-in \\
+TypeScript (strict) & Plain JavaScript & Compile-time safety at the database and LLM boundaries; cost is a build step and type upkeep \\
+shadcn/ui + Tailwind (owned components) & Packaged component library (MUI, Chakra) & Components copied into the repo, no runtime dependency, full styling control; cost is manual updates \\
+Vitest & Jest & Native ESM/TypeScript and Vite-speed runs aligned with the toolchain; cost is a smaller ecosystem \\
+Zod validation at boundaries & Trusting LLM / database output & Tolerant, versioned parsing of untrusted input; cost is schema upkeep \\
+Constrained analytics catalogue & Free-form SQL / BI access & Injection-proof custom charts; cost is limited expressiveness \\
 \bottomrule
 \end{tabular}
 \end{table}

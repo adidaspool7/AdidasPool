@@ -1,8 +1,9 @@
 # Analysis of `final-feedback-points.md` — Agent Working Notes
 
-> Read-only analysis of all 61 feedback points. **No report text has been changed yet.**
-> Each point below: **Issue** (my understanding) · **Location** (exact file/label/quote) ·
-> **Fix** (planned correction) · **Links** (connected references) · **Status**.
+> Analysis of all 61 feedback points. **Applied edits are logged in the batch blocks below and
+> tracked per-point in the STATUS DASHBOARD.** The per-point sections further down keep the
+> original reasoning (Issue · Location · Fix · Links · Status) and may predate the dashboard —
+> **the dashboard is the source of truth for what is done vs missing.**
 >
 > Status legend:
 > - ✅ **Confirmed** — fact verified, only wording to agree.
@@ -39,6 +40,35 @@
 > Pt54 "silent omission"→"an unstated one" (ch7); Pt56 "forgo an ORM"→"not to use an ORM" (ch7);
 > Pt19 risk caption now spells out Likelihood (L) and Impact (I) (ch3).
 > **Drafts 1 & 2 applied 2026-07-05:** NL analytics chatbot → ch7 future work; concurrency safeguard (two explicit levels: request-level single-flight + data-level idempotent upsert) → ch5 §impl-jobs. Pt52b "glossed over"→"papered over".
+
+---
+
+## STATUS DASHBOARD (updated 2026-07-05)
+
+**61 points total → 48 applied · 10 remaining · 4 resolved-no-edit.** Committed in `c6b1c80` (+ earlier passes); Batches 3–7 (Pt 3, 4, 5, 9, 11, 13, 18, 23, 24-report, 27, 32, 33, 36, 41, 50, 53, 58, 59, 61) applied and pending commit. Pt 7/17 → `jira-backlog-plan.md`; Pt 8 → `supervisor-feedback-responses.md`. All `.tex` edits still need a fresh Overleaf compile to eyeball.
+
+### ✅ DONE — applied to source (48)
+`1, 3, 4, 5, 6*, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 36, 37, 38, 39, 40, 41, 42*, 43, 44, 48, 50, 51*, 52a, 52b, 53, 54, 55, 56, 57, 58, 59, 61` — plus Draft 1 (NL analytics chatbot) & Draft 2 (sync concurrency).
+> \* 6 = already present (in-app user guide, no edit). 42/51 = widgets are real → prose stays; only the future-work bullet was added. 3 = discovery sentence already singular ("The HR team interviewed…"); abstract left generic "HR teams". 13 = removed the duplicated PO-duties sentence in ch3 §Project Management intro (Roles bullet already lists them). 23 = ch3 §3.8 conclusion expanded (traceability chain + validation link + limitations forward-ref). 27 = job-specific AI interview added to ch7 Future Work. 20 = 11 glossary entries confirmed present (whisper, zod, shadcn, tailwind, cookies, cors, mime, vitest, v8, turbopack, gin).
+
+### ❓ NEEDS YOUR DECISION / INPUT (14)
+- **Pt 2** — **resolved, no edit.** Confirmed no links exist anywhere; user decided to add nothing about the live app.
+- **Pt 60** — **resolved, no edit.** Bias detection is a fairness/disparate-impact audit placeholder (FR-13); referenced 5× in the report (ch3:290, ch3:668, ch5:98, ch5:121, ch7:217) with two bib entries (Raghavan2020, BogenRieke2018). No additional definition added; supervisor accepted.
+- **Pt 7 / 17** — backlog plan drafted → `jira-backlog-plan.md` (epics/stories/AC/priority/estimate/status + JIRA CSV mapping). Next: generate `talenthub-jira.csv` on request.
+- **Pt 8** — supervisor response map drafted → `supervisor-feedback-responses.md` (point → change → chapter/section). Keep in step as remaining points close.
+- **Pt 16** — **dropped, no edit.** User does not want a Figma screenshot.
+- **Pt 18** — **applied.** `fig:gantt` adjusted: testing/deployment bar extended to end-June, final-report/presentation bar shortened to mid-June→July, and a second green situation-point line added at 24~Mar (alongside the end-Apr one).
+- **Pt 32** — **applied.** Added a lite implementation sketch to ch4 §GDPR Alignment: a scheduled Vercel/Supabase cron job finds records past the retention window and deletes/anonymises PII in one transaction, after a one-month consent-renewal notice.
+- **Pt 33** — **applied.** Added 6 rows to ch4 `tab:design-decisions` (Next.js App Router, TypeScript strict, shadcn/ui+Tailwind, Vitest-vs-Jest, Zod-boundary validation, constrained analytics catalogue).
+- **Pt 36** — **applied.** Added `lst:dev-audit` to Appendix D §AI-Assisted Development: the open-ended security-audit prompt that surfaced the PostgREST `.or()` filter-injection, fixed by `escapeOrTerm()`.
+- **Pt 41** — **applied.** Trimmed ch5 §5.7 (impl) to reference the token contract in ch4 §design-interviewer instead of re-describing the HMAC token; kept only impl-specific facts (turn/proctoring/results routes, selected-skill enforcement, call-time secret). ch4 remains the contract home (it has the sequence diagram). Easily flipped if you prefer trimming ch4 instead.
+
+### 🔍 PDF-ONLY — need your compiled PDF to judge float/placement (7)
+`4` (footnote in scope table), `29` (fig:status-sm before §4.4), `34` (tab:tech-stack), `35` (tab:feature-inventory), `46` (ambassador figure placement — **user handling later, open**), `49` (spare last page → maybe +1–2 code excerpts — **user checking, open**), `50` (coverage-figure placement). `53` → **applied** (tables 6.1/6.2/6.3 forced to `[H]` so they sit right under the referring text).
+
+### 🖼️ NEED ASSETS FROM YOU (2)
+- **Pt 45** — presentation/role-choice page screenshot + HR-side candidate-profile screenshot.
+- **Pt 47** — tell me which image is oversized/mislabelled (Fig 5.9 ambassador vs Fig 5.10 portal) → I shrink + fix caption.
 
 ---
 

@@ -3,7 +3,7 @@
 
 This chapter turns the problem stated in \chapref{cap:introduction} into
 an analysed, prioritised body of work. It first characterises the
-stakeholders and the two personas TalentHub serves, then revisits the
+stakeholders and the two user profiles TalentHub serves, then revisits the
 client pain points and the instrument used to validate them, sets out the
 language talent framework that the client brief explicitly asked for,
 derives the functional and non-functional requirements that follow from
@@ -11,39 +11,40 @@ those pains, and finally describes the project-management method.
 
 %----------------------------------------------------------------------------------------
 
-\section{Stakeholders and Personas}
+\section{Stakeholders and User Profiles}
 \label{sec:analysis-stakeholders}
 
 Four groups of stakeholders shaped the work. The \textbf{client} --- the HR
 and Talent Acquisition team at adidas GBS Porto --- supplied the problem,
 validated the pain points, and acted as acceptance tester through recurring
 review sessions. The \textbf{end users} fall into two roles that the
-application treats as first-class personas. The \textbf{academic
+application treats as first-class profiles. The \textbf{academic
 supervisors}, Prof.\ Nuno Escudeiro and Prof.\ Ana Cl\'audia Rodrigues,
 provided methodological guidance and assessed the work in its academic
 context. The \textbf{development team} that
 built TalentHub was a two-person engineering team (\secref{sec:team})
 that carried both engineering and, in the author's case, product ownership.
 
-Two personas were used to keep design decisions grounded:
+Two user profiles were used to keep design decisions grounded:
 
 \begin{description}
-	\item[Carla, the recruiter (HR persona).] An HR specialist at adidas
+	\item[The HR member.] An HR and Talent Acquisition specialist at adidas
 	GBS Porto who simultaneously owns a number of open roles and triages a
-	high weekly volume of CVs. She needs to find, compare and contact
+	high weekly volume of CVs. They need to find, compare and contact
 	candidates quickly, to know whether someone has applied before, and to
-	justify shortlisting decisions to colleagues. She is the primary user
-	of the HR dashboard, the matching screens, the notification tools and
+	justify shortlisting decisions to colleagues. This profile is the primary
+	user of the HR dashboard, the matching screens, the notification tools and
 	the analytics.
 
-	\item[Tiago, the candidate (candidate persona).] A multilingual
-	jobseeker who applies through the public portal, uploads his own CV,
-	completes language or skill assessments when invited, and wishes to be
-	kept informed of status changes rather than disappearing into a black
-	hole. He is the primary user of the candidate self-service portal.
+	\item[The candidate.] A multilingual applicant --- for a job, an
+	internship or an ambassador programme --- who applies through the public
+	portal, uploads their own CV, completes language or skill assessments when
+	invited, and wishes to be kept informed of status changes rather than
+	disappearing into a black hole. This profile is the primary user of the
+	candidate self-service portal.
 \end{description}
 
-The two personas justify the role-based split that runs through the whole
+These two profiles justify the role-based split that runs through the whole
 system: the same application exposes different navigation, permissions and
 screens depending on whether the authenticated user holds the HR or the
 candidate role.
@@ -515,11 +516,8 @@ Usability & Usability & Role-based IA; accessible shadcn/ui primitives & Client 
 The BlendEd program ran on Scrum, with a Scrum Master facilitating shared
 ceremonies across its four subproject teams over the February--July~2026
 internship. This section focuses on how that framework played out for the
-two-person talent-pool subproject. Acting as the subproject's Product Owner,
-the author owned the product vision, the backlog and its prioritisation, and
-the relationship with the client; both members acted as developers. The
-section describes how the framework was adapted at subproject scale and how
-the backlog was ordered.
+two-person talent-pool subproject: how Scrum was adapted at subproject scale
+and how the backlog was ordered.
 
 \subsection{Scrum at Program and Subproject Scale}
 \label{sec:method-scrum}
@@ -604,10 +602,12 @@ possible.
 \barrow{2}{0.4}{1.6}{Architecture \& DB design}
 \barrow{3}{1.4}{3.2}{Core development (parsing, pool, matching)}
 \barrow{4}{2.4}{3.2}{Language-assessment integration}
-\barrow{5}{1.6}{4.4}{Testing, deployment \& validation}
+\barrow{5}{1.6}{4.9}{Testing, deployment \& validation}
 \barrow{6}{3.4}{4.2}{Survey design, collection \& analysis}
-\barrow{7}{3.6}{5.0}{Final report \& presentation}
-% Situation-point marker
+\barrow{7}{4.5}{5.0}{Final report \& presentation}
+% Situation-point markers
+\draw[lststring, thick, dashed] (1.75,0.4) -- (1.75,-7.2);
+\node[lststring, font=\scriptsize, anchor=south, rotate=90] at (1.75,-7.2) {Situation point (24 Mar)};
 \draw[lststring, thick, dashed] (2.95,0.4) -- (2.95,-7.2);
 \node[lststring, font=\scriptsize, anchor=south, rotate=90] at (2.95,-7.2) {Situation point (end Apr)};
 \end{tikzpicture}
@@ -701,20 +701,16 @@ Browser speech-API limits & H & L & Documented Chromium constraint; future Whisp
 \subsection{Deviations from the Initial Plan}
 \label{sec:method-deviations}
 
-Two deviations from the initial proposal are worth recording, both minor and
-both absorbed without disrupting the backlog; both were surfaced and accepted
-at the end-of-April~2026 situation-point review with the client. First, the
-persistence layer was migrated from the originally planned Prisma ORM over a
-Neon PostgreSQL database to \textbf{Supabase}. The driver was integration
-economy: adopting Supabase folded the database, file storage and ---
-decisively --- authentication (Google OAuth) into a single managed platform,
-removing the need to build and secure a separate authentication stack within
-the academic timeframe. Second, a public \textbf{welcome page} was added to
-the deployed application at the suggestion of our group's design team,
-providing a branded entry point for visitors. Neither change altered the
-agreed scope, and both were
-folded into the backlog and re-prioritised in the same way as any
-emergent requirement.
+Two minor deviations from the initial proposal are worth recording; both were
+surfaced and accepted at the end-of-April~2026 situation-point review with the
+client. First, the persistence layer was migrated from the originally planned
+Prisma ORM over Neon PostgreSQL to \textbf{Supabase}, for integration economy:
+this folded the database, file storage and --- decisively --- authentication
+(Google OAuth) into one managed platform, removing the need to build a separate
+authentication stack within the academic timeframe. Second, a public
+\textbf{welcome page} was added at the suggestion of our group's design team,
+giving visitors a branded entry point. Neither change altered the agreed scope,
+and both were re-prioritised in the backlog like any emergent requirement.
 
 %----------------------------------------------------------------------------------------
 
@@ -723,5 +719,17 @@ emergent requirement.
 
 The analysis produced a prioritised, traceable set of requirements anchored
 in validated client pain points, together with the quality attributes that
-constrain the solution and the Scrum-based method used to deliver it. The
-next chapter translates these requirements into a concrete software design.
+constrain the solution and the Scrum-based method used to deliver it. Its
+central output is a single traceability chain --- from the nine pain points,
+through the survey that validated them and the language-talent framework that
+organises them, to the functional and non-functional requirements and the use
+cases that realise them --- so that every feature built later in the report can
+be traced back to a concrete, client-confirmed need rather than to a designer's
+assumption. That chain is what gives the validation in
+\chapref{cap:validation} its force: because each requirement has a known
+origin, evidence that a feature is wanted is also evidence that the underlying
+pain was real. Two constraints established here --- the single-respondent
+nature of the survey and the concentration of the Product Owner and
+lead-developer roles in one person --- are carried forward as explicit
+limitations in \chapref{cap:conclusions}. The next chapter translates these
+requirements into a concrete software design.

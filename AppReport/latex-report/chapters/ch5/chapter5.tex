@@ -36,7 +36,7 @@ Framework & Next.js 16 (App Router), TypeScript & One codebase for UI and API; f
 UI & shadcn/ui + Tailwind CSS & Accessible primitives without a heavy framework \\
 Authentication & Supabase Auth (Google OAuth) & Managed identity; role claim in the \gls{jwt} \\
 Database & Supabase PostgreSQL (no ORM) & Relational domain; direct typed client \\
-Storage & Supabase Storage & Uploaded CV files \\
+Storage & Supabase Storage & Candidate documents (CVs, letters, agreements) \\
 LLM & Groq Llama 3.3 70B (primary), OpenAI GPT-4o (fallback) & Free-tier primary with a reliability fallback \\
 Validation & Zod & Runtime validation of all external/LLM input \\
 Email & Resend & HR-to-candidate outreach (live delivery pending sender-domain verification) \\
@@ -481,18 +481,18 @@ discussed with the testing lesson in \chapref{cap:validation}.
 
 The conversational interviewer itself is the second team member's contribution
 (\secref{sec:team}); this section documents only the integration surface owned
-by the Next.js application. On the application side the flow is: an API route
-creates an \texttt{interview\_sessions} row and issues a short-lived
-HMAC-SHA256 token (storing only its hash); the browser opens an interview
-popup that streams audio and chat; transcript turns are recorded through a
-realtime turn endpoint; proctoring events are logged; and, on completion, the
-structured evaluation returned by the sidecar is saved as the assessment
-result. The selected skill (for the technical mode) is persisted on the
-session and enforced server-side so that questions cannot drift off the
-chosen topic. The token-signing utility resolves its secret at call time
+by the Next.js application, whose token-and-session contract with the sidecar is
+described in \secref{sec:design-interviewer} and not repeated here. In
+implementation terms that surface is a small set of API routes: one creates the
+\texttt{interview\_sessions} row and issues the signed session token, a realtime
+turn endpoint records each transcript turn, a proctoring endpoint logs integrity
+events, and a results endpoint saves the structured evaluation returned by the
+sidecar as the assessment result. Two details are specific to the
+implementation. First, the selected skill (for the technical mode) is persisted
+on the session and enforced server-side so that questions cannot drift off the
+chosen topic. Second, the token-signing utility resolves its secret at call time
 rather than at module load, so that a local build can complete without the
-deployment-only secret while still failing fast at request time in
-production.
+deployment-only secret while still failing fast at request time in production.
 
 \begin{figure}[ht]
 \centering
@@ -718,6 +718,7 @@ The second is the heart of the authorisation middleware: a single guard that
 gates every API route, returning \texttt{401} for unauthenticated callers and
 \texttt{403} for non-HR callers on the HR-only prefixes.
 
+\newpage
 \begin{lstlisting}[language=TypeScript,caption={Centralised API route gating in the middleware.},captionpos=b]
 const role = user?.app_metadata?.role as "hr" | "candidate" | undefined;
 if (pathname.startsWith("/api/")) {
@@ -739,4 +740,42 @@ special characters cannot alter the query.
 \begin{lstlisting}[language=TypeScript,caption={Escaping user input before a PostgREST filter.},captionpos=b]
 const term = escapeOrTerm(rawSearch);
 query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
+\end{lstlisting}
+
+The fourth is the escaping helper referenced above: it removes the characters
+PostgREST treats as structural separators inside a \texttt{.or()} list before
+the value is interpolated, so a crafted search term cannot inject additional
+filter branches.
+
+\begin{lstlisting}[language=TypeScript,caption={The PostgREST \texttt{.or()} sanitiser (\texttt{escapeOrTerm}).},captionpos=b]
+export function escapeOrTerm(value: string): string {
+  // PostgREST treats , ( ) : as structural separators in a .or() list;
+  // strip them so a term cannot inject extra OR-branches.
+  return value
+    .replace(/[,():"\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+\end{lstlisting}
+
+The fifth illustrates the casing boundary between the database and the
+application: rows arrive in \texttt{snake\_case} and are converted to the
+\texttt{camelCase} used throughout the code, recursing into related rows but
+never into the opaque JSONB payloads, whose internal keys must be preserved
+verbatim.
+
+\begin{lstlisting}[language=TypeScript,caption={Snake-to-camel conversion at the database boundary (\texttt{camelizeKeys}, abridged).},captionpos=b]
+export function camelizeKeys(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const ck = toCamel(k);                    // job_title -> jobTitle
+    if (v === null) out[ck] = v;
+    else if (isIsoDate(v)) out[ck] = new Date(v);
+    else if (Array.isArray(v)) out[ck] = v.map(camelizeIfObject);
+    // JSONB columns are opaque payloads -- never recurse into them.
+    else if (typeof v === "object" && !JSONB_KEYS.has(ck)) out[ck] = camelizeKeys(v);
+    else out[ck] = v;
+  }
+  return out;
+}
 \end{lstlisting}

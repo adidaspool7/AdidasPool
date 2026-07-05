@@ -117,14 +117,14 @@ abstraction moves work elsewhere rather than eliminating it.
 \label{sec:concl-ai}
 
 Three lessons recurred whenever a Large Language Model touched persistent
-data. First, \textbf{structured-output prompting beats free-form} for any
+data. First, structured-output prompting beats free-form for any
 value that must land in a column: validating model output against a strict
 Zod schema, and tolerantly discarding invented values, was the difference
-between trustworthy and unusable parsing. Second, \textbf{LLM output schemas
-must be versioned}, because the shape the model is asked to produce evolves;
+between trustworthy and unusable parsing. Second, LLM output schemas
+must be versioned, because the shape the model is asked to produce evolves;
 storing a schema version alongside parsed requirements let the system
-re-parse only what was stale. Third, \textbf{fallback providers are a
-reliability mechanism, not a luxury} --- the Groq-to-OpenAI fallback turned a
+re-parse only what was stale. Third, fallback providers are a
+reliability mechanism, not a luxury --- the Groq-to-OpenAI fallback turned a
 single point of failure into a degradation rather than an outage.
 
 \subsection{Working with AI Coding Assistants}
@@ -135,25 +135,27 @@ bounded, author-specified coding tasks, the prompts for which are documented
 in \appref{app:prompts}. Reflecting on that use critically yielded its own
 lessons, and they were as much about the tool's limits as its leverage.
 
-The first and most consistent observation was that \textbf{the assistant does
-not hold the whole project in mind}. It reasons well about the file or
+The first and most consistent observation was that the assistant does
+not hold the whole project in mind. It reasons well about the file or
 function in front of it but loses the wider context --- the layering rules,
 the casing convention at the database boundary, an invariant enforced three
-modules away. Left unguided it tends to \textbf{solve the local problem in the
-simplest way that compiles}, not the way that respects the architecture; a
+modules away. Left unguided it tends to solve the local problem in the
+simplest way that compiles, not the way that respects the architecture; a
 plausible fix would, for example, reach from a use case straight into
 infrastructure and quietly violate the dependency rule the whole design
-rests on. The practical consequence is that \textbf{every output requires
-careful validation against the design, not just against the compiler}.
+rests on. The practical consequence is that every output requires
+careful validation against the design, not just against the compiler.
 Generated code was therefore reviewed the way a second developer's pull
 request would be --- checked for boundary violations, hidden assumptions and
 silent scope creep --- and the strict TypeScript compiler plus the test suite
 acted as a backstop rather than a guarantee.
 
-The second lesson was that \textbf{prompting is a skill that improved with
-practice}. Early prompts were broad (``add feature X''), which is exactly when
-the context problem bites hardest: the assistant fills the gaps with
-assumptions. The prompts that worked, and that \secref{app:prompts-development}
+The second lesson was that prompting is a skill that improved with
+practice. When a prompt leaves the architectural constraints implicit ---
+the target files, the ports, the expected shape of the result --- the
+assistant has to guess them, and it fills those gaps with its own
+assumptions rather than the project's conventions.
+The prompts that worked, and that \secref{app:prompts-development}
 records, share a shape that emerged over the project: state the architectural
 constraints explicitly, name the files and ports involved, specify the
 expected shape of the result, and reduce the task to a bounded piece the
@@ -274,7 +276,11 @@ the analytics widget catalogue so analysts can express more questions safely
 lets a recruiter ask for a chart in plain language (for example, ``new hires
 per month over the past year'') and have it generated automatically, lowering
 the barrier to ad-hoc analysis while staying inside the same safe, constrained
-catalogue; adding an offline transcription path (for example a Whisper-based fallback)
+catalogue; making the AI interview job-specific, so that HR can attach a set of
+priority topics to each vacancy and the corresponding technical or language
+assessment becomes available to a candidate as soon as they apply for that job
+--- tying skill verification directly to the requirements of the role; adding an
+offline transcription path (for example a Whisper-based fallback)
 so the spoken assessment works on browsers without the Web Speech API; adding
 an OCR fallback to the ingestion pipeline so scanned and image-only CVs can be
 parsed automatically; moving bulk parsing onto a durable queue with a

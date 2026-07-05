@@ -75,7 +75,7 @@ transforms), and the server-side authorisation guards --- while the thin
 Infrastructure adapters (data repositories and external-service clients) are
 verified indirectly through the use cases that depend on them.
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption[Automated test inventory]{Automated test inventory at submission
 (33 files, 527 cases, all passing), sorted by case count.}
@@ -141,7 +141,7 @@ figure of 46.9\% is therefore not a uniform average but a blend of
 near-exhaustive coverage where a defect would be costly and near-zero
 coverage where a unit test would merely restate a database query.
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption[Coverage by architectural layer]{Coverage by architectural layer
 (V8 provider, percentages). Decision-bearing layers are covered heavily;
@@ -166,6 +166,30 @@ Infrastructure --- data repositories & 2.5 & 3.1 & 4.3 & 2.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsubsection{What is Tested, and Why}
+
+The suite is not uniform by design; the depth of testing in each area is
+proportional to its risk and to how much consequential logic it contains.
+
+\paragraph{Decision-critical Domain logic (highest priority).}
+The job-anchored matching engine (\texttt{computeJobFit}) is the most
+heavily tested unit, with 47 cases. Being a pure function with no external
+dependencies, it is straightforward to exercise exhaustively: the tests cover
+every one of the seven criteria
+(field, experience-in-field, seniority, required and preferred skills,
+languages, education), the ``average of applicable criteria only'' rule,
+and the \texttt{isEligible} flag computed as the conjunction of applicable
+\texttt{met} flags. A dedicated \textit{golden skill-match corpus} locks in
+expected match and no-match outcomes for realistic skill pairs --- for
+example that \texttt{js} matches \texttt{javascript} and \texttt{k8s}
+matches \texttt{kubernetes} through curated synonym groups and phrase
+aliases, while genuinely distinct products such as AWS and Azure, or Java
+and JavaScript, are kept apart. This corpus exists specifically to prevent
+silent regressions in matching accuracy when the synonym tables are edited.
+The scoring service (13 cases) is tested in the same spirit, covering score
+ranges, relative ordering, boundary capping, and the keyword-to-\gls{cefr}
+mapping.
 
 \begin{figure}[ht]
 \centering
@@ -195,37 +219,10 @@ Infrastructure --- data repositories & 2.5 & 3.1 & 4.3 & 2.7 \\
 };
 \end{axis}
 \end{tikzpicture}
-\caption[Line coverage by architectural layer]{Line coverage by layer
-(V8 provider). The decision-bearing layers --- domain services, application
-use cases and their DTO schemas, and the authorisation guards --- sit between
-80\% and 100\%, while the thin infrastructure adapters are covered only
-indirectly. The whole-codebase line average is 46.9\%.}
+\caption[Line coverage by architectural layer]{Line coverage by architectural
+layer (V8 provider).}
 \label{fig:coverage-by-layer}
 \end{figure}
-
-\subsubsection{What is Tested, and Why}
-
-The suite is not uniform by design; the depth of testing in each area is
-proportional to its risk and to how much consequential logic it contains.
-
-\paragraph{Decision-critical Domain logic (highest priority).}
-The job-anchored matching engine (\texttt{computeJobFit}) is the most
-heavily tested unit, with 47 cases. Being a pure function with no external
-dependencies, it is straightforward to exercise exhaustively: the tests cover
-every one of the seven criteria
-(field, experience-in-field, seniority, required and preferred skills,
-languages, education), the ``average of applicable criteria only'' rule,
-and the \texttt{isEligible} flag computed as the conjunction of applicable
-\texttt{met} flags. A dedicated \textit{golden skill-match corpus} locks in
-expected match and no-match outcomes for realistic skill pairs --- for
-example that \texttt{js} matches \texttt{javascript} and \texttt{k8s}
-matches \texttt{kubernetes} through curated synonym groups and phrase
-aliases, while genuinely distinct products such as AWS and Azure, or Java
-and JavaScript, are kept apart. This corpus exists specifically to prevent
-silent regressions in matching accuracy when the synonym tables are edited.
-The scoring service (13 cases) is tested in the same spirit, covering score
-ranges, relative ordering, boundary capping, and the keyword-to-\gls{cefr}
-mapping.
 
 \paragraph{The glue between layers.}
 The \texttt{job-matching-bridge} suite (25 cases) was added after a
@@ -283,7 +280,7 @@ is gold-plating --- the table makes both failure modes visible. Every
 must-have capability traces to at least one automated test, and the
 user-facing ones additionally trace to a survey item or an acceptance session.
 
-\begin{table}[ht]
+\begin{table}[H]
 \centering
 \caption[Requirements traceability matrix]{Traceability from capability to
 automated test to validation evidence. Survey items are the numbered

@@ -238,6 +238,23 @@ DELETE CASCADE, and make every statement idempotent with IF NOT EXISTS so I can
 re-run it safely in the Supabase SQL editor.
 \end{lstlisting}
 
+\begin{lstlisting}[caption={Open-ended security audit of the Supabase repository layer.},label={lst:dev-audit}]
+Do a general security audit of my Supabase repository layer. Look closely at
+anywhere a user-supplied value reaches a query -- the search filters in
+particular -- and flag anything exploitable, with a minimal, testable fix.
+\end{lstlisting}
+
+This last prompt is the one exception to the bounded-task pattern above: it was
+an open-ended review rather than a specification, and it surfaced a genuine
+issue the author had not spotted. PostgREST treats \texttt{,}, \texttt{(},
+\texttt{)} and \texttt{:} as structural separators inside a \texttt{.or()}
+list, so a search term such as \texttt{foo,email.eq.victim@example.com} would
+inject an extra OR-branch and silently widen the result set beyond the intended
+columns. The fix --- reviewed and unit-tested before being committed --- was a
+small \texttt{escapeOrTerm()} helper that strips those separators and collapses
+whitespace, applied to every user-supplied value that reaches a \texttt{.or()}
+filter (\texttt{tests/escape-or-term.test.ts}).
+
 Used this way --- bounded tasks, explicit specifications, mandatory review ---
 the assistant accelerated boilerplate, test scaffolding and debugging without
 owning any design decision, and every generated unit was covered by the test
