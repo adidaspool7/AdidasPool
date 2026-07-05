@@ -87,13 +87,13 @@ backlog can quietly bend toward what is interesting to build rather than what
 the client needs. Two practices kept this in check. First, the backlog was
 disciplined to be \emph{client-driven by construction}: the MoSCoW-prioritised,
 pain-point-traceable ordering of \secref{sec:method-backlog} made deferral an
-explicit, defensible decision rather than a silent omission. Second, the
-dedicated client-acceptance session that doubled as the sprint review
+explicit, defensible decision rather than an unstated one. Second, the
+dedicated client-acceptance sessions that doubled as sprint reviews
 (\secref{sec:method-scrum}) meant that the people who owned the problem signed
 off each increment, which is the closest a one-person product role can get to
 an external check. Within the team, the sprint review was also the moment the
 second developer could push back on product decisions, since the increment
-was concrete and demonstrable rather than abstract. The honest takeaway is
+was concrete and demonstrable rather than abstract. The takeaway is
 that combining the roles is workable at this scale only with deliberate
 guardrails against scope creep; it is not a structure to carry into a larger
 team unchanged.
@@ -106,7 +106,7 @@ the AI Interviewer had to live in a separate Python process. Because the
 Domain held no external dependencies and use cases never reached into
 infrastructure, extracting the interviewer behind a typed token contract was
 a boundary change, not a rewrite. The counter-lesson concerns the decision
-to forgo an ORM: the manual \texttt{camelize}/\texttt{snakeify} conversion
+not to use an ORM: the manual \texttt{camelize}/\texttt{snakeify} conversion
 between database and domain was a real, recurring cost, and a later review of
 the codebase showed it was also where type safety leaked (rows cast through
 \texttt{any}). The cost was bounded and the strict compiler largely filled
@@ -132,8 +132,8 @@ single point of failure into a degradation rather than an outage.
 
 AI was also used as a \emph{development tool} during the project --- for
 bounded, author-specified coding tasks, the prompts for which are documented
-in \appref{app:prompts}. Treating that use honestly yielded its own lessons,
-and they were as much about the tool's limits as its leverage.
+in \appref{app:prompts}. Reflecting on that use critically yielded its own
+lessons, and they were as much about the tool's limits as its leverage.
 
 The first and most consistent observation was that \textbf{the assistant does
 not hold the whole project in mind}. It reasons well about the file or
@@ -269,8 +269,12 @@ automating the time-based retention purge as a scheduled, GDPR-compliant job
 expires, so candidates can opt to stay in the pool rather than lapse by
 default; making the location component configurable rather than fixed to the
 single Maia origin (\secref{sec:concl-partial}); widening
-the analytics widget catalogue so analysts can express more questions safely;
-adding an offline transcription path (for example a Whisper-based fallback)
+the analytics widget catalogue so analysts can express more questions safely
+--- and, extending that further, a natural-language analytics assistant that
+lets a recruiter ask for a chart in plain language (for example, ``new hires
+per month over the past year'') and have it generated automatically, lowering
+the barrier to ad-hoc analysis while staying inside the same safe, constrained
+catalogue; adding an offline transcription path (for example a Whisper-based fallback)
 so the spoken assessment works on browsers without the Web Speech API; adding
 an OCR fallback to the ingestion pipeline so scanned and image-only CVs can be
 parsed automatically; moving bulk parsing onto a durable queue with a

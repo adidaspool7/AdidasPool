@@ -150,43 +150,6 @@ export class UploadUseCases {
     };
   }
 
-  // ─── Ambassador Pitch Video Upload ───────────────────────────
-
-  private static readonly ALLOWED_VIDEO_MIME_TYPES = [
-    "video/mp4",
-    "video/webm",
-    "video/quicktime",
-  ];
-  private static readonly MAX_VIDEO_SIZE_MB = 100;
-
-  /**
-   * Upload a pitch video for an ambassador application.
-   * Validates type (mp4/webm/mov) and size (≤100 MB), then stores under
-   * `ambassador-videos/[candidateId]/pitch.[ext]`.
-   */
-  async uploadAmbassadorVideo(
-    file: File,
-    candidateId: string
-  ): Promise<{ url: string }> {
-    if (!UploadUseCases.ALLOWED_VIDEO_MIME_TYPES.includes(file.type)) {
-      throw new Error(
-        "Invalid video format. Please upload an MP4, WebM, or MOV file."
-      );
-    }
-    const maxBytes = UploadUseCases.MAX_VIDEO_SIZE_MB * 1024 * 1024;
-    if (file.size > maxBytes) {
-      throw new Error(
-        `Video file is too large. Maximum size is ${UploadUseCases.MAX_VIDEO_SIZE_MB} MB.`
-      );
-    }
-    const ext = file.name.split(".").pop() ?? "mp4";
-    const { url } = await this.storageService.uploadFile(
-      file,
-      `ambassador-videos/${candidateId}/pitch.${ext}`
-    );
-    return { url };
-  }
-
   // ─── HR Bulk Upload ───────────────────────────────────────────
 
   /**

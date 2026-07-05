@@ -29,7 +29,8 @@ export async function POST(
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
-    const videoFile = formData.get("video") as File | null;
+    const pitchVideoUrlRaw =
+      (formData.get("pitchVideoUrl") as string | null) || null;
     const motivation = (formData.get("motivation") as string | null) || null;
     const university = (formData.get("university") as string | null) || null;
     const yearOfStudy = (formData.get("yearOfStudy") as string | null) || null;
@@ -46,14 +47,25 @@ export async function POST(
     // Step 1: Upload + parse CV → creates/updates candidate
     const uploadResult = await uploadUseCases.uploadCandidateCv(file);
 
-    // Step 2: Upload pitch video (optional)
+    // Step 2: Validate the optional pitch-video link
     let pitchVideoUrl: string | null = null;
-    if (videoFile && videoFile.size > 0) {
-      const videoUpload = await uploadUseCases.uploadAmbassadorVideo(
-        videoFile,
-        uploadResult.candidateId
-      );
-      pitchVideoUrl = videoUpload.url;
+    if (pitchVideoUrlRaw && pitchVideoUrlRaw.trim().length > 0) {
+      let parsed: URL;
+      try {
+        parsed = new URL(pitchVideoUrlRaw.trim());
+      } catch {
+        return NextResponse.json(
+          { error: "The pitch video link is not a valid URL." },
+          { status: 400 }
+        );
+      }
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        return NextResponse.json(
+          { error: "The pitch video link must be an http(s) link." },
+          { status: 400 }
+        );
+      }
+      pitchVideoUrl = parsed.toString();
     }
 
     // Step 3: Submit the ambassador application (also marks sourceType = AMBASSADOR)

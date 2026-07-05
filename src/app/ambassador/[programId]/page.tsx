@@ -58,13 +58,12 @@ export default function AmbassadorApplyPage() {
 
   // Form fields
   const [cvFile, setCvFile] = useState<File | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [pitchVideoUrl, setPitchVideoUrl] = useState("");
   const [university, setUniversity] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
   const [motivation, setMotivation] = useState("");
   const [previousExperience, setPreviousExperience] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/ambassador/public/${programId}`)
@@ -98,7 +97,7 @@ export default function AmbassadorApplyPage() {
 
     const fd = new FormData();
     fd.append("file", cvFile);
-    if (videoFile) fd.append("video", videoFile);
+    if (pitchVideoUrl.trim()) fd.append("pitchVideoUrl", pitchVideoUrl.trim());
     if (university) fd.append("university", university);
     if (yearOfStudy) fd.append("yearOfStudy", yearOfStudy);
     if (motivation) fd.append("motivation", motivation);
@@ -406,45 +405,25 @@ export default function AmbassadorApplyPage() {
 
               {/* Pitch Video */}
               <div className="space-y-2">
-                <Label htmlFor="video-upload">
-                  Pitch video{" "}
+                <Label htmlFor="pitch-video-url">
+                  Pitch video link{" "}
                   <span className="text-neutral-500 font-normal">(optional — 1 min max)</span>
                 </Label>
                 <p className="text-xs text-neutral-500">
-                  Record a short 60-second clip introducing yourself and why you&apos;d make a great ambassador. Helps us see your communication style.
+                  Record a short 60-second clip introducing yourself and why you&apos;d make a great ambassador, upload it to YouTube (unlisted), Vimeo, or Google Drive, and paste the shareable link here. Make sure anyone with the link can view it.
                 </p>
-                <div
-                  className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
-                    videoFile
-                      ? "border-white/40 bg-neutral-800"
-                      : "border-neutral-700 hover:border-neutral-500"
-                  }`}
-                  onClick={() => videoInputRef.current?.click()}
-                >
-                  {videoFile ? (
-                    <div className="flex items-center justify-center gap-2 text-white">
-                      <Video className="h-5 w-5" />
-                      <span className="font-medium text-sm">{videoFile.name}</span>
-                      <span className="text-xs text-neutral-400">
-                        ({(videoFile.size / (1024 * 1024)).toFixed(1)} MB)
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="text-neutral-400 space-y-1">
-                      <Video className="h-8 w-8 mx-auto text-neutral-500" />
-                      <p className="text-sm font-medium">Click to upload your pitch video</p>
-                      <p className="text-xs">MP4, WebM or MOV — max 100 MB · 1 min recommended</p>
-                    </div>
-                  )}
+                <div className="relative">
+                  <Video className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                  <Input
+                    id="pitch-video-url"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://youtu.be/your-clip"
+                    className="pl-9"
+                    value={pitchVideoUrl}
+                    onChange={(e) => setPitchVideoUrl(e.target.value)}
+                  />
                 </div>
-                <input
-                  ref={videoInputRef}
-                  id="video-upload"
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                  className="hidden"
-                  onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
-                />
               </div>
 
               {errorMessage && (

@@ -426,6 +426,7 @@ actor.
 \draw (cand) -- (c4.east); \draw (cand) -- (c5.east); \draw (cand) -- (c6.east);
 \draw (cand) -- (c7.east); \draw (cand) -- (c8.east); \draw (cand) -- (c9.east);
 \draw (llm) -- (u1.south west);
+\draw (llm) -- (u3.west);
 \draw (ai) -- (c5.south east);
 \end{tikzpicture}}
 \caption[Principal use cases by actor]{Principal use cases grouped by actor.}
@@ -547,15 +548,15 @@ that add value at that scale:
 	\emph{planning}, \emph{review} and \emph{retrospective} run with the
 	Scrum Master across all four subprojects, the talent-pool team kept its
 		own lightweight rhythm: an informal \emph{weekly} sync kept the two
-	developers aligned, and a dedicated client-acceptance session
+	developers aligned, and dedicated client-acceptance sessions
 	(\secref{sec:val-manual}) doubled as the subproject's sprint
-	review, so that the people who reported the pain points also signed off
+	reviews, so that the people who reported the pain points also signed off
 	the increments that addressed them.
 	\item \textbf{Tooling.} The product increment was always the live
 	Vercel deployment. Source control on GitHub, a conventional-commit
 	history (\texttt{feat}, \texttt{fix}, \texttt{docs}, \texttt{refactor})
 	and continuous integration gave each increment an auditable trail, and
-	the meeting minutes (\appref{app:survey}) record the ceremonies.
+	the client-engagement log (\appref{app:survey}) records the cadence.
 	Communication across the four subproject teams was handled through
 	Discord (structured channels per topic) and WhatsApp (informal
 	coordination), while a shared Figma board served as the programme's
@@ -677,8 +678,8 @@ itself evidence that the mitigations were chosen early enough.
 
 \begin{table}[ht]
 \centering
-\caption[Risk register]{Project risk register with pre-mitigation likelihood
-and impact, and the mitigation applied.}
+\caption[Risk register]{Project risk register with pre-mitigation Likelihood
+(L) and Impact (I), and the mitigation applied.}
 \label{tab:risk-register}
 \small
 \begin{tabular}{p{0.27\linewidth}cc p{0.42\linewidth}}
@@ -709,10 +710,9 @@ economy: adopting Supabase folded the database, file storage and ---
 decisively --- authentication (Google OAuth) into a single managed platform,
 removing the need to build and secure a separate authentication stack within
 the academic timeframe. Second, a public \textbf{welcome page} was added to
-the deployed application at the explicit request of the adidas Design team,
+the deployed application at the suggestion of our group's design team,
 providing a branded entry point for visitors. Neither change altered the
-scope agreed in sprint zero --- a talent pool with communication
-verification, deliberately \emph{not} a full \gls{ats} --- and both were
+agreed scope, and both were
 folded into the backlog and re-prioritised in the same way as any
 emergent requirement.
 

@@ -99,9 +99,7 @@ Presentation $\rightarrow$ Application $\rightarrow$ Domain $\leftarrow$
 Infrastructure
 \end{quote}
 
-\figref{fig:onion} draws this as concentric layers: the dependency-free
-Domain at the centre, the Application layer wrapping it, and Infrastructure
-and Presentation forming the outer shell.
+\figref{fig:onion} draws this as concentric layers.
 
 \begin{figure}[ht]
 \centering
@@ -147,9 +145,7 @@ with no domain or use-case changes), and provider flexibility (changing LLM
 provider is a new service implementation behind an existing port). The
 alternatives --- MVC, a permissive three-tier split, microservices, or a
 bag of serverless functions --- were rejected as either too coupled or too
-heavy for a two-person team. This same separation is what later allowed the
-AI Interviewer to be extracted into its own process behind an unchanged
-contract.
+heavy for a two-person team.
 
 \subsection{Dependency Injection and the Composition Root}
 \label{sec:design-di}
@@ -289,7 +285,7 @@ machine.}
 
 The store is a Supabase-managed PostgreSQL database accessed directly
 through the Supabase client, with \textbf{no ORM}. The schema lives in a
-single canonical SQL file (\texttt{00000000000000\_schema.sql}) into which
+single canonical SQL file into which
 every per-feature change was consolidated, so a fresh database is created by
 running one script.
 
@@ -417,7 +413,7 @@ together with the per-criterion correctness of each rule, is demonstrated by
 the unit suite in \secref{sec:val-unit}. What the design does \emph{not}
 establish is that the resulting order coincides with an expert recruiter's own
 ranking of the same candidates: that agreement was left unvalidated for want of
-real application data and recruiter time, and is recorded honestly as a
+real application data and recruiter time, and is recorded as a
 limitation in \secref{sec:val-limitations}.
 
 \figref{fig:match-flow} traces the orchestration end to end. The element
@@ -489,7 +485,7 @@ structured-output prompt that drives the extraction is reproduced in
 \draw[r] (9.0,-5.0) -- node[above]{JSON candidate (retry on fail $\rightarrow$ OpenAI)} (3.4,-5.0);
 \draw[m] (3.4,-5.7) -- ++(1.2,0) -- ++(0,-0.5) -- (3.4,-6.2);
 \node[anchor=west,font=\tiny] at (4.65,-5.95) {validate (Zod) + retry};
-\draw[m] (3.4,-6.9) -- node[above]{persist candidate + children} (11.8,-6.9);
+\draw[m] (3.4,-6.9) -- node[above]{persist candidate + related records (experiences, education, languages, skills)} (11.8,-6.9);
 \draw[r] (11.8,-7.5) -- node[above]{ok} (3.4,-7.5);
 \draw[r] (3.4,-8.1) -- node[above]{parsed candidate} (0,-8.1);
 \end{tikzpicture}}
@@ -598,6 +594,17 @@ controls that erase the full record and its stored documents, or export the
 profile, are described in \secref{sec:impl-engagement}. The remaining gap --- automating
 the time-based purge so that retention is enforced without a manual trigger
 --- is recorded as future work in \chapref{cap:conclusions}.
+
+Recognising a repeat applicant \emph{after} their profile has been erased is
+likewise treated as future work rather than an implemented feature. Within the
+retention window the persistent talent pool and its interaction history already
+surface prior applications, but once a record is purged that link is gone by
+design. The intended approach keeps only a pseudonymised token --- a salted
+one-way hash of the candidate's e-mail together with the date and outcome of
+the prior application --- while all personal data is deleted, so the system can
+answer whether a person has applied before without retaining their data. Being
+pseudonymised rather than anonymous, such a token would itself require a
+documented legitimate-interest basis and its own retention limit.
 
 \subsection{Hardening and Transparency}
 \label{sec:design-hardening}

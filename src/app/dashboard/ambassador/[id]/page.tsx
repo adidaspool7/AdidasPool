@@ -717,11 +717,14 @@ export default function AmbassadorProgramDetailPage() {
                   Pitch video
                 </Label>
                 {viewApp.pitchVideoUrl ? (
-                  <video
-                    src={viewApp.pitchVideoUrl}
-                    controls
-                    className="w-full rounded-md border bg-black"
-                  />
+                  <a
+                    href={viewApp.pitchVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    <Video className="h-4 w-4" /> Watch pitch video
+                  </a>
                 ) : (
                   <p className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
                     <Video className="h-4 w-4" /> No pitch video submitted

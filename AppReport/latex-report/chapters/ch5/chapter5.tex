@@ -238,7 +238,7 @@ internally aware of. It is shown to the recruiter on the candidate profile
 as a single ``parse confidence'' percentage with the flags listed beside it,
 so the reviewer immediately knows which records to scrutinise.
 
-It is important to be honest about what this number is and is not. It is the
+It is important to be precise about what this number is and is not. It is the
 model's \emph{stated} confidence, not a calibrated probability of
 correctness: Large Language Models are known to be imperfectly calibrated and
 can be confidently wrong. The value is therefore treated as a triage
@@ -276,9 +276,9 @@ pipeline records, a representative call carries roughly 1{,}800 input
 tokens (the structured-output system prompt plus a one-to-two-page CV) and
 returns roughly 900 output tokens of JSON. Job-description extraction is
 comparable but slightly cheaper and far less frequent, so CV volume is the
-right unit to reason about. \tabref{tab:parse-cost} applies the mid-2026
-published list prices of three small/fast models to that token profile, and
-\figref{fig:parse-cost} plots the cumulative cost as the number of parsed
+right unit to reason about. \tabref{tab:parse-cost} turns that token profile
+into per-CV and bulk costs across three small/fast models, and
+\figref{fig:parse-cost} plots how the total scales as the number of parsed
 CVs grows.
 
 \begin{table}[ht]
@@ -361,8 +361,8 @@ batches or offload to a durable queue (recorded as future work in
 
 Once a CV is parsed, the candidate receives a deterministic quality score.
 The engine is a pure domain service: the same input always produces the same
-output, which is the property the client asked for under the heading of
-transparency. The overall score is a weighted sum of five components, each
+output --- a property we adopted as a deliberate design principle of
+transparency and reproducibility. The overall score is a weighted sum of five components, each
 normalised to the range $0$--$100$, as set out in
 \tabref{tab:cv-scoring}. Language proficiency carries the largest weight of any
 single criterion ($35\%$), reflecting the platform's purpose as a
@@ -373,7 +373,9 @@ play, where the job-anchored fit (\secref{sec:impl-jobs}) replaces it with
 \gls{llm}-assessed relevance --- while the $10\%$ \emph{Years of experience}
 weight rewards raw tenure. In the generic, job-agnostic score the former is
 proxied by the latter, which is why the worked example below scores both
-alike.
+alike. The two remaining components --- formal education and geographic
+location --- each contribute $15\%$, completing the five-way split set out
+in \tabref{tab:cv-scoring}.
 
 \begin{table}[ht]
 \centering
@@ -424,8 +426,8 @@ can retune the model without a code change.
 
 Jobs are created and edited by HR or ingested by a scraper that collects
 real listings from the adidas careers portal (used to populate a realistic
-demonstration dataset). Because a full portal sync can take the better part of
-a minute, it reuses the same fire-and-forget pattern as the bulk CV upload
+demonstration dataset). Because a full portal sync can take about a minute, it
+reuses the same fire-and-forget pattern as the bulk CV upload
 (\secref{sec:impl-cv}): the route returns \texttt{202\,Accepted} with a
 sync identifier and runs the scrape through the Next.js \texttt{after()}
 primitive, recording progress in a \texttt{sync\_jobs} row that the client
@@ -433,7 +435,23 @@ polls. The work therefore continues server-side regardless of the browser, so
 the recruiter can navigate away and return to find the sync still progressing
 or its result waiting. The same run also reconciles the local board against
 the portal: scraped jobs that are no longer listed are marked closed, while
-manually-created jobs are left untouched. When an HR user first opens a job's
+manually-created jobs are left untouched.
+
+Because this trigger is available to any authenticated user rather than to HR
+alone, overlapping sync requests are made safe on two independent levels.
+\emph{At the request level}, the route is single-flight: before starting it
+checks the \texttt{sync\_jobs} table for a run already in progress and returns
+that one instead of launching a second, so concurrent clicks converge on a
+single background job --- and a run stuck for more than five minutes is
+auto-expired so the trigger can never wedge permanently. \emph{At the data
+level}, the write itself is idempotent: scraped listings are upserted on the
+unique \texttt{external\_id} key, so even two overlapping scrapes can only
+converge on the same rows rather than create duplicates, and the reconciliation
+that closes vanished listings is a no-op when repeated. Because the job board
+is a single shared resource rather than per-user state, two recruiters --- or a
+candidate and a recruiter --- refreshing at once is indistinguishable from one.
+
+When an HR user first opens a job's
 ranking screen,
 its description is parsed lazily into the versioned requirements schema and
 cached. The orchestrator \texttt{matchCandidatesToJob} then runs the matching
@@ -540,11 +558,12 @@ side of the framework (\chapref{cap:analysis}) through six further
 modules.
 
 \paragraph{Welcome and onboarding page.}
-At the request of the client's design team, the application opens on a branded
-welcome page that orients each visitor before authentication and, after Google
-sign-in, routes them to the dashboard appropriate to their role. It states the
-platform's purpose in adidas terms and presents the two entry paths ---
-recruiter and candidate.
+At the suggestion of our group's design team, the application opens on a
+branded welcome (hero) page that introduces the platform in adidas terms
+before any authentication. From there the visitor moves to a presentation
+page that offers the two entry paths --- recruiter and candidate --- and,
+after choosing one and completing Google sign-in, is routed to the dashboard
+appropriate to their role.
 
 \begin{figure}[ht]
 \centering
@@ -613,8 +632,8 @@ internships, a learning agreement --- each stored in the same object-storage
 bucket as the CV. Applications are submitted against jobs, internships and
 ambassador programs, and their status is tracked back to the candidate as the
 HR recruiter advances each one. Open positions are browsed from a live feed
-that HR refreshes from the adidas careers portal through a sync action backed
-by the scraper. Finally, a ``Danger Zone'' in the settings view lets the
+synced from the adidas careers portal by a sync action --- available to any
+signed-in user --- and backed by the scraper. Finally, a ``Danger Zone'' in the settings view lets the
 candidate delete their CV alone or erase their entire record and all stored
 documents in one operation, alongside a CSV export of their profile ---
 operationalising the GDPR rights of access and erasure directly in the

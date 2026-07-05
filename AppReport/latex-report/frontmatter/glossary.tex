@@ -109,3 +109,58 @@
 	name={ISO/IEC~25010},
 	description={International standard defining a product-quality model for software and software-intensive systems. It organises quality into eight top-level characteristics (functional suitability, performance efficiency, compatibility, usability, reliability, security, maintainability, portability), each further decomposed into sub-characteristics that guide both design decisions and verification criteria}
 }
+
+\newglossaryentry{whisper}{
+	name={Whisper},
+	description={Open-source automatic speech-recognition model released by OpenAI, able to transcribe speech to text across many languages. Considered in TalentHub as an offline fallback for the browser-based speech-to-text used by the AI Interviewer}
+}
+
+\newglossaryentry{zod}{
+	name={Zod},
+	description={TypeScript-first schema-declaration and validation library. In TalentHub it defines the expected shape of every use-case input and of the structured JSON returned by the LLMs, rejecting malformed data at the untrusted boundary}
+}
+
+\newglossaryentry{shadcn}{
+	name={shadcn/ui},
+	description={A collection of accessible React user-interface components built on Radix primitives and styled with Tailwind CSS. Rather than a dependency, the components are copied into the project and owned directly. Used for TalentHub's dialogs, tables, forms and other interface elements}
+}
+
+\newglossaryentry{tailwind}{
+	name={Tailwind CSS},
+	description={A utility-first CSS framework in which styling is composed from small, single-purpose classes applied directly in the markup, rather than from hand-written stylesheets. Used throughout the TalentHub front end}
+}
+
+\newglossaryentry{cookies}{
+	name={Cookies},
+	description={Small pieces of data that a server asks a browser to store and return on subsequent requests. In TalentHub, HTTP-only cookies carry the Supabase session so that authentication state persists across page loads without exposing tokens to client-side scripts}
+}
+
+\newglossaryentry{cors}{
+	name={CORS},
+	description={Cross-Origin Resource Sharing --- a browser security mechanism that uses HTTP headers to control whether a web page served from one origin may make requests to a different origin. Relevant to the calls between the Next.js application and the AI Interviewer service}
+}
+
+\newglossaryentry{mime}{
+	name={MIME type},
+	description={Multipurpose Internet Mail Extensions type --- a standardised label (e.g.\ \texttt{application/pdf}) that identifies the format of a file or payload. Used when validating uploaded CV files before they are stored and parsed}
+}
+
+\newglossaryentry{vitest}{
+	name={Vitest},
+	description={A fast unit-testing framework for JavaScript and TypeScript projects, sharing configuration with the Vite build tool. TalentHub uses it for its automated test suite (527 tests across 33 files at the time of writing)}
+}
+
+\newglossaryentry{v8}{
+	name={V8},
+	description={Google's high-performance JavaScript and WebAssembly engine, which powers Chrome and Node.js. In TalentHub it also underpins the \texttt{@vitest/coverage-v8} provider that measures test coverage}
+}
+
+\newglossaryentry{turbopack}{
+	name={Turbopack},
+	description={An incremental bundler for JavaScript and TypeScript, written in Rust and integrated with Next.js, used to build and serve the TalentHub application faster than the previous Webpack-based toolchain}
+}
+
+\newglossaryentry{gin}{
+	name={GIN index},
+	description={Generalised Inverted Index --- a PostgreSQL index type suited to columns holding composite values such as arrays or JSONB. In TalentHub a GIN index accelerates membership queries over the \texttt{fields\_of\_work} array on candidate experiences}
+}
