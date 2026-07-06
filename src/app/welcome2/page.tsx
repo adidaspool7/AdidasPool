@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -204,7 +205,7 @@ function OffsetButton({
       } ${
         uppercase
           ? "font-adihaus-bold text-sm uppercase tracking-widest"
-          : `font-adihaus-regular tracking-wide ${large ? "text-xl sm:text-2xl" : "text-lg"}`
+          : `font-adihaus-bold tracking-wide ${large ? "text-xl sm:text-2xl" : "text-lg"}`
       }`}
     >
       {children}
@@ -278,16 +279,37 @@ function FlagCarousel() {
   );
 }
 
-/* ── Testimonial (placeholder, matches designer) ── */
+/* ── Testimonial placeholders (3 empty profiles, matches /welcome) ── */
+const testimonials = [
+  { image: "https://images.unsplash.com/photo-1499996860823-5214fcc65f8f?w=500&h=500&fit=crop" },
+  { image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&h=500&fit=crop" },
+  { image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500&h=500&fit=crop" },
+];
+
 function TestimonialCarousel() {
+  const [current, setCurrent] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(
+      () => setCurrent((c) => (c + 1) % testimonials.length),
+      6000
+    );
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const t = testimonials[current];
+
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-center sm:gap-12">
-        <div className="h-56 w-56 flex-shrink-0 overflow-hidden rounded-2xl shadow-2xl">
+        <div className="h-56 w-56 flex-shrink-0 overflow-hidden rounded-none shadow-2xl">
           <img
-            src="https://images.unsplash.com/photo-1546519638-68e109498ffc?w=500&h=500&fit=crop"
+            src={t.image}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-opacity duration-700"
           />
         </div>
         <div className="max-w-md text-center sm:text-left">
@@ -300,11 +322,15 @@ function TestimonialCarousel() {
         </div>
       </div>
 
-      <div className="flex gap-2" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span
+      <div className="flex gap-2">
+        {testimonials.map((_, i) => (
+          <button
             key={i}
-            className={`h-2.5 w-2.5 rounded-full ${i === 1 ? "bg-white" : "bg-white/40"}`}
+            onClick={() => setCurrent(i)}
+            className={`h-2.5 w-2.5 rounded-none transition-all ${
+              i === current ? "bg-white scale-125" : "bg-white/40"
+            }`}
+            aria-label={`Testimonial ${i + 1}`}
           />
         ))}
       </div>
@@ -427,7 +453,7 @@ export default function Welcome2Page() {
               {missions.map((m) => (
                 <div
                   key={m.n}
-                  className={`rounded-sm border border-white/15 bg-white/[0.02] p-8 transition-colors hover:border-white/40 hover:bg-white/[0.04] ${
+                  className={`rounded-none border border-white/15 bg-white/[0.02] p-8 transition-colors hover:border-white/40 hover:bg-white/[0.04] ${
                     m.n === "05" ? "md:col-span-2" : ""
                   }`}
                 >
