@@ -124,26 +124,29 @@ flowchart LR
 
 ---
 
-## SLIDE 6 — vs State of the art → what adidas can adopt (~55s)
+## SLIDE 6 — A prototype adidas can tune & adopt (~55s)
 
-**On slide:** "Market gap → Our response" table.
+**Slide title:** "Not a finished product — a tunable prototype built for adidas to adopt"
 
-| Market gap | TalentHub's response |
-|---|---|
-| Matching is opaque / workflow-centric | Pure, unit-tested **Fit** function, per-criterion breakdown |
-| Language is self-declared | **Dual-mode CEFR AI interview** with sub-scores |
-| Compliance bolted on afterwards | **GDPR deletion-aware schema + full audit trail** |
-| LLM output unreliable for parsing | Strict tolerant validation + **provider fallback** |
-| Intelligence tools assume big budgets | **Free-tier / self-hostable**, provider-agnostic |
+**On slide — four value groups (how adidas would take this forward):**
 
-**Then — "It's a prototype adidas can tune & adopt":**
-- **Tunable** scoring weights · improve **JD parsing** (adidas *owns* that data internally — we only scrape the public listings to compare)
-- **Two adoption paths:** a **screening front-end** *before* the ATS · or a **talent-pool management backend** that **integrates with SAP SuccessFactors** (we complement it, never replace it)
-- **Run it on adidas's own AI** — CV parsing, job-matching and the AI interviewer can point to an **internal/self-hosted model** instead of public LLMs
-- **Data stays in-house** — keeps every candidate's data inside adidas (**GDPR**) and removes per-call API cost
+**1 · Tune it to adidas's reality**
+- **Scoring weights are configurable** — HR decides how much field, seniority, skills and languages each count
+- **Sharper JD parsing** — adidas *owns* its job-description data internally; we only scrape public listings, so parsing quality jumps once it reads the real source
+
+**2 · Two ways to plug it in**
+- **Screening front-end** *before* the ATS — ranks and language-verifies candidates first
+- **Talent-pool backend** that **integrates with SAP SuccessFactors** — we complement it, never replace it
+
+**3 · Bring the AI in-house**
+- **Re-point to adidas's own model** — CV parsing, matching and the AI interviewer swap public LLMs for an **internal / self-hosted** model with one adapter change
+- **Data stays inside adidas** — satisfies **GDPR**, removes per-call API cost, and keeps candidate data off third-party providers
+
+**4 · Measure the funnel**
+- **Funnel & time-to-hire analytics** — HR can measure and compare hiring pipelines, not just individual candidates
 
 **You say:**
-> "Against the state of the art, our edge is transparency and verification — most tools are opaque black boxes that trust self-reported language levels, and treat compliance as an afterthought; we built explainable scoring, real CEFR verification, and GDPR-aware data from the schema up. As a prototype, the scoring is tunable, and the job-description parsing would sharpen a lot internally — adidas owns that data, we only scrape the public listings. There are two ways to pick this up: as a screening front-end *before* SAP SuccessFactors, or as a candidate talent-pool backend that integrates with it. We complement the ATS — we don't replace it."
+> "The key message on this slide: this is a prototype, and it was built to be adopted and tuned by adidas — not a locked black box. Four levers. First, everything is tunable — the scoring weights are configurable, and the job-description parsing would sharpen a lot internally because adidas owns that data; we only scrape the public listings. Second, two adoption paths: a screening front-end *before* SAP SuccessFactors, or a talent-pool backend that integrates with it — we complement the ATS, we never replace it. Third, bring the AI in-house — the CV parsing, matching and interviewer can all re-point to an internal self-hosted model, which keeps candidate data inside adidas for GDPR and kills the per-call cost. And fourth, funnel and time-to-hire analytics so HR can actually measure the pipeline."
 
 **Closing line:**
 > "In short: TalentHub turns raw CVs into a ranked, language-verified, fully auditable talent pool — and it's live in production today."
