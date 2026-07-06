@@ -183,8 +183,15 @@
 \input{chapters/ch2/chapter2} % State of the Art
 \input{chapters/ch3/chapter3} % Analysis & Methodology
 \input{chapters/ch4/chapter4} % Solution Design
+% Author request: drop the blank verso the two-sided class inserts before
+% chapters 5 and 6 ONLY. We make their \chapter openings use \clearpage instead
+% of \cleardoublepage, then restore the class default immediately, so every
+% other chapter keeps the template's standard openright blank-verso behaviour.
+\let\cleardoublepageSaved\cleardoublepage
+\let\cleardoublepage\clearpage
 \input{chapters/ch5/chapter5} % Implementation
 \input{chapters/ch6/chapter6} % Verification & Validation
+\let\cleardoublepage\cleardoublepageSaved
 \input{chapters/ch7/chapter7} % Conclusions
 
 %----------------------------------------------------------------------------------------
