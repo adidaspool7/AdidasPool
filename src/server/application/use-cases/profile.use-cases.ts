@@ -205,18 +205,22 @@ export class ProfileUseCases {
     }
 
     // 2. Check for a candidate with the same email (HR-uploaded without user_id,
-    //    or an existing record whose user_id wasn't linked yet).
+    //    or an existing record whose user_id wasn't linked / is stale).
     if (user.email) {
       const emailMatch = await this.candidateRepo.findByEmail(user.email);
       if (emailMatch) {
-        if (!emailMatch.userId) {
-          // Claim the unlinked record: set user_id and mark activated.
+        if (emailMatch.userId !== user.id) {
+          // Unlinked, or linked to a stale/different auth account. Because the
+          // authenticated email matches this candidate's email, the current user is
+          // the rightful owner — (re)claim the record so ownership-gated actions
+          // (e.g. launching an interview via /api/interview/session) don't 403.
+          const activatedAt = emailMatch.activatedAt ?? new Date().toISOString();
           await this.candidateRepo.update(emailMatch.id, {
             userId: user.id,
-            activatedAt: new Date().toISOString(),
+            activatedAt,
           });
           emailMatch.userId = user.id;
-          emailMatch.activatedAt = new Date().toISOString();
+          emailMatch.activatedAt = activatedAt;
         } else if (!emailMatch.activatedAt) {
           await this.candidateRepo.update(emailMatch.id, { activatedAt: new Date().toISOString() });
           emailMatch.activatedAt = new Date().toISOString();
