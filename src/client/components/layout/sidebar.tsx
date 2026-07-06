@@ -126,6 +126,9 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
           <h1 className="text-sm font-semibold">TalentHub</h1>
           <p className="text-xs text-muted-foreground">platform v0.3</p>
         </div>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* User + Role badge */}
@@ -200,7 +203,6 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
 
       {/* Footer */}
       <div className="border-t p-4 space-y-2">
-        <ThemeToggle />
         <UserGuideDialog role={role} />
         <button
           onClick={clearRole}
