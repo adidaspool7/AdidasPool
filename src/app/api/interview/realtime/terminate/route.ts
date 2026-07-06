@@ -30,12 +30,22 @@ const DEFAULT_EVALUATION = {
 };
 
 type EvaluatorResult = {
-  technical: { passed: boolean; cefr_level?: string; grammar?: string; vocabulary?: string; fluency?: string };
+  technical: {
+    passed: boolean;
+    cefr_level?: string;
+    grammar?: string;
+    vocabulary?: string;
+    fluency?: string;
+    listening?: string;
+    writing?: string;
+  };
   integrity: { status: "CLEAR" | "REVIEW" | "FAIL" };
   final: boolean;
   evidence?: string[];
   turn_count?: number;
-  rationale: { technical: string; integrity: string; final: string };
+  rationale: { technical: string; integrity: string; final: string; early_termination?: string };
+  trajectory?: unknown;
+  early_terminated?: boolean;
   raw?: unknown;
 };
 
@@ -213,6 +223,9 @@ export async function POST(request: NextRequest) {
           candidate: evaluatorCandidate,
           transcript,
           mode: sessionMode,
+          // Reaching this route means the candidate exited or the window elapsed —
+          // always an early termination. Evaluate fairly, do not auto-fail.
+          early_terminated: true,
         });
       } catch (evalError) {
         log.error("Evaluator call failed:", evalError);
@@ -244,6 +257,10 @@ export async function POST(request: NextRequest) {
     if (evaluation.technical.grammar) rationaleWithMeta.grammar = evaluation.technical.grammar;
     if (evaluation.technical.vocabulary) rationaleWithMeta.vocabulary = evaluation.technical.vocabulary;
     if (evaluation.technical.fluency) rationaleWithMeta.fluency = evaluation.technical.fluency;
+    if (evaluation.technical.listening) rationaleWithMeta.listening = evaluation.technical.listening;
+    if (evaluation.technical.writing) rationaleWithMeta.writing = evaluation.technical.writing;
+    if (evaluation.trajectory) rationaleWithMeta.trajectory = evaluation.trajectory;
+    rationaleWithMeta.early_terminated = evaluation.early_terminated ?? true;
     if (evaluation.turn_count !== undefined) rationaleWithMeta.turn_count = evaluation.turn_count;
     if (evaluation.evidence?.length) rationaleWithMeta.evidence = evaluation.evidence;
 

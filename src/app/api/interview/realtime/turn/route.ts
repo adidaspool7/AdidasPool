@@ -32,12 +32,22 @@ const DEFAULT_EVALUATION = {
 };
 
 type EvaluatorResult = {
-  technical: { passed: boolean; cefr_level?: string; grammar?: string; vocabulary?: string; fluency?: string };
+  technical: {
+    passed: boolean;
+    cefr_level?: string;
+    grammar?: string;
+    vocabulary?: string;
+    fluency?: string;
+    listening?: string;
+    writing?: string;
+  };
   integrity: { status: "CLEAR" | "REVIEW" | "FAIL" };
   final: boolean;
   evidence?: string[];
   turn_count?: number;
-  rationale: { technical: string; integrity: string; final: string };
+  rationale: { technical: string; integrity: string; final: string; early_termination?: string };
+  trajectory?: unknown;
+  early_terminated?: boolean;
   raw?: unknown;
 };
 
@@ -195,9 +205,18 @@ export async function POST(request: NextRequest) {
       {
         id: generateId(),
         interview_id: interview.id,
+        // For listening turns the stored transcript includes the spoken passage
+        // (transcript_assistant) so the evaluator can grade comprehension, while the
+        // candidate's live view only ever receives the visible assistant_reply.
         role: "assistant",
-        raw_text: (turnResult.assistant_reply as string) || "",
-        normalized_text: (turnResult.assistant_reply as string) || "",
+        raw_text:
+          (turnResult.transcript_assistant as string) ||
+          (turnResult.assistant_reply as string) ||
+          "",
+        normalized_text:
+          (turnResult.transcript_assistant as string) ||
+          (turnResult.assistant_reply as string) ||
+          "",
         sequence: base + 2,
       },
     ]);
@@ -285,6 +304,10 @@ export async function POST(request: NextRequest) {
       if (evaluation.technical.grammar) rationaleWithMeta.grammar = evaluation.technical.grammar;
       if (evaluation.technical.vocabulary) rationaleWithMeta.vocabulary = evaluation.technical.vocabulary;
       if (evaluation.technical.fluency) rationaleWithMeta.fluency = evaluation.technical.fluency;
+      if (evaluation.technical.listening) rationaleWithMeta.listening = evaluation.technical.listening;
+      if (evaluation.technical.writing) rationaleWithMeta.writing = evaluation.technical.writing;
+      if (evaluation.trajectory) rationaleWithMeta.trajectory = evaluation.trajectory;
+      if (evaluation.early_terminated) rationaleWithMeta.early_terminated = evaluation.early_terminated;
       if (evaluation.turn_count !== undefined) rationaleWithMeta.turn_count = evaluation.turn_count;
       if (evaluation.evidence?.length) rationaleWithMeta.evidence = evaluation.evidence;
 

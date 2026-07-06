@@ -156,11 +156,21 @@ export async function POST(request: NextRequest) {
         ? (interview.targetLanguage?.trim() || "English")
         : undefined;
 
+    // Map project date fields to the snake_case the Python backend expects.
+    const mappedProjects = parsed.data.candidate.projects.map((project) => ({
+      title: project.title ?? null,
+      description: project.description,
+      technologies: project.technologies,
+      start_date: project.startDate ?? null,
+      end_date: project.endDate ?? null,
+    }));
+
     const startResult = await callPython("/interview/start", {
       candidate: {
         ...parsed.data.candidate,
         target_skill: enforcedTargetSkill,
         skills: scopedCandidateSkills,
+        projects: mappedProjects,
         mode: enforcedMode,
         ...(targetLanguage ? { target_language: targetLanguage } : {}),
       },

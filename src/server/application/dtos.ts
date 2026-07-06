@@ -479,6 +479,8 @@ export const StartInterviewRealtimeSchema = z.object({
           title: z.string().optional().nullable(),
           description: z.string().min(1),
           technologies: z.array(z.string()).default([]),
+          startDate: z.string().optional().nullable(),
+          endDate: z.string().optional().nullable(),
         })
       )
       .default([]),
