@@ -1,7 +1,7 @@
 # TalentHub — Final Presentation Handoff
 
 > **For:** Designer (slide build) + Presenter (5-minute speech)
-> **Format:** 6 slides · ~5 minutes · max 4 screenshots
+> **Format:** 5 slides · ~5 minutes · max 4 screenshots
 > **Context:** Presentation takes place **at the adidas center** — so we keep client background minimal and avoid re-explaining adidas to adidas.
 
 ---
@@ -41,15 +41,15 @@ Authoritative numbers come from the near-final LaTeX report. **Use these exact f
 
 | Recruitment need | What we built |
 |---|---|
-| **Ingest at scale** | Single + **bulk ZIP** CV upload, async parsing pipeline |
+| **Ingest at scale** | Single + **bulk ZIP** CV upload with an async parsing pipeline (3-tier dedup) |
 | **Structure raw CVs** | AI extraction → skills, **CEFR languages**, experience, education, 16 canonical *fields of work* |
-| **Verify language objectively** | AI interview scoring spoken English on the **CEFR rubric** |
+| **Verify language & skills** (first screening) | **Dual-mode AI interview** — CEFR spoken-English rubric **+ technical skill validation** |
 | **Rank fairly** | Two transparent scores: **Quality** (CV-intrinsic) + per-job **Fit** (7 criteria) |
 | **Manage candidates** | Status lifecycle, tags, recruiter notes, **watchlist**, per-job **shortlists** |
 | **Full audit trail** | Per-candidate **interaction history** — every status change, email, campaign |
 | **Engage talent** | **Email contact**, **promo campaigns**, **notifications**, candidate **segments** |
-| **Beyond hiring** | **Internship** applications (motivation letter + learning agreement) & **Ambassador program** portal |
-| **Develop borderline talent** | **Improvement tracks** auto-created on a failed assessment |
+| **Beyond job hiring** | **Internship** applications & **Ambassador program** portal |
+| **Develop borderline talent** | **Improvement tracks** for candidates *(partial)* |
 | **Decide with data** | Analytics dashboard — 7 default charts + a **custom chart builder** |
 
 **You say:**
@@ -124,31 +124,8 @@ flowchart LR
 
 ---
 
-## SLIDE 6 — A prototype adidas can tune & adopt (~55s)
+## Closing line (~10s)
 
-**Slide title:** "Not a finished product — a tunable prototype built for adidas to adopt"
-
-**On slide — four value groups (how adidas would take this forward):**
-
-**1 · Tune it to adidas's reality**
-- **Scoring weights are configurable** — HR decides how much field, seniority, skills and languages each count
-- **Sharper JD parsing** — adidas *owns* its job-description data internally; we only scrape public listings, so parsing quality jumps once it reads the real source
-
-**2 · Two ways to plug it in**
-- **Screening front-end** *before* the ATS — ranks and language-verifies candidates first
-- **Talent-pool backend** that **integrates with SAP SuccessFactors** — we complement it, never replace it
-
-**3 · Bring the AI in-house**
-- **Re-point to adidas's own model** — CV parsing, matching and the AI interviewer swap public LLMs for an **internal / self-hosted** model with one adapter change
-- **Data stays inside adidas** — satisfies **GDPR**, removes per-call API cost, and keeps candidate data off third-party providers
-
-**4 · Measure the funnel**
-- **Funnel & time-to-hire analytics** — HR can measure and compare hiring pipelines, not just individual candidates
-
-**You say:**
-> "The key message on this slide: this is a prototype, and it was built to be adopted and tuned by adidas — not a locked black box. Four levers. First, everything is tunable — the scoring weights are configurable, and the job-description parsing would sharpen a lot internally because adidas owns that data; we only scrape the public listings. Second, two adoption paths: a screening front-end *before* SAP SuccessFactors, or a talent-pool backend that integrates with it — we complement the ATS, we never replace it. Third, bring the AI in-house — the CV parsing, matching and interviewer can all re-point to an internal self-hosted model, which keeps candidate data inside adidas for GDPR and kills the per-call cost. And fourth, funnel and time-to-hire analytics so HR can actually measure the pipeline."
-
-**Closing line:**
 > "In short: TalentHub turns raw CVs into a ranked, language-verified, fully auditable talent pool — and it's live in production today."
 
 ---
