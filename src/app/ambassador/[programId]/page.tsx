@@ -48,7 +48,7 @@ interface ProgramInfo {
 
 type PageState = "loading" | "not-found" | "closed" | "form" | "submitting" | "success" | "error";
 
-/* ── Three vertical stripes on the right edge (matches /welcome2 hero) ── */
+/* ── Three vertical stripes on the right edge (matches /welcome hero) ── */
 function ThreeStripes() {
   return (
     <div
