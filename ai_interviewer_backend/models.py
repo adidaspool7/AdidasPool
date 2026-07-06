@@ -13,6 +13,8 @@ class CandidateProject(BaseModel):
     title: str | None = None
     description: str
     technologies: list[str] = Field(default_factory=list)
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class CandidateProfile(BaseModel):
@@ -60,6 +62,10 @@ class TurnResponse(BaseModel):
     session_id: str
     transcript_user: str
     assistant_reply: str
+    # For listening turns: the text spoken aloud (hidden passage) differs from the
+    # visible reply, and the stored transcript includes the passage for evaluation.
+    speak_text: str | None = None
+    transcript_assistant: str | None = None
     audio_base64: str | None = None
     audio_mime_type: str | None = None
     should_end: bool = False
@@ -91,6 +97,7 @@ class EvaluationRequest(BaseModel):
     candidate: CandidateProfile
     transcript: list[ChatMessage]
     mode: Literal["TECHNICAL", "LANGUAGE"] = "TECHNICAL"
+    early_terminated: bool = False
 
 
 class EvaluationResponse(BaseModel):
@@ -98,4 +105,7 @@ class EvaluationResponse(BaseModel):
     integrity: dict[str, Any]
     final: bool
     rationale: dict[str, str] | None = None
+    trajectory: dict[str, Any] | None = None
+    early_terminated: bool = False
+    evidence: list[str] = Field(default_factory=list)
     raw: dict[str, Any] | None = None

@@ -81,7 +81,26 @@ _LANGUAGE_CORE_TOPICS: dict[str, list[str]] = {
         "cargo, crates, modules",
         "zero-cost abstractions and performance trade-offs",
     ],
+    "sql": [
+        "SELECT queries: projection, filtering (WHERE), sorting (ORDER BY), LIMIT/OFFSET",
+        "JOINs: INNER, LEFT/RIGHT/FULL OUTER, CROSS, SELF joins and their semantics",
+        "aggregation: GROUP BY, HAVING, aggregate functions (COUNT, SUM, AVG, MIN, MAX)",
+        "subqueries, correlated subqueries, CTEs (WITH), recursive CTEs",
+        "window functions: ROW_NUMBER, RANK, DENSE_RANK, LEAD/LAG, PARTITION BY",
+        "set operations: UNION, UNION ALL, INTERSECT, EXCEPT",
+        "DDL: CREATE/ALTER TABLE, constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, NOT NULL)",
+        "DML: INSERT, UPDATE, DELETE, UPSERT/MERGE semantics",
+        "indexing: B-tree vs hash indexes, composite indexes, covering indexes, when indexes help or hurt",
+        "query planning and optimization: EXPLAIN, execution plans, cardinality, join order",
+        "transactions, ACID, isolation levels, locking, deadlocks",
+        "normalization/denormalization, keys, referential integrity",
+        "NULL handling and three-valued logic",
+    ],
 }
+
+# Skills that receive the strict, per-topic language-style scope contract.
+# SQL is treated as a query language and fenced with the same rigor.
+_STRICT_SCOPE_SKILLS: frozenset[str] = _PROGRAMMING_LANGUAGES | frozenset({"sql"})
 
 _GENERIC_LANGUAGE_TOPICS: list[str] = [
     "core syntax and semantics of the language",
@@ -108,10 +127,29 @@ _LANGUAGE_FORBIDDEN_TOPICS: list[str] = [
 
 
 def _get_skill_type(normalized_skill: str | None) -> str:
-    """Returns 'language', or 'generic'."""
-    if normalized_skill and normalized_skill in _PROGRAMMING_LANGUAGES:
+    """Returns 'language' (curated strict-scope skill), or 'generic'."""
+    if normalized_skill and normalized_skill in _STRICT_SCOPE_SKILLS:
         return "language"
     return "generic"
+
+
+def _build_generic_scope_addendum(skill_name: str) -> str:
+    """Strict scope enforcement for any non-curated target skill (React, Docker, Pandas, ...).
+
+    Every target skill — not only programming languages — must be hard-fenced so the
+    interview never drifts off the single subject under assessment.
+    """
+    return f"""
+Strict scope enforcement for {skill_name} (CRITICAL — topic drift is a hard failure):
+- Every single question must directly test the candidate's hands-on knowledge of {skill_name}.
+- Do NOT ask about any other tool, framework, library, language, cloud product, or methodology,
+  even when it appears in the candidate's résumé, projects, or previous answers.
+- The only exception is referencing another technology for one clause strictly to frame a
+  {skill_name} question (e.g. "when using {skill_name} with X, ...") — the question itself must
+  still assess {skill_name}.
+- If the candidate steers the conversation toward a different technology, acknowledge it in one
+  short sentence and immediately redirect with the next question strictly about {skill_name}.
+""".strip()
 
 
 def _build_language_scope_addendum(skill_name: str) -> str:
@@ -249,6 +287,96 @@ def get_writing_reference_text(language: str) -> str:
     return WRITING_REFERENCE_TEXTS.get(language.strip().lower(), WRITING_REFERENCE_TEXTS_DEFAULT)
 
 
+# ── Language mode — listening comprehension task ────────────────────────────────
+# The passage is spoken aloud (TTS) but never shown as text. The candidate must
+# comprehend the audio to answer the question. One (passage, question, instruction)
+# set per supported language.
+
+LISTENING_TASKS: dict[str, dict[str, str]] = {
+    "english": {
+        "passage": (
+            "Good morning. Welcome to your first day at adidas Porto. Your onboarding session "
+            "will start at ten o'clock in meeting room three, on the second floor. Please bring "
+            "your laptop and your identification badge. After the session, your team lead, Marta, "
+            "will give you a short tour of the office and introduce you to your colleagues. Lunch "
+            "is provided in the canteen at half past twelve."
+        ),
+        "question": "Where and at what time does the onboarding session start, and what two items should you bring?",
+        "instruction": (
+            "🎧 Listening task. I will now read a short passage aloud one time only — the text will "
+            "not be shown. Listen carefully, then type your answer to this question: "
+            "Where and at what time does the onboarding session start, and what two items should you bring?"
+        ),
+    },
+    "portuguese": {
+        "passage": (
+            "Bom dia. Bem-vindo ao seu primeiro dia na adidas Porto. A sua sessão de integração "
+            "começa às dez horas na sala de reuniões três, no segundo andar. Por favor, traga o seu "
+            "computador portátil e o seu cartão de identificação. Depois da sessão, a sua líder de "
+            "equipa, a Marta, fará uma pequena visita ao escritório e apresentá-lo-á aos colegas. "
+            "O almoço é servido na cantina às doze e meia."
+        ),
+        "question": "Onde e a que horas começa a sessão de integração, e que dois objetos deve trazer?",
+        "instruction": (
+            "🎧 Tarefa de compreensão oral. Vou ler um pequeno texto em voz alta apenas uma vez — o "
+            "texto não será mostrado. Ouça com atenção e depois escreva a sua resposta a esta pergunta: "
+            "Onde e a que horas começa a sessão de integração, e que dois objetos deve trazer?"
+        ),
+    },
+    "spanish": {
+        "passage": (
+            "Buenos días. Bienvenido a su primer día en adidas Porto. Su sesión de incorporación "
+            "comienza a las diez en la sala de reuniones tres, en la segunda planta. Por favor, traiga "
+            "su ordenador portátil y su tarjeta de identificación. Después de la sesión, su responsable "
+            "de equipo, Marta, le hará una breve visita por la oficina y le presentará a sus compañeros. "
+            "El almuerzo se sirve en la cantina a las doce y media."
+        ),
+        "question": "¿Dónde y a qué hora comienza la sesión de incorporación, y qué dos objetos debe traer?",
+        "instruction": (
+            "🎧 Tarea de comprensión auditiva. Voy a leer un texto breve en voz alta una sola vez — el "
+            "texto no se mostrará. Escuche con atención y luego escriba su respuesta a esta pregunta: "
+            "¿Dónde y a qué hora comienza la sesión de incorporación, y qué dos objetos debe traer?"
+        ),
+    },
+    "german": {
+        "passage": (
+            "Guten Morgen. Willkommen zu Ihrem ersten Tag bei adidas Porto. Ihre Einführungssitzung "
+            "beginnt um zehn Uhr im Besprechungsraum drei im zweiten Stock. Bitte bringen Sie Ihren "
+            "Laptop und Ihren Ausweis mit. Nach der Sitzung wird Ihre Teamleiterin, Marta, Ihnen einen "
+            "kurzen Rundgang durch das Büro geben und Sie Ihren Kollegen vorstellen. Das Mittagessen "
+            "wird um halb eins in der Kantine serviert."
+        ),
+        "question": "Wo und um wie viel Uhr beginnt die Einführungssitzung, und welche zwei Dinge sollen Sie mitbringen?",
+        "instruction": (
+            "🎧 Hörverständnisaufgabe. Ich lese Ihnen jetzt einen kurzen Text einmal vor — der Text wird "
+            "nicht angezeigt. Hören Sie gut zu und schreiben Sie dann Ihre Antwort auf diese Frage: "
+            "Wo und um wie viel Uhr beginnt die Einführungssitzung, und welche zwei Dinge sollen Sie mitbringen?"
+        ),
+    },
+    "french": {
+        "passage": (
+            "Bonjour. Bienvenue pour votre premier jour chez adidas Porto. Votre séance d'intégration "
+            "commence à dix heures dans la salle de réunion trois, au deuxième étage. Veuillez apporter "
+            "votre ordinateur portable et votre badge d'identification. Après la séance, votre chef "
+            "d'équipe, Marta, vous fera une courte visite du bureau et vous présentera à vos collègues. "
+            "Le déjeuner est servi à la cantine à midi et demi."
+        ),
+        "question": "Où et à quelle heure commence la séance d'intégration, et quels deux objets devez-vous apporter ?",
+        "instruction": (
+            "🎧 Tâche de compréhension orale. Je vais lire un court texte à voix haute une seule fois — le "
+            "texte ne sera pas affiché. Écoutez attentivement puis écrivez votre réponse à cette question : "
+            "Où et à quelle heure commence la séance d'intégration, et quels deux objets devez-vous apporter ?"
+        ),
+    },
+}
+
+LISTENING_TASK_DEFAULT = LISTENING_TASKS["english"]
+
+
+def get_listening_task(language: str) -> dict[str, str]:
+    return LISTENING_TASKS.get(language.strip().lower(), LISTENING_TASK_DEFAULT)
+
+
 # ── Language mode prompts ───────────────────────────────────────────────────────
 
 LANGUAGE_PERSONA_PROMPT = """
@@ -296,17 +424,25 @@ Q5: Which of those values do you relate to the most, and why?
 After the candidate answers Q5, move immediately to Phase 3.
 
 ══════════════════════════════════════════════════════════
-PHASE 3 — WRITING TASK (exactly 1 turn to present, 1 candidate reply)
+PHASE 3 — LISTENING TASK (system-handled — DO NOT generate this yourself)
+══════════════════════════════════════════════════════════
+The system presents the listening-comprehension task automatically: it plays a short passage
+aloud (the text is NOT shown to the candidate) and asks one comprehension question. You will
+see the candidate's answer to that question in the conversation. Do NOT re-read or repeat the
+passage. Once the candidate has answered the listening question, move immediately to Phase 4.
+
+══════════════════════════════════════════════════════════
+PHASE 4 — WRITING TASK (exactly 1 turn to present, 1 candidate reply)
 ══════════════════════════════════════════════════════════
 Instruct the candidate to type the following text exactly as shown in the chat.
 Present the dictation text on a new line, verbatim — do not translate or alter it.
-After the candidate submits their typed version, move immediately to Phase 4.
+After the candidate submits their typed version, move immediately to Phase 5.
 
 Dictation text to present:
 {{WRITING_REFERENCE_TEXT}}
 
 ══════════════════════════════════════════════════════════
-PHASE 4 — CLOSING (exactly 1 turn, then end)
+PHASE 5 — CLOSING (exactly 1 turn, then end)
 ══════════════════════════════════════════════════════════
 Thank the candidate for their time.
 Inform them that the Talent Acquisition team will review their application and get back to them
@@ -316,8 +452,9 @@ Then append the end token: {END_INTERVIEW_SENTINEL}
 ══════════════════════════════════════════════════════════
 INTERNAL TURN STATE (update each turn, do not reveal)
 ══════════════════════════════════════════════════════════
-- phase: intro | oral_q1 | oral_q2 | oral_q3 | oral_q4 | oral_q5 | writing | closing
+- phase: intro | oral_q1 | oral_q2 | oral_q3 | oral_q4 | oral_q5 | listening | writing | closing
 - oral_questions_asked: 0-5
+- listening_answered: false | true
 - writing_submitted: false | true
 - cefr_signal: A1/A2/B1/B2/C1/C2
 """
@@ -367,6 +504,13 @@ def build_technical_system_prompt(candidate: CandidateProfile) -> str:
         else []
     )
     off_topic_block = ", ".join(off_topic_skills) if off_topic_skills else "None listed"
+    def _format_period(project: Any) -> str:
+        start = (getattr(project, "start_date", None) or "").strip()
+        end = (getattr(project, "end_date", None) or "").strip()
+        if start or end:
+            return f" | Period: {start or '?'} – {end or 'present'}"
+        return ""
+
     projects_block = "\n".join(
         [
             f"- {project.title or 'Untitled'}: {project.description}"
@@ -375,16 +519,18 @@ def build_technical_system_prompt(candidate: CandidateProfile) -> str:
                 if project.technologies
                 else ""
             )
+            + _format_period(project)
             for project in candidate.projects
         ]
     ) or "- None provided"
 
     skill_type = _get_skill_type(normalized_focus)
-    language_addendum = (
-        "\n\n" + _build_language_scope_addendum(focus)
-        if focus and skill_type == "language"
-        else ""
-    )
+    if focus and skill_type == "language":
+        scope_addendum = "\n\n" + _build_language_scope_addendum(focus)
+    elif focus:
+        scope_addendum = "\n\n" + _build_generic_scope_addendum(focus)
+    else:
+        scope_addendum = ""
 
     scope_block = (
         f"""
@@ -393,7 +539,7 @@ Skill scope contract (MANDATORY):
 - Every question must directly assess {focus} implementation ability.
 - Do NOT ask about unrelated tools/frameworks/cloud products, even if they appear in resume context.
 - If the candidate answers with off-topic technologies, acknowledge briefly and immediately ask the next question strictly about {focus}.
-- Off-topic skills you must avoid unless explicitly needed to explain {focus}: {off_topic_block}{language_addendum}
+- Off-topic skills you must avoid unless explicitly needed to explain {focus}: {off_topic_block}{scope_addendum}
 """.strip()
         if focus
         else """
@@ -404,11 +550,26 @@ Skill scope contract (MANDATORY):
     )
 
     focus_label = focus or "highest-signal technical skill in provided profile"
+    resume_anchoring_block = f"""
+Résumé anchoring and difficulty calibration (MANDATORY):
+- Ground your questions in the candidate's real Work Experience & Projects listed below.
+- Open with a question about the experience/project that is MOST relevant to {focus_label}
+  (e.g. if the target skill is SQL, ask about the project where they actually used SQL).
+- If no listed experience clearly relates to {focus_label}, say so briefly and ask a direct
+  {focus_label} question instead — never invent experience the candidate did not provide.
+- Infer the candidate's seniority/skill level from their titles, project depth, and periods,
+  then calibrate difficulty accordingly: start at a level that matches the résumé evidence and
+  probe one step deeper with each correct answer.
+- Every question must still stay strictly within {focus_label}. Résumé anchoring changes WHICH
+  {focus_label} question you ask, never the subject itself.
+""".strip()
     return f"""
 {INTERVIEWER_PERSONA_PROMPT}
 {INTERVIEW_GUARDRAILS_PROMPT}
 {INTERVIEW_FLOW_PROMPT}
 {scope_block}
+
+{resume_anchoring_block}
 
 Candidate context:
 - Candidate ID: {candidate.candidate_id}
@@ -418,7 +579,7 @@ Candidate context:
 Extracted skills:
 {skills_block}
 
-Extracted projects:
+Extracted Work Experience & Projects:
 {projects_block}
 """.strip()
 
@@ -437,7 +598,7 @@ Candidate context:
 - Candidate ID: {candidate.candidate_id}
 - Candidate Name: {name}
 - Assessed language: {language}
-- Assessment type: CEFR Language Proficiency (structured 4-phase script)
+- Assessment type: CEFR Language Proficiency (structured 5-phase script: intro, oral, listening, writing, closing)
 - Conduct all your messages in {language}.
 - Do NOT ask about technical programming skills.
 """.strip()
@@ -476,9 +637,10 @@ class InterviewSessionManager:
             {
                 "phase": "oral_q1",
                 "oral_questions_asked": 0,
+                "listening_answered": False,
                 "writing_submitted": False,
                 "cefr_signal": "B1",
-                # Budget: 5 oral answers + 1 writing submission + 1 closing = 7 minimum turns
+                # Budget: 5 oral + 1 listening + 1 writing answer; closing fires on the 7th turn.
                 "remaining_question_budget": 7,
             }
             if candidate.mode == "LANGUAGE"
@@ -504,7 +666,7 @@ class InterviewSessionManager:
 
     async def process_turn(
         self, session_id: str, user_text: str, is_clarification: bool = False
-    ) -> tuple[str, bool]:
+    ) -> tuple[str, bool, dict[str, Any]]:
         if session_id not in self.sessions:
             raise ValueError("Session not found")
         state = self.sessions[session_id]
@@ -519,10 +681,14 @@ class InterviewSessionManager:
         if not is_clarification:
             turn_state["remaining_question_budget"] = max(remaining - 1, 0)
 
+        listening_payload: dict[str, str] | None = None
+
         if mode == "LANGUAGE":
-            # Advance the phase state machine
+            # Advance the phase state machine:
+            #   oral_q1..oral_q5 → listening → writing → closing
             phase = turn_state.get("phase", "oral_q1")
             oral_asked = int(turn_state.get("oral_questions_asked", 0))
+            listening_answered = bool(turn_state.get("listening_answered", False))
             writing_submitted = bool(turn_state.get("writing_submitted", False))
 
             if phase.startswith("oral_q"):
@@ -531,10 +697,28 @@ class InterviewSessionManager:
                 if oral_asked < 5:
                     turn_state["phase"] = f"oral_q{oral_asked + 1}"
                 else:
-                    turn_state["phase"] = "writing"
+                    turn_state["phase"] = "listening"
+            elif phase == "listening" and not listening_answered:
+                turn_state["listening_answered"] = True
+                turn_state["phase"] = "writing"
             elif phase == "writing" and not writing_submitted:
                 turn_state["writing_submitted"] = True
                 turn_state["phase"] = "closing"
+
+            if turn_state["phase"] == "listening":
+                # Deterministic listening turn — bypass the LLM so the passage is
+                # delivered as audio only and never leaked as visible text.
+                language = state.get("candidate", {}).get("target_language") or "English"
+                task = get_listening_task(language)
+                listening_payload = {
+                    "visible": task["instruction"],
+                    "speak_text": f'{task["passage"]}\n\n{task["question"]}',
+                    "transcript_text": (
+                        f'{task["instruction"]}\n\n'
+                        f'[Audio passage read aloud for listening comprehension — '
+                        f'not shown to the candidate]: {task["passage"]}'
+                    ),
+                }
         else:
             turn_state["depth_level"] = min(int(turn_state.get("depth_level", 1)) + 1, 5)
             turn_state["evidence_confidence"] = min(
@@ -543,6 +727,21 @@ class InterviewSessionManager:
             )
 
         state["turn_state"] = turn_state
+
+        extras: dict[str, Any] = {}
+
+        if listening_payload is not None:
+            assistant_reply = listening_payload["visible"]
+            extras["speak_text"] = listening_payload["speak_text"]
+            extras["transcript_text"] = listening_payload["transcript_text"]
+            # Persist the full passage into history so the evaluator can grade listening.
+            state["messages"].append(
+                ChatMessage(
+                    role="assistant", content=listening_payload["transcript_text"]
+                ).model_dump()
+            )
+            return assistant_reply, False, extras
+
         assistant_reply = await self._chat(state["messages"])
 
         if (
@@ -558,7 +757,7 @@ class InterviewSessionManager:
         if should_end:
             state["lifecycle"] = "ended"
 
-        return assistant_reply.replace(END_INTERVIEW_SENTINEL, "").strip(), should_end
+        return assistant_reply.replace(END_INTERVIEW_SENTINEL, "").strip(), should_end, extras
 
     def get_transcript(self, session_id: str) -> list[ChatMessage]:
         if session_id not in self.sessions:

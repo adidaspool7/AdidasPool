@@ -39,8 +39,25 @@ for the skill under assessment, based solely on the interview transcript.
     "technical": "one or two sentences citing specific transcript evidence",
     "integrity": "one sentence",
     "final": "one sentence summary"
+  },
+  "trajectory": {
+    "skill_assessed": "the single skill under assessment (e.g. SQL)",
+    "criteria": [
+      { "name": "e.g. JOIN semantics", "grade": "STRONG | ADEQUATE | WEAK | NOT_ASSESSED",
+        "evidence": "short quote or paraphrase of what the candidate said" }
+    ],
+    "how_graded": "one or two sentences on the grading method and where the passing bar sat",
+    "strengths": ["..."],
+    "weaknesses": ["..."],
+    "pass_fail_justification": "explicit reason the candidate is above/below the passing bar"
   }
 }
+
+Rules for the `trajectory` object (MANDATORY — this is the audit trail HR reads):
+- `criteria` must contain one entry per distinct sub-topic actually probed in the interview.
+  Grade each STRONG/ADEQUATE/WEAK, or NOT_ASSESSED if the topic never came up.
+- `pass_fail_justification` must name the concrete bar and why the candidate cleared or missed it.
+- Base everything only on transcript evidence.
 
 Rules for the `evidence` array:
 - On PASS: may be empty or contain supporting quotes.
@@ -50,19 +67,26 @@ Rules for the `evidence` array:
 
 Turn count context: {turn_count} user turns were recorded.
 If turn_count < 5, require strong evidence of factual error to fail.
+{early_termination_clause}
 """
 
 
 LANGUAGE_EVALUATION_PROMPT = """
 You are a certified CEFR language examiner evaluating a structured language assessment transcript.
-The assessment followed a fixed 4-phase script: intro, 5 oral questions, 1 writing dictation task,
-and a closing. Assess the candidate across FIVE dimensions:
+The assessment followed a fixed 5-phase script: intro, 5 oral questions, 1 listening-comprehension
+task, 1 writing dictation task, and a closing. You MUST score all three mandated aspects —
+LISTENING, WRITING, and SPEAKING — plus grammar and vocabulary. Assess these SIX dimensions:
 
-1. Grammar — accuracy and range across all oral turns
-2. Vocabulary — range and precision across all oral turns
-3. Fluency — coherence, natural flow, response length and depth
+1. Speaking (fluency) — coherence, natural flow, response length and depth across the oral turns
+2. Grammar — accuracy and range across all oral turns
+3. Vocabulary — range and precision across all oral turns
 4. Task achievement — did the candidate engage appropriately with the job-context questions?
-5. Writing — accuracy of the dictation turn: how faithfully did the candidate reproduce the
+5. Listening — the listening turn is the candidate message that immediately follows the AI's
+   listening-comprehension prompt (the AI played a short passage aloud and asked a question about
+   it; the passage text was NOT shown to the candidate). Judge how correctly and relevantly the
+   candidate answered that comprehension question. If the candidate clearly did not understand the
+   spoken passage, score listening low.
+6. Writing — accuracy of the dictation turn: how faithfully did the candidate reproduce the
    reference text? Penalise spelling errors, missing words, punctuation errors, and omissions.
    Award full marks (C2) only for a perfect or near-perfect reproduction.
 
@@ -73,11 +97,6 @@ and a closing. Assess the candidate across FIVE dimensions:
 - C1: Fluent, flexible, precise language with rare errors
 - C2: Near-native mastery, wide range, minimal errors
 
-## Identifying the writing turn
-The writing turn is the candidate message that immediately follows the AI message presenting
-the dictation text (the adidas Porto paragraph). Compare that candidate message to the
-reference text to score the writing dimension.
-
 ## Output format — strict JSON only
 
 {
@@ -87,22 +106,40 @@ reference text to score the writing dimension.
     "grammar": "B2",
     "vocabulary": "B1",
     "fluency": "B2",
+    "listening": "B2",
     "writing": "B1"
   },
   "integrity": { "status": "CLEAR" },
   "final": true,
   "evidence": [],
   "rationale": {
-    "technical": "B2 overall — good grammar control, varied vocabulary; writing had 3 spelling errors",
+    "technical": "B2 overall — good grammar control, varied vocabulary; listening answer on-point; writing had 3 spelling errors",
     "integrity": "Natural responses, no copy-paste pattern detected in oral turns",
     "final": "B2 — meets B1 threshold, recommended for roles requiring professional communication"
+  },
+  "trajectory": {
+    "skill_assessed": "CEFR language proficiency (<language>)",
+    "criteria": [
+      { "name": "Speaking (fluency)", "grade": "B2", "evidence": "short paraphrase" },
+      { "name": "Grammar", "grade": "B2", "evidence": "short paraphrase" },
+      { "name": "Vocabulary", "grade": "B1", "evidence": "short paraphrase" },
+      { "name": "Listening", "grade": "B2", "evidence": "how well the comprehension answer matched the spoken passage" },
+      { "name": "Writing", "grade": "B1", "evidence": "number/type of dictation errors" }
+    ],
+    "how_graded": "one or two sentences: overall CEFR is the balanced average of the dimensions, bar is B1",
+    "strengths": ["..."],
+    "weaknesses": ["..."],
+    "pass_fail_justification": "explicit reason the overall level is above/below the B1 bar"
   }
 }
 
 Pass threshold: B1 or above overall (passed=true). A1/A2 is passed=false.
 If the writing turn is absent (candidate skipped it), set "writing": "A1" and note it in the rationale.
+If the listening turn is absent, set "listening": "A1" and note it in the rationale.
+The `trajectory` object is MANDATORY and must grade every dimension listed above.
 
 Turn count context: {turn_count} user turns were recorded.
+{early_termination_clause}
 """
 
 
@@ -123,17 +160,28 @@ class InterviewEvaluator:
         candidate: CandidateProfile,
         transcript: list[ChatMessage],
         mode: str = "TECHNICAL",
+        early_terminated: bool = False,
     ) -> dict[str, Any]:
         turn_count = _count_user_turns(transcript)
+
+        early_termination_clause = (
+            "IMPORTANT — this interview was ENDED EARLY (the candidate exited or the time window "
+            "elapsed before all planned questions were asked). Evaluate fairly and only on the "
+            "questions that WERE answered. Do NOT penalise the candidate for the reduced number of "
+            "questions, and do NOT fail them merely because fewer topics were covered. Apply the "
+            "same evidence bar as a full interview."
+            if early_terminated
+            else ""
+        )
 
         if mode == "LANGUAGE":
             system_prompt = LANGUAGE_EVALUATION_PROMPT.replace(
                 "{turn_count}", str(turn_count)
-            )
+            ).replace("{early_termination_clause}", early_termination_clause)
         else:
             system_prompt = TECHNICAL_EVALUATION_PROMPT.replace(
                 "{turn_count}", str(turn_count)
-            )
+            ).replace("{early_termination_clause}", early_termination_clause)
 
         transcript_text = "\n".join(
             [
@@ -154,7 +202,7 @@ Transcript ({turn_count} candidate turns):
             model=self.model,
             response_format={"type": "json_object"},
             temperature=0,
-            max_tokens=500,
+            max_tokens=900,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_payload},
@@ -208,23 +256,52 @@ Transcript ({turn_count} candidate turns):
             cefr_level = str(technical_data.get("cefr_level", "B1")).upper()
             if cefr_level not in VALID_CEFR_LEVELS:
                 cefr_level = "B1"
+
+            def _cefr(key: str) -> str:
+                value = str(technical_data.get(key, cefr_level)).upper()
+                return value if value in VALID_CEFR_LEVELS else cefr_level
+
             result_technical["cefr_level"] = cefr_level
-            result_technical["grammar"] = str(technical_data.get("grammar", cefr_level)).upper()
-            result_technical["vocabulary"] = str(technical_data.get("vocabulary", cefr_level)).upper()
-            result_technical["fluency"] = str(technical_data.get("fluency", cefr_level)).upper()
-            writing = str(technical_data.get("writing", cefr_level)).upper()
-            result_technical["writing"] = writing if writing in VALID_CEFR_LEVELS else cefr_level
+            result_technical["grammar"] = _cefr("grammar")
+            result_technical["vocabulary"] = _cefr("vocabulary")
+            result_technical["fluency"] = _cefr("fluency")
+            result_technical["listening"] = _cefr("listening")
+            result_technical["writing"] = _cefr("writing")
+
+        # Structured grading trajectory (audit trail for HR).
+        trajectory = parsed.get("trajectory")
+        if not isinstance(trajectory, dict):
+            trajectory = {}
+
+        result_rationale: dict[str, str] = {
+            "technical": str(rationale.get("technical", "")),
+            "integrity": str(rationale.get("integrity", "")),
+            "final": str(rationale.get("final", "")),
+        }
+
+        # Early termination: fair eval already applied above. If the candidate still
+        # passed, attach an explicit early-termination note (per product requirement).
+        if early_terminated:
+            note = (
+                f"Interview ended early; the candidate was evaluated fairly on the "
+                f"{turn_count} question(s) answered."
+            )
+            if final_gate:
+                result_rationale["early_termination"] = f"{note} They still met the passing bar."
+                result_rationale["final"] = (
+                    f"{result_rationale['final']} ({note} Passing bar still met.)".strip()
+                )
+            else:
+                result_rationale["early_termination"] = note
 
         return {
             "technical": result_technical,
             "integrity": {"status": integrity_status},
             "final": final_gate,
             "evidence": evidence,
-            "rationale": {
-                "technical": str(rationale.get("technical", "")),
-                "integrity": str(rationale.get("integrity", "")),
-                "final": str(rationale.get("final", "")),
-            },
+            "rationale": result_rationale,
+            "trajectory": trajectory,
+            "early_terminated": early_terminated,
             "raw": parsed,
             "turn_count": turn_count,
         }

@@ -54,10 +54,14 @@ async def next_turn(payload: TurnRequest) -> TurnResponse:
         transcript_user = payload.user_text or await stt_service.transcribe_audio(
             payload.user_audio_base64 or ""
         )
-        assistant_reply, should_end = await interviewer.process_turn(
+        assistant_reply, should_end, extras = await interviewer.process_turn(
             payload.session_id, transcript_user, is_clarification=payload.is_clarification
         )
-        audio_base64, audio_mime_type = await tts_service.synthesize_text(assistant_reply)
+        # For a listening turn, speak the hidden passage (not the visible instruction).
+        speak_text = extras.get("speak_text")
+        audio_base64, audio_mime_type = await tts_service.synthesize_text(
+            speak_text or assistant_reply
+        )
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -65,6 +69,8 @@ async def next_turn(payload: TurnRequest) -> TurnResponse:
         session_id=payload.session_id,
         transcript_user=transcript_user,
         assistant_reply=assistant_reply,
+        speak_text=speak_text,
+        transcript_assistant=extras.get("transcript_text"),
         audio_base64=audio_base64,
         audio_mime_type=audio_mime_type,
         should_end=should_end,
@@ -101,11 +107,19 @@ async def end_interview(payload: EndInterviewRequest) -> EndInterviewResponse:
 
 @app.post("/interview/evaluate", response_model=EvaluationResponse)
 async def evaluate_interview(payload: EvaluationRequest) -> EvaluationResponse:
-    result = await evaluator.evaluate(payload.candidate, payload.transcript, mode=payload.mode)
+    result = await evaluator.evaluate(
+        payload.candidate,
+        payload.transcript,
+        mode=payload.mode,
+        early_terminated=payload.early_terminated,
+    )
     return EvaluationResponse(
         technical=result["technical"],
         integrity=result["integrity"],
         final=bool(result["final"]),
         rationale=result.get("rationale"),
+        trajectory=result.get("trajectory"),
+        early_terminated=bool(result.get("early_terminated", False)),
+        evidence=result.get("evidence", []),
         raw=result.get("raw"),
     )

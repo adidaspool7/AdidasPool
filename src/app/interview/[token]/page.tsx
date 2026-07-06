@@ -8,8 +8,10 @@ import { Input } from "@client/components/ui/input";
 import { formatTime, isClarificationText, STT_FALLBACK_MESSAGE } from "@/lib/interview-utils";
 
 // ─── Timer constants ──────────────────────────────────────────────────────────
-// Total interview timer removed (Phase 2 — only per-question timer remains)
 const QUESTION_SECONDS = 3 * 60; // 3 minutes per question
+// Total interview window cap. When it elapses the interview auto-ends and is
+// evaluated as an early termination (fair eval on answered questions).
+const TOTAL_SECONDS = 15 * 60; // 15 minutes total window
 
 // ─── Browser API types ────────────────────────────────────────────────────────
 interface SpeechRecognitionEvent extends Event {
@@ -48,6 +50,8 @@ type RealtimeStartResponse = {
 
 type RealtimeTurnResponse = {
   assistant_reply?: string;
+  /** For listening turns: text to speak aloud (the hidden passage), differs from the visible reply. */
+  speak_text?: string | null;
   should_end?: boolean;
   evaluation?: EvaluationResult | null;
   error?: string;
@@ -63,15 +67,24 @@ type TerminateResponse = {
     technical?: string;
     integrity?: string;
     final?: string;
+    early_termination?: string;
   };
   error?: string;
 };
 
 type EvaluationResult = {
   final?: boolean;
-  technical?: { passed?: boolean; cefr_level?: string; grammar?: string; vocabulary?: string; fluency?: string };
+  technical?: {
+    passed?: boolean;
+    cefr_level?: string;
+    grammar?: string;
+    vocabulary?: string;
+    fluency?: string;
+    listening?: string;
+    writing?: string;
+  };
   integrity?: { status?: string };
-  rationale?: { technical?: string; integrity?: string; final?: string };
+  rationale?: { technical?: string; integrity?: string; final?: string; early_termination?: string };
 };
 
 type ChatLine = { role: "assistant" | "user"; content: string };
@@ -145,10 +158,15 @@ export default function InterviewRuntimePage() {
   // ── Evaluation results
   const [evaluation, setEvaluation] = useState<TerminateResponse | null>(null);
 
-  // ── Per-question timer only (total timer removed)
+  // ── Per-question timer
   const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_SECONDS);
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const questionTimeoutFiredRef = useRef(false);
+
+  // ── Total interview window timer (15 min hard cap)
+  const [totalTimeLeft, setTotalTimeLeft] = useState(TOTAL_SECONDS);
+  const totalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const totalTimeoutFiredRef = useRef(false);
 
   // ── Refs
   const interviewIdRef = useRef<string>("");
@@ -379,6 +397,42 @@ export default function InterviewRuntimePage() {
     }
   }
 
+  function stopTotalTimer() {
+    if (totalTimerRef.current) {
+      clearInterval(totalTimerRef.current);
+      totalTimerRef.current = null;
+    }
+  }
+
+  /**
+   * Start the single 15-minute total interview window. Runs once for the whole
+   * session (never reset). On expiry the interview is terminated early and
+   * evaluated fairly on whatever was answered.
+   */
+  function startTotalTimer() {
+    totalTimeoutFiredRef.current = false;
+    setTotalTimeLeft(TOTAL_SECONDS);
+    if (totalTimerRef.current) clearInterval(totalTimerRef.current);
+    let remaining = TOTAL_SECONDS;
+    totalTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setTotalTimeLeft(remaining);
+      if (remaining <= 0 && !totalTimeoutFiredRef.current) {
+        totalTimeoutFiredRef.current = true;
+        stopTotalTimer();
+        void handleTotalTimeout();
+      }
+    }, 1000);
+  }
+
+  async function handleTotalTimeout() {
+    if (endedRef.current) return;
+    await emitProctoring("interview_time_limit", "WARNING", {
+      totalWindowSeconds: TOTAL_SECONDS,
+    });
+    await terminateInterview("time_limit_reached");
+  }
+
   /**
    * Reset and restart the per-question countdown.
    * Only call this when a new question arrives — NOT on clarification turns.
@@ -431,7 +485,13 @@ export default function InterviewRuntimePage() {
         setQuestion(assistantText);
         if (assistantText.length > 0) {
           setChat((prev) => [...prev, { role: "assistant", content: assistantText }]);
-          if (ttsEnabled) speakText(assistantText, targetLanguage);
+          if (data.speak_text) {
+            // Listening turn: the hidden passage MUST play for the task to be valid,
+            // so speak it regardless of the TTS toggle.
+            speakText(data.speak_text, targetLanguage);
+          } else if (ttsEnabled) {
+            speakText(assistantText, targetLanguage);
+          }
         }
 
         if (data.should_end) {
@@ -475,6 +535,7 @@ export default function InterviewRuntimePage() {
     endedRef.current = true;
     setEnded(true);
     stopQuestionTimer();
+    stopTotalTimer();
     if (monitorRef.current) window.clearInterval(monitorRef.current);
     stopMediaStream();
     window.speechSynthesis?.cancel();
@@ -497,6 +558,7 @@ export default function InterviewRuntimePage() {
     endedRef.current = true;
     setEnded(true);           // Show ended view immediately — Return button visible at once
     stopQuestionTimer();
+    stopTotalTimer();
     if (monitorRef.current) window.clearInterval(monitorRef.current);
     stopMediaStream();
     window.speechSynthesis?.cancel();
@@ -634,7 +696,12 @@ export default function InterviewRuntimePage() {
         firstName?: string;
         lastName?: string;
         skills?: Array<{ name: string; category?: string }>;
-        experiences?: Array<{ jobTitle?: string; description?: string }>;
+        experiences?: Array<{
+          jobTitle?: string;
+          description?: string;
+          startDate?: string | null;
+          endDate?: string | null;
+        }>;
       };
 
       const startRes = await fetch("/api/interview/realtime", {
@@ -656,6 +723,8 @@ export default function InterviewRuntimePage() {
               title: e.jobTitle || null,
               description: e.description || e.jobTitle || "No project details",
               technologies: [],
+              startDate: e.startDate ?? null,
+              endDate: e.endDate ?? null,
             })),
           },
         }),
@@ -690,6 +759,7 @@ export default function InterviewRuntimePage() {
       if (ttsEnabled) speakText(data.firstQuestion, data.targetLanguage ?? "English");
       startIntegrityMonitor();
       resetQuestionTimer();
+      startTotalTimer();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start interview");
     } finally {
@@ -718,6 +788,7 @@ export default function InterviewRuntimePage() {
       cleanup();
       if (monitorRef.current) window.clearInterval(monitorRef.current);
       stopQuestionTimer();
+      stopTotalTimer();
       stopMediaStream();
       window.speechSynthesis?.cancel();
       if (audioContextRef.current) {
@@ -737,6 +808,13 @@ export default function InterviewRuntimePage() {
     questionTimeLeft < 30
       ? "text-destructive"
       : questionTimeLeft < 60
+        ? "text-amber-500"
+        : "text-foreground";
+
+  const totalTimerColor =
+    totalTimeLeft < 60
+      ? "text-destructive"
+      : totalTimeLeft < 180
         ? "text-amber-500"
         : "text-foreground";
 
@@ -844,6 +922,12 @@ export default function InterviewRuntimePage() {
                               {evaluation.rationale.final}
                             </p>
                           )}
+                          {evaluation.rationale.early_termination && (
+                            <p className="text-amber-700 dark:text-amber-300">
+                              <span className="font-medium">⏱ Early termination: </span>
+                              {evaluation.rationale.early_termination}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -868,6 +952,10 @@ export default function InterviewRuntimePage() {
                   <span className="text-muted-foreground text-xs">Per-question timer</span>
                   <span className={`font-mono font-semibold ${questionTimerColor}`}>
                     {formatTime(questionTimeLeft)}
+                  </span>
+                  <span className="text-muted-foreground text-xs">Total</span>
+                  <span className={`font-mono font-semibold ${totalTimerColor}`}>
+                    {formatTime(totalTimeLeft)}
                   </span>
                   {interviewMode === "TECHNICAL" && (
                     <span className="text-xs text-muted-foreground">

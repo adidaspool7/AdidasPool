@@ -312,6 +312,82 @@ function DecisionBadge({ value }: { value?: string | null }) {
   );
 }
 
+type TrajectoryCriterion = { name?: string; grade?: string; evidence?: string };
+type TrajectoryShape = {
+  skill_assessed?: string;
+  criteria?: TrajectoryCriterion[];
+  how_graded?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  pass_fail_justification?: string;
+};
+
+/** Renders the structured grading trajectory (audit trail) stored on the evaluation. */
+function GradingTrajectory({ trajectory }: { trajectory: unknown }) {
+  if (!trajectory || typeof trajectory !== "object") return null;
+  const t = trajectory as TrajectoryShape;
+  const hasContent =
+    (t.criteria && t.criteria.length > 0) ||
+    t.how_graded ||
+    t.pass_fail_justification ||
+    (t.strengths && t.strengths.length > 0) ||
+    (t.weaknesses && t.weaknesses.length > 0);
+  if (!hasContent) return null;
+
+  const gradeColor = (grade?: string) => {
+    const g = (grade || "").toUpperCase();
+    if (g === "STRONG" || g === "C2" || g === "C1") return "text-green-700 dark:text-green-300";
+    if (g === "WEAK" || g === "A1" || g === "A2") return "text-destructive";
+    if (g === "NOT_ASSESSED") return "text-muted-foreground";
+    return "text-amber-600 dark:text-amber-400";
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-dashed p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Grading trajectory{t.skill_assessed ? ` — ${t.skill_assessed}` : ""}
+      </p>
+      {t.criteria && t.criteria.length > 0 && (
+        <div className="space-y-1">
+          {t.criteria.map((c, i) => (
+            <div key={i} className="text-xs">
+              <span className="font-medium">{c.name ?? `Criterion ${i + 1}`}: </span>
+              <span className={`font-semibold ${gradeColor(c.grade)}`}>{c.grade ?? "—"}</span>
+              {c.evidence ? (
+                <span className="text-muted-foreground"> — {c.evidence}</span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+      {t.how_graded ? (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">How graded: </span>
+          {t.how_graded}
+        </p>
+      ) : null}
+      {t.strengths && t.strengths.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Strengths: </span>
+          {t.strengths.join("; ")}
+        </p>
+      ) : null}
+      {t.weaknesses && t.weaknesses.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Weaknesses: </span>
+          {t.weaknesses.join("; ")}
+        </p>
+      ) : null}
+      {t.pass_fail_justification ? (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Pass/fail justification: </span>
+          {t.pass_fail_justification}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function InterviewCard({ session }: { session: InterviewSession }) {
   const [expanded, setExpanded] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -390,11 +466,11 @@ function InterviewCard({ session }: { session: InterviewSession }) {
                 ) : null
               )}
               {/* CEFR / language metrics */}
-              {(["cefr_level", "grammar", "vocabulary", "fluency"] as const).some(
+              {(["cefr_level", "grammar", "vocabulary", "fluency", "listening", "writing"] as const).some(
                 (k) => rationale[k]
               ) && (
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {(["cefr_level", "grammar", "vocabulary", "fluency"] as const).map(
+                  {(["cefr_level", "grammar", "vocabulary", "fluency", "listening", "writing"] as const).map(
                     (k) =>
                       rationale[k] ? (
                         <span
@@ -407,6 +483,14 @@ function InterviewCard({ session }: { session: InterviewSession }) {
                   )}
                 </div>
               )}
+              {/* Early-termination note */}
+              {rationale.early_termination ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  ⏱ {String(rationale.early_termination)}
+                </div>
+              ) : null}
+              {/* Grading trajectory */}
+              <GradingTrajectory trajectory={rationale.trajectory} />
               {/* Evidence */}
               {Array.isArray(rationale.evidence) && rationale.evidence.length > 0 && (
                 <div className="space-y-1">
