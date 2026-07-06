@@ -31,6 +31,7 @@ import {
   SheetTrigger,
 } from "@client/components/ui/sheet";
 import { UserGuideDialog } from "./user-guide-dialog";
+import { ThemeToggle } from "./theme-toggle";
 
 // ============================================
 // NAVIGATION DEFINITIONS PER ROLE
@@ -199,6 +200,7 @@ function SidebarContent({ role, roleLabel, pathname, clearRole, onNavigate, user
 
       {/* Footer */}
       <div className="border-t p-4 space-y-2">
+        <ThemeToggle />
         <UserGuideDialog role={role} />
         <button
           onClick={clearRole}
