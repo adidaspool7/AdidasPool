@@ -85,10 +85,14 @@ async function syncSkillVerification({
 
 async function callPython(
   path: string,
-  payload: unknown
+  payload: unknown,
+  timeoutMs?: number
 ): Promise<EvaluatorResult> {
   const baseUrl = getInterviewBackendUrl();
   const targetUrl = `${baseUrl}${path}`;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer =
+    controller && timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
   let response: Response;
   try {
     response = await fetch(targetUrl, {
@@ -96,10 +100,17 @@ async function callPython(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       cache: "no-store",
+      signal: controller?.signal,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown network error";
+    const message = controller?.signal.aborted
+      ? `timed out after ${timeoutMs}ms`
+      : error instanceof Error
+        ? error.message
+        : "Unknown network error";
     throw new Error(`Interview backend unreachable at ${targetUrl}: ${message}`);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -226,7 +237,7 @@ export async function POST(request: NextRequest) {
           // Reaching this route means the candidate exited or the window elapsed —
           // always an early termination. Evaluate fairly, do not auto-fail.
           early_terminated: true,
-        });
+        }, 45000);
       } catch (evalError) {
         log.error("Evaluator call failed:", evalError);
         evaluation = DEFAULT_EVALUATION;
@@ -309,6 +320,7 @@ export async function POST(request: NextRequest) {
       finalDecision,
       technicalDecision,
       integrityDecision: integrityStatus,
+      technical: evaluation.technical,
       rationale: evaluation.rationale,
     });
   } catch (error) {

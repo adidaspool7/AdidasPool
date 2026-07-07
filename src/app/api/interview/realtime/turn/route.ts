@@ -91,9 +91,12 @@ async function syncSkillVerification({
   }
 }
 
-async function callPython(path: string, payload: unknown) {
+async function callPython(path: string, payload: unknown, timeoutMs?: number) {
   const baseUrl = getInterviewBackendUrl();
   const targetUrl = `${baseUrl}${path}`;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer =
+    controller && timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
   let response: Response;
   try {
     response = await fetch(targetUrl, {
@@ -101,10 +104,17 @@ async function callPython(path: string, payload: unknown) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       cache: "no-store",
+      signal: controller?.signal,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown network error";
+    const message = controller?.signal.aborted
+      ? `timed out after ${timeoutMs}ms`
+      : error instanceof Error
+        ? error.message
+        : "Unknown network error";
     throw new Error(`Interview backend unreachable at ${targetUrl}: ${message}`);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -275,7 +285,7 @@ export async function POST(request: NextRequest) {
           candidate: evaluatorCandidate,
           transcript,
           mode: sessionMode,
-        });
+        }, 45000);
       } catch {
         evaluation = DEFAULT_EVALUATION;
       }

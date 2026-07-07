@@ -63,6 +63,15 @@ type TerminateResponse = {
   /** "PASS"/"FAIL" for technical mode; CEFR level string (e.g. "B2") for language mode */
   technicalDecision?: string;
   integrityDecision?: string;
+  /** Per-dimension CEFR sub-scores (language mode) — surfaced for explainability. */
+  technical?: {
+    cefr_level?: string;
+    grammar?: string;
+    vocabulary?: string;
+    fluency?: string;
+    listening?: string;
+    writing?: string;
+  };
   rationale?: {
     technical?: string;
     integrity?: string;
@@ -501,7 +510,16 @@ export default function InterviewRuntimePage() {
           resetQuestionTimer();
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Turn failed");
+        const msg = e instanceof Error ? e.message : "Turn failed";
+        // If the interview backend lost its in-memory session (e.g. a redeploy or
+        // cold start on the host), the full transcript is still persisted
+        // server-side. Rather than showing a broken-system error, gracefully end
+        // and evaluate fairly on whatever was already answered.
+        if (/session not found|not in running state|token expired|\b404\b/i.test(msg)) {
+          await terminateInterview("session_recovered");
+        } else {
+          setError(msg);
+        }
       } finally {
         setBusy(false);
       }
@@ -547,7 +565,18 @@ export default function InterviewRuntimePage() {
         finalDecision: evalData.final ? "PASS" : "FAIL",
         technicalDecision: cefrLevel ?? (evalData.technical?.passed ? "PASS" : "FAIL"),
         integrityDecision: evalData.integrity?.status ?? "REVIEW",
+        technical: evalData.technical,
         rationale: evalData.rationale,
+      });
+    } else {
+      // Backend returned no evaluation — never hang on the spinner; show a graceful
+      // pending-review result instead of an infinite “Processing…” state.
+      setEvaluation({
+        integrityDecision: "REVIEW",
+        rationale: {
+          final:
+            "Scoring is taking longer than expected. Our team will review your interview and follow up — this does not count against you.",
+        },
       });
     }
   }
@@ -581,6 +610,16 @@ export default function InterviewRuntimePage() {
       await emitProctoring("interview_terminated", "INFO", { reason, evaluation: data });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to finalize interview");
+      // Never leave the candidate on an infinite “Processing evaluation…” spinner.
+      setEvaluation((prev) =>
+        prev ?? {
+          integrityDecision: "REVIEW",
+          rationale: {
+            final:
+              "We couldn't finish scoring your interview automatically. Our team will review it and follow up — this does not count against you.",
+          },
+        }
+      );
     } finally {
       setBusy(false);
     }
@@ -888,10 +927,30 @@ export default function InterviewRuntimePage() {
                         </span>
                       </p>
                       {interviewMode === "LANGUAGE" ? (
-                        <p>
-                          <span className="font-medium">CEFR level: </span>
-                          {evaluation.technicalDecision ?? "—"}
-                        </p>
+                        <>
+                          <p>
+                            <span className="font-medium">CEFR level: </span>
+                            {evaluation.technicalDecision ?? "—"}
+                          </p>
+                          {evaluation.technical && (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded border p-2 text-xs">
+                              {([
+                                ["Speaking / fluency", evaluation.technical.fluency],
+                                ["Grammar", evaluation.technical.grammar],
+                                ["Vocabulary", evaluation.technical.vocabulary],
+                                ["Listening", evaluation.technical.listening],
+                                ["Writing", evaluation.technical.writing],
+                              ] as const).map(([label, val]) =>
+                                val ? (
+                                  <p key={label}>
+                                    <span className="font-medium text-foreground">{label}: </span>
+                                    {val}
+                                  </p>
+                                ) : null
+                              )}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <p>
                           <span className="font-medium">Technical: </span>
@@ -1006,7 +1065,7 @@ export default function InterviewRuntimePage() {
                     autoPlay
                     muted
                     playsInline
-                    className="h-48 w-full rounded-md bg-black object-cover"
+                    className="aspect-video w-full rounded-md bg-black object-contain"
                   />
                   {cameraDevices.length > 1 ? (
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">

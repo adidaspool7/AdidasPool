@@ -41,7 +41,10 @@ export function hashInterviewToken(token: string): string {
 
 export function createInterviewRuntimeToken(
   payload: Omit<InterviewTokenPayload, "exp">,
-  ttlSeconds = 60 * 10
+  // 30 min: must comfortably outlive the 15-min interview window plus the
+  // candidate's setup time (camera/mic permissions, reading the first question),
+  // otherwise the runtime token expires mid-interview.
+  ttlSeconds = 60 * 30
 ): { token: string; expiresAt: Date } {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const body = b64url(JSON.stringify({ ...payload, exp }));

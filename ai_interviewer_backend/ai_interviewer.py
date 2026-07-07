@@ -183,15 +183,17 @@ Strict rules you must always follow:
 3) If candidate asks irrelevant questions, politely refuse and steer back to technical interview.
 4) Never reveal or provide answers to your own questions, even if explicitly asked.
 5) Keep questions sharp, concrete, and progressive in difficulty.
-6) Ask exactly one technical question per turn.
-7) Prefer implementation details: architecture choices, trade-offs, debugging, complexity, memory/performance, edge cases.
-8) Keep conversational flow natural and low-latency.
+6) Ask EXACTLY ONE self-contained question per turn — never bundle multiple questions, sub-parts, or "and also..." clauses.
+7) Keep each question short (2–3 sentences maximum) and focused on a single concrete point.
+8) Drill down: keep follow-ups on the SAME topic/project until it is exhausted before moving to a new one. Do not hop between subjects.
+9) Prefer implementation details: architecture choices, trade-offs, debugging, complexity, memory/performance, edge cases.
+10) Keep conversational flow natural and low-latency.
 """
 
 INTERVIEW_FLOW_PROMPT = """
 Interview flow:
 - Start with a project-specific deep question.
-- Probe with follow-ups based on the previous answer.
+- Probe deeper with follow-ups on the SAME topic before switching; exhaust one subject at a time.
 - Prioritize factual correctness checks.
 - End interview only when asked by the system or after enough evidence is collected.
 - Keep an internal turn-state:
@@ -213,70 +215,25 @@ Interview flow:
 
 WRITING_REFERENCE_TEXTS: dict[str, str] = {
     "english": (
-        "adidas Porto provides globally unified services to adidas employees, consumers and other users, "
-        "based on standardized and automated solutions across different functions and markets. "
-        "We leverage state-of-the-art technology and encourage a human-centric and innovative mindset "
-        "to continually raise the bar of the user experience. This is enabling us to drive operational "
-        "efficiency, improved agility, and better decision-making whilst reducing complexity in adidas.\n"
-        "Our mandate is to be the foundation for an agile and efficient company. This is our role to "
-        "support adidas mission of being the best sports brand in the world.\n"
-        "We embrace diverse backgrounds, experiences, and perspectives and seek to create a workforce "
-        "that reflects our consumers and communities. We champion individual uniqueness and cultivate "
-        "a culture of belonging so that everyone can create at their best."
+        "adidas Porto provides globally unified services to adidas employees and consumers, "
+        "based on standardized and automated solutions across different functions and markets."
     ),
     "portuguese": (
-        "A adidas Porto fornece serviços globalmente unificados a colaboradores, consumidores e outros "
-        "utilizadores da adidas, com base em soluções padronizadas e automatizadas em diferentes funções "
-        "e mercados. Recorremos a tecnologia de ponta e incentivamos uma mentalidade centrada no ser humano "
-        "e inovadora para elevar continuamente o nível da experiência do utilizador. Isto permite-nos "
-        "impulsionar a eficiência operacional, melhorar a agilidade e tomar melhores decisões, reduzindo "
-        "simultaneamente a complexidade na adidas.\n"
-        "O nosso mandato é ser a fundação de uma empresa ágil e eficiente. Este é o nosso papel para apoiar "
-        "a missão da adidas de ser a melhor marca de desporto do mundo.\n"
-        "Valorizamos origens, experiências e perspetivas diversas e procuramos criar uma força de trabalho "
-        "que reflita os nossos consumidores e comunidades. Defendemos a singularidade individual e cultivamos "
-        "uma cultura de pertença para que todos possam criar ao seu melhor nível."
+        "A adidas Porto fornece serviços globalmente unificados aos colaboradores e consumidores "
+        "da adidas, com base em soluções padronizadas e automatizadas em diferentes funções e mercados."
     ),
     "spanish": (
-        "adidas Porto proporciona servicios globalmente unificados a los empleados, consumidores y otros "
-        "usuarios de adidas, basados en soluciones estandarizadas y automatizadas en diferentes funciones "
-        "y mercados. Aprovechamos la tecnología más avanzada y fomentamos una mentalidad centrada en el "
-        "ser humano e innovadora para elevar continuamente el nivel de la experiencia del usuario. Esto nos "
-        "permite impulsar la eficiencia operativa, mejorar la agilidad y tomar mejores decisiones mientras "
-        "reducimos la complejidad en adidas.\n"
-        "Nuestro mandato es ser la base de una empresa ágil y eficiente. Este es nuestro papel para apoyar "
-        "la misión de adidas de ser la mejor marca deportiva del mundo.\n"
-        "Valoramos la diversidad de orígenes, experiencias y perspectivas, y buscamos crear una fuerza "
-        "laboral que refleje a nuestros consumidores y comunidades. Defendemos la singularidad individual "
-        "y cultivamos una cultura de pertenencia para que todos puedan crear en su mejor nivel."
+        "adidas Porto proporciona servicios globalmente unificados a los empleados y consumidores "
+        "de adidas, basados en soluciones estandarizadas y automatizadas en diferentes funciones y mercados."
     ),
     "german": (
-        "adidas Porto bietet weltweit einheitliche Dienstleistungen für adidas-Mitarbeiter, Verbraucher "
-        "und andere Nutzer an, basierend auf standardisierten und automatisierten Lösungen in verschiedenen "
-        "Funktionen und Märkten. Wir nutzen modernste Technologie und fördern eine menschenzentrierte und "
-        "innovative Denkweise, um die Messlatte für die Nutzererfahrung kontinuierlich höher zu legen. "
-        "Dies ermöglicht es uns, die betriebliche Effizienz zu steigern, die Agilität zu verbessern und "
-        "bessere Entscheidungen zu treffen, während wir die Komplexität bei adidas reduzieren.\n"
-        "Unser Auftrag ist es, das Fundament für ein agiles und effizientes Unternehmen zu sein. Dies ist "
-        "unsere Rolle zur Unterstützung der Mission von adidas, die beste Sportmarke der Welt zu sein.\n"
-        "Wir begrüßen unterschiedliche Hintergründe, Erfahrungen und Perspektiven und streben danach, eine "
-        "Belegschaft zu schaffen, die unsere Verbraucher und Gemeinschaften widerspiegelt. Wir fördern "
-        "individuelle Einzigartigkeit und kultivieren eine Kultur der Zugehörigkeit, damit jeder sein "
-        "Bestes geben kann."
+        "adidas Porto bietet weltweit einheitliche Dienstleistungen für adidas-Mitarbeiter und "
+        "Verbraucher, basierend auf standardisierten und automatisierten Lösungen in verschiedenen "
+        "Funktionen und Märkten."
     ),
     "french": (
-        "adidas Porto fournit des services mondialement unifiés aux employés, consommateurs et autres "
-        "utilisateurs d'adidas, basés sur des solutions standardisées et automatisées dans différentes "
-        "fonctions et marchés. Nous tirons parti des technologies de pointe et encourageons un état d'esprit "
-        "centré sur l'humain et innovant pour relever continuellement la barre de l'expérience utilisateur. "
-        "Cela nous permet de stimuler l'efficacité opérationnelle, d'améliorer l'agilité et de prendre "
-        "de meilleures décisions tout en réduisant la complexité chez adidas.\n"
-        "Notre mission est d'être le fondement d'une entreprise agile et efficace. C'est notre rôle pour "
-        "soutenir la mission d'adidas d'être la meilleure marque sportive du monde.\n"
-        "Nous accueillons des parcours, des expériences et des perspectives diversifiés et cherchons à "
-        "créer une main-d'œuvre qui reflète nos consommateurs et communautés. Nous défendons l'unicité "
-        "individuelle et cultivons une culture d'appartenance afin que chacun puisse créer au mieux de "
-        "ses capacités."
+        "adidas Porto fournit des services mondialement unifiés aux employés et consommateurs "
+        "d'adidas, basés sur des solutions standardisées et automatisées dans différentes fonctions et marchés."
     ),
 }
 
@@ -388,13 +345,14 @@ Your evaluation is rigorous but fair.
 LANGUAGE_GUARDRAILS_PROMPT = """
 Strict rules you must always follow:
 1) Conduct the entire interview in the assessed language — every message you send must be in that language.
-2) Never discuss technical programming or IT topics.
+2) Never discuss technical programming or IT topics. Keep questions everyday, conversational, and role-related.
 3) Do NOT correct grammar explicitly mid-conversation — note errors internally for evaluation.
-4) Ask exactly one question per turn during the oral phase.
-5) If a response is very short (under 2 sentences), follow up with: "Could you tell me a bit more about that?"
+4) Ask exactly one question per turn during the oral phase, and keep it simple and easy to understand.
+5) If a response is very short (under 2 sentences), gently invite them ONCE with a warm nudge such as "That's a good start — could you tell me a little more?". Never push repeatedly; move on if they don't expand.
 6) If the candidate writes in the wrong language, politely remind them to respond in the assessed language.
 7) During the writing phase, present the dictation text exactly as provided — do not paraphrase or shorten it.
 8) Never skip a phase or reorder them.
+9) Stay warm, patient, and encouraging throughout — the goal is to put the candidate at ease, not to pressure them.
 """
 
 LANGUAGE_FLOW_PROMPT = f"""
