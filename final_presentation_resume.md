@@ -41,8 +41,7 @@ Authoritative numbers come from the near-final LaTeX report. **Use these exact f
 
 | Recruitment need | What we built |
 |---|---|
-| **Ingest at scale** | Single + **bulk ZIP** CV upload with an async parsing pipeline (3-tier dedup) |
-| **Structure raw CVs** | AI extraction → skills, **CEFR languages**, experience, education, 16 canonical *fields of work* |
+| **Ingest & structure at scale** | Single + **bulk ZIP** CV upload → AI extraction into skills, **CEFR languages**, experience, education, 16 canonical *fields of work* (3-tier dedup) |
 | **Verify language & skills** (first screening) | **Dual-mode AI interview** — CEFR spoken-English rubric **+ technical skill validation** |
 | **Rank fairly** | Two transparent scores: **Quality** (CV-intrinsic) + per-job **Fit** (7 criteria) |
 | **Manage candidates** | Status lifecycle, tags, recruiter notes, **watchlist**, per-job **shortlists** |
