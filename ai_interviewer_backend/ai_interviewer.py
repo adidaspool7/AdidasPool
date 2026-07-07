@@ -125,6 +125,28 @@ _LANGUAGE_FORBIDDEN_TOPICS: list[str] = [
     "abstract system design or architecture theory not anchored to the language runtime",
 ]
 
+# Soft/behavioural skills — assessed with behavioural (STAR) questions, never technical ones.
+_SOFT_SKILLS: frozenset[str] = frozenset({
+    "communication", "teamwork", "collaboration", "leadership", "problem solving",
+    "problem-solving", "critical thinking", "adaptability", "time management",
+    "creativity", "emotional intelligence", "conflict resolution", "negotiation",
+    "presentation", "public speaking", "active listening", "empathy", "resilience",
+    "work ethic", "attention to detail", "organization", "organisation", "flexibility",
+    "interpersonal skills", "decision making", "decision-making", "stakeholder management",
+    "mentoring", "coaching", "customer service", "accountability", "self-motivation",
+})
+
+
+def _is_soft_skill(candidate: CandidateProfile, normalized_focus: str | None) -> bool:
+    """A target skill is behavioural when its category says so, or it matches the soft-skill set."""
+    if not normalized_focus:
+        return False
+    for skill in candidate.skills:
+        if normalize_skill_name(skill.name) == normalized_focus and skill.category:
+            if "soft" in skill.category.strip().lower():
+                return True
+    return normalized_focus in _SOFT_SKILLS
+
 
 def _get_skill_type(normalized_skill: str | None) -> str:
     """Returns 'language' (curated strict-scope skill), or 'generic'."""
@@ -206,6 +228,38 @@ Interview flow:
   - end if evidence_confidence >= 0.85 and at least 6 questions asked
 - end if user repeatedly refuses technical answers
 - when ending, append {END_INTERVIEW_SENTINEL} token at response end.
+"""
+
+
+# ── Soft-skill (behavioural) mode prompts ────────────────────────────────────────
+
+SOFT_SKILL_PERSONA_PROMPT = """
+You are a warm, professional behavioural interviewer assessing a candidate's soft skill
+(an interpersonal or professional competency). Your tone is encouraging and conversational.
+"""
+
+SOFT_SKILL_GUARDRAILS_PROMPT = """
+Strict rules you must always follow:
+1) This is a BEHAVIOURAL assessment of a single soft skill — NEVER ask technical, programming,
+   coding, tooling, or implementation questions of any kind.
+2) Ask only about real situations, experiences, behaviours, decisions, and reflections.
+3) Ask EXACTLY ONE open-ended question per turn; keep it short and easy to understand.
+4) Prefer the STAR pattern: invite a concrete Situation and Task, then probe the candidate's
+   own Actions and the Result.
+5) Stay on the single target soft skill; if the candidate drifts, acknowledge briefly and redirect.
+6) Never grade or correct answers mid-conversation; keep a warm, natural flow.
+7) If an answer is very short, invite ONE gentle follow-up such as "Could you tell me more about
+   what you personally did in that situation?".
+"""
+
+SOFT_SKILL_FLOW_PROMPT = """
+Interview flow:
+- Open by asking the candidate to describe a real situation where they demonstrated {focus}.
+- Probe follow-ups on the SAME story — their specific actions, reasoning, the outcome, and what
+  they learned — before asking for a new example.
+- Every question must be about behaviour and experience, never technical implementation.
+- Gather 2–3 concrete behavioural examples with enough depth (typically 6–8 questions).
+- When you have enough evidence, thank the candidate and append {sentinel} at the response end.
 """
 
 
@@ -345,7 +399,7 @@ Your evaluation is rigorous but fair.
 LANGUAGE_GUARDRAILS_PROMPT = """
 Strict rules you must always follow:
 1) Conduct the entire interview in the assessed language — every message you send must be in that language.
-2) Never discuss technical programming or IT topics. Keep questions everyday, conversational, and role-related.
+2) This assessment measures LANGUAGE ability, not technical knowledge. Keep every question about the candidate's education, career, experiences, and motivations — never about technical programming, tools, or implementation details.
 3) Do NOT correct grammar explicitly mid-conversation — note errors internally for evaluation.
 4) Ask exactly one question per turn during the oral phase, and keep it simple and easy to understand.
 5) If a response is very short (under 2 sentences), gently invite them ONCE with a warm nudge such as "That's a good start — could you tell me a little more?". Never push repeatedly; move on if they don't expand.
@@ -353,6 +407,7 @@ Strict rules you must always follow:
 7) During the writing phase, present the dictation text exactly as provided — do not paraphrase or shorten it.
 8) Never skip a phase or reorder them.
 9) Stay warm, patient, and encouraging throughout — the goal is to put the candidate at ease, not to pressure them.
+10) If the candidate starts explaining technical implementation details, gently steer them back to describe their experience or studies in everyday language (e.g. "Thanks — and in general terms, what did you enjoy about that experience?").
 """
 
 LANGUAGE_FLOW_PROMPT = f"""
@@ -372,12 +427,13 @@ PHASE 2 — ORAL QUESTIONS (exactly 5 questions, one per turn)
 ══════════════════════════════════════════════════════════
 Ask the following 5 questions in order, one per candidate reply.
 Adapt the phrasing naturally to the assessed language, but keep the intent identical.
+Keep the whole conversation about the candidate's education, career, and experiences — never technical implementation.
 
-Q1: In your perspective, what are the main tasks that are allocated to the position you applied for?
-Q2: What skills do you believe are important for someone who will work in this department or area? Could you please provide some examples?
-Q3: What challenges do you believe you will deal with in the daily tasks within this department or area? Please justify your answer.
-Q4: Can you identify the values of our company? If not, can you identify some values that are important to you in a work environment?
-Q5: Which of those values do you relate to the most, and why?
+Q1: To start, could you tell us a little about your educational background — what you studied and where?
+Q2: What made you choose that field of study, and what did you enjoy most about it?
+Q3: Could you walk us through your career journey so far, and tell us about a role or experience you found rewarding?
+Q4: What are you looking for in your next role, and what attracted you to this position?
+Q5: What values matter most to you in a workplace, and how do they show up in the way you work?
 
 After the candidate answers Q5, move immediately to Phase 3.
 
@@ -562,9 +618,39 @@ Candidate context:
 """.strip()
 
 
+def build_soft_skill_system_prompt(candidate: CandidateProfile) -> str:
+    focus = candidate.target_skill.strip() if candidate.target_skill else "the selected soft skill"
+    name = candidate.full_name or "Candidate"
+    experiences_block = "\n".join(
+        f"- {p.title or 'Experience'}: {p.description}" for p in candidate.projects
+    ) or "- None provided"
+    flow = SOFT_SKILL_FLOW_PROMPT.format(focus=focus, sentinel=END_INTERVIEW_SENTINEL)
+    return f"""
+{SOFT_SKILL_PERSONA_PROMPT}
+{SOFT_SKILL_GUARDRAILS_PROMPT}
+{flow}
+
+Behavioural scope contract (MANDATORY):
+- The only competency under assessment is: {focus}
+- Ask ONLY about real situations and behaviours that demonstrate {focus}.
+- NEVER ask technical, coding, or implementation questions.
+- Anchor questions in the candidate's work experience below where possible.
+
+Candidate context:
+- Candidate ID: {candidate.candidate_id}
+- Candidate Name: {name}
+- Soft skill under assessment: {focus}
+
+Work Experience:
+{experiences_block}
+""".strip()
+
+
 def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
     if candidate.mode == "LANGUAGE":
         return build_language_system_prompt(candidate)
+    if _is_soft_skill(candidate, normalize_skill_name(candidate.target_skill)):
+        return build_soft_skill_system_prompt(candidate)
     return build_technical_system_prompt(candidate)
 
 
@@ -582,7 +668,12 @@ class InterviewSessionManager:
             "Begin the language proficiency assessment now. Deliver Phase 1 (the intro) "
             "and immediately ask Oral Question 1 in the same message, as instructed."
             if candidate.mode == "LANGUAGE"
-            else "Start the interview now with your first deeply technical question."
+            else (
+                "Start the behavioural interview now by asking the candidate to describe a "
+                "real situation where they demonstrated the target soft skill."
+                if _is_soft_skill(candidate, normalize_skill_name(candidate.target_skill))
+                else "Start the interview now with your first deeply technical question."
+            )
         )
 
         messages = [

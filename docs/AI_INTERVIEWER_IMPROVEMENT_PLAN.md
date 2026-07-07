@@ -170,3 +170,18 @@ surface stays intact. `npx tsc --noEmit` after each phase.
 - `npx tsc --noEmit` — clean
 - `python -m py_compile` on the three modified backend modules — clean
 - **Not** runtime-tested against the live Render backend — recommend a staging smoke test of one TECHNICAL and one LANGUAGE interview before relying on #4/#7 in production.
+
+---
+
+## Follow-up issues (2026-07-07, batch 2)
+
+| # | Issue | Status | Fix |
+|---|-------|--------|-----|
+| 9 | Soft-skill evaluation shouldn't ask technical questions | ✅ Done | New **behavioural (STAR) interview mode**. `_is_soft_skill()` detects a soft-skill target (by skill category `"Soft Skill"` or a curated keyword set) and routes to `build_soft_skill_system_prompt` — behavioural questions only, never technical. Opening instruction is now skill-aware too. |
+| 10 | Language assessment should focus on career/education, not implementations | ✅ Done | Rewrote the 5 oral questions around **education + career journey + motivations + values**; strengthened `LANGUAGE_GUARDRAILS` (measures language not tech; gently redirect any technical dive back to everyday terms). |
+
+**Files:** `ai_interviewer_backend/ai_interviewer.py` only. **Validation:** `py_compile` clean.
+
+**Note (not changed):** soft-skill interviews still run through the TECHNICAL evaluator
+(`TECHNICAL_EVALUATION_PROMPT`), which defaults to PASS without a factual error — acceptable
+for behavioural answers, but a dedicated behavioural rubric could be a future refinement.
