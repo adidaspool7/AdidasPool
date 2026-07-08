@@ -726,7 +726,13 @@ CREATE TABLE interview_sessions (
   integrity_decision   integrity_decision,
   final_decision       interview_decision,
   evaluation_rationale JSONB,
-  termination_reason   TEXT
+  termination_reason   TEXT,
+  -- Human-review handoff. The candidate-facing decisions above stay binary; when the
+  -- evaluator's verdict is unsupported (FAIL without evidence) or integrity is REVIEW,
+  -- review_required flags the interview for the separate human-review process, whose
+  -- outcome is applied via the skill verification override endpoint.
+  review_required      BOOLEAN NOT NULL DEFAULT FALSE,
+  review_reason        TEXT
 );
 
 CREATE TRIGGER trg_interview_sessions_updated_at

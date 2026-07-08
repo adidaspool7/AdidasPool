@@ -6,16 +6,14 @@ from uuid import uuid4
 
 from config import settings
 from models import CandidateProfile, ChatMessage
+from skill_taxonomy import classify_target
 
 END_INTERVIEW_SENTINEL = "__END_INTERVIEW__"
 
 # ── Skill domain taxonomy ───────────────────────────────────────────────────────
-
-_PROGRAMMING_LANGUAGES: frozenset[str] = frozenset({
-    "python", "javascript", "typescript", "java", "c", "c++", "c#", "go", "golang",
-    "rust", "swift", "kotlin", "ruby", "php", "scala", "r", "lua", "haskell",
-    "elixir", "dart", "perl", "bash", "shell", "powershell",
-})
+# Programming-language and soft-skill classification now lives in skill_taxonomy.py
+# (shared with evaluator.py). This module keeps only the language-specific TOPIC
+# catalogs used to build the strict per-language scope contract.
 
 # Core allowed topics per language — injected verbatim into scope block
 _LANGUAGE_CORE_TOPICS: dict[str, list[str]] = {
@@ -98,10 +96,6 @@ _LANGUAGE_CORE_TOPICS: dict[str, list[str]] = {
     ],
 }
 
-# Skills that receive the strict, per-topic language-style scope contract.
-# SQL is treated as a query language and fenced with the same rigor.
-_STRICT_SCOPE_SKILLS: frozenset[str] = _PROGRAMMING_LANGUAGES | frozenset({"sql"})
-
 _GENERIC_LANGUAGE_TOPICS: list[str] = [
     "core syntax and semantics of the language",
     "type system and memory model",
@@ -124,36 +118,6 @@ _LANGUAGE_FORBIDDEN_TOPICS: list[str] = [
     "candidate's projects AND directly tied to Python internals",
     "abstract system design or architecture theory not anchored to the language runtime",
 ]
-
-# Soft/behavioural skills — assessed with behavioural (STAR) questions, never technical ones.
-_SOFT_SKILLS: frozenset[str] = frozenset({
-    "communication", "teamwork", "collaboration", "leadership", "problem solving",
-    "problem-solving", "critical thinking", "adaptability", "time management",
-    "creativity", "emotional intelligence", "conflict resolution", "negotiation",
-    "presentation", "public speaking", "active listening", "empathy", "resilience",
-    "work ethic", "attention to detail", "organization", "organisation", "flexibility",
-    "interpersonal skills", "decision making", "decision-making", "stakeholder management",
-    "mentoring", "coaching", "customer service", "accountability", "self-motivation",
-})
-
-
-def _is_soft_skill(candidate: CandidateProfile, normalized_focus: str | None) -> bool:
-    """A target skill is behavioural when its category says so, or it matches the soft-skill set."""
-    if not normalized_focus:
-        return False
-    for skill in candidate.skills:
-        if normalize_skill_name(skill.name) == normalized_focus and skill.category:
-            if "soft" in skill.category.strip().lower():
-                return True
-    return normalized_focus in _SOFT_SKILLS
-
-
-def _get_skill_type(normalized_skill: str | None) -> str:
-    """Returns 'language' (curated strict-scope skill), or 'generic'."""
-    if normalized_skill and normalized_skill in _STRICT_SCOPE_SKILLS:
-        return "language"
-    return "generic"
-
 
 def _build_generic_scope_addendum(skill_name: str) -> str:
     """Strict scope enforcement for any non-curated target skill (React, Docker, Pandas, ...).
@@ -417,7 +381,8 @@ You MUST follow this exact 4-phase structure. Do not deviate from the order.
 PHASE 1 — INTRO (exactly 1 turn, your opening message)
 ══════════════════════════════════════════════════════════
 Deliver a warm personalized greeting using the candidate's name.
-State that this is a language proficiency assessment for the role they applied for.
+State that this is a language proficiency assessment for the adidas talent pool (not tied to a
+specific job opening).
 Clarify that there are no right or wrong answers — evaluation is on language fluency
 (comprehension, speaking, writing) and not on technical knowledge.
 Then ask the first oral question immediately (do not wait for a reply to the intro).
@@ -429,10 +394,16 @@ Ask the following 5 questions in order, one per candidate reply.
 Adapt the phrasing naturally to the assessed language, but keep the intent identical.
 Keep the whole conversation about the candidate's education, career, and experiences — never technical implementation.
 
+Make it feel like a real conversation, not a checklist: before each new question (Q2 onward),
+warmly acknowledge something specific the candidate just said in ONE short, natural sentence, then
+segue into the next question. React to their actual words — reference a detail they mentioned — so
+the flow feels responsive. Do NOT add extra questions or sub-parts: the acknowledgement is a brief
+lead-in, and each turn still contains exactly ONE of the five scripted questions.
+
 Q1: To start, could you tell us a little about your educational background — what you studied and where?
 Q2: What made you choose that field of study, and what did you enjoy most about it?
 Q3: Could you walk us through your career journey so far, and tell us about a role or experience you found rewarding?
-Q4: What are you looking for in your next role, and what attracted you to this position?
+Q4: What are you looking for in your next role, and what kind of work environment brings out your best?
 Q5: What values matter most to you in a workplace, and how do they show up in the way you work?
 
 After the candidate answers Q5, move immediately to Phase 3.
@@ -472,6 +443,45 @@ INTERNAL TURN STATE (update each turn, do not reveal)
 - writing_submitted: false | true
 - cefr_signal: A1/A2/B1/B2/C1/C2
 """
+
+
+# ── Per-interview context (shared across all modes) ──────────────────────────────
+# Static organisation context. adidas's stated core values are Courage, Ownership,
+# Innovation, Teamplay, Integrity and Respect; the workplace-culture framework is
+# Confidence, Collaboration and Creativity. Edit here to retune — this is the single
+# place the values are defined, injected into every interview as background only.
+COMPANY_NAME = "adidas Porto"
+COMPANY_CORE_VALUES = [
+    "Courage", "Ownership", "Innovation", "Teamplay", "Integrity", "Respect",
+]
+COMPANY_CULTURE_PILLARS = ["Confidence", "Collaboration", "Creativity"]
+
+COMPANY_CONTEXT_PROMPT = f"""
+Organisation context (background only — do NOT quiz the candidate on this):
+- This assessment is administered by {COMPANY_NAME}, a global services hub within the adidas group.
+- adidas's stated core values are: {", ".join(COMPANY_CORE_VALUES)}.
+- Its workplace culture emphasises: {", ".join(COMPANY_CULTURE_PILLARS)}.
+Use this purely to ground your tone and framing. Never require the candidate to recite these values.
+""".strip()
+
+# Purpose preamble for skill-validation (technical + soft) interviews.
+VALIDATION_PURPOSE_TECHNICAL = """
+Interview purpose (read carefully):
+- This is a PLATFORM SKILL-VALIDATION interview. Its sole goal is to verify the candidate's real
+  proficiency in the SINGLE target skill named below, for their talent-pool record.
+- It is NOT tied to any specific job opening or vacancy. Do NOT reference a particular position,
+  team, or hiring decision, and never ask which role the candidate applied for.
+- The outcome updates the candidate's skill-validation status on the platform.
+""".strip()
+
+# Purpose preamble for language-proficiency validation interviews.
+VALIDATION_PURPOSE_LANGUAGE = """
+Interview purpose (read carefully):
+- This is a PLATFORM LANGUAGE-PROFICIENCY VALIDATION for the talent pool. Its goal is to verify the
+  candidate's CEFR proficiency in the assessed language.
+- It is NOT tied to any specific job opening. Keep the conversation about the candidate's own
+  education, career, and experiences; never assume they applied to a particular position or team.
+""".strip()
 
 
 def normalize_skill_name(value: str | None) -> str | None:
@@ -538,7 +548,7 @@ def build_technical_system_prompt(candidate: CandidateProfile) -> str:
         ]
     ) or "- None provided"
 
-    skill_type = _get_skill_type(normalized_focus)
+    skill_type = classify_target(candidate)
     if focus and skill_type == "language":
         scope_addendum = "\n\n" + _build_language_scope_addendum(focus)
     elif focus:
@@ -579,6 +589,9 @@ Résumé anchoring and difficulty calibration (MANDATORY):
 """.strip()
     return f"""
 {INTERVIEWER_PERSONA_PROMPT}
+{VALIDATION_PURPOSE_TECHNICAL}
+
+{COMPANY_CONTEXT_PROMPT}
 {INTERVIEW_GUARDRAILS_PROMPT}
 {INTERVIEW_FLOW_PROMPT}
 {scope_block}
@@ -605,6 +618,9 @@ def build_language_system_prompt(candidate: CandidateProfile) -> str:
     flow = LANGUAGE_FLOW_PROMPT.replace("{{WRITING_REFERENCE_TEXT}}", writing_text)
     return f"""
 {LANGUAGE_PERSONA_PROMPT}
+{VALIDATION_PURPOSE_LANGUAGE}
+
+{COMPANY_CONTEXT_PROMPT}
 {LANGUAGE_GUARDRAILS_PROMPT}
 {flow}
 
@@ -627,6 +643,9 @@ def build_soft_skill_system_prompt(candidate: CandidateProfile) -> str:
     flow = SOFT_SKILL_FLOW_PROMPT.format(focus=focus, sentinel=END_INTERVIEW_SENTINEL)
     return f"""
 {SOFT_SKILL_PERSONA_PROMPT}
+{VALIDATION_PURPOSE_TECHNICAL}
+
+{COMPANY_CONTEXT_PROMPT}
 {SOFT_SKILL_GUARDRAILS_PROMPT}
 {flow}
 
@@ -649,7 +668,7 @@ Work Experience:
 def build_dynamic_system_prompt(candidate: CandidateProfile) -> str:
     if candidate.mode == "LANGUAGE":
         return build_language_system_prompt(candidate)
-    if _is_soft_skill(candidate, normalize_skill_name(candidate.target_skill)):
+    if classify_target(candidate) == "soft":
         return build_soft_skill_system_prompt(candidate)
     return build_technical_system_prompt(candidate)
 
@@ -671,7 +690,7 @@ class InterviewSessionManager:
             else (
                 "Start the behavioural interview now by asking the candidate to describe a "
                 "real situation where they demonstrated the target soft skill."
-                if _is_soft_skill(candidate, normalize_skill_name(candidate.target_skill))
+                if classify_target(candidate) == "soft"
                 else "Start the interview now with your first deeply technical question."
             )
         )

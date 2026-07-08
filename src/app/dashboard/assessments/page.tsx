@@ -38,8 +38,10 @@ interface InterviewResult {
   finalDecision: "PASS" | "FAIL" | null;
   technicalDecision: "PASS" | "FAIL" | null;
   integrityDecision: string | null;
-  evaluationRationale: Record<string, string> | null;
+  evaluationRationale: Record<string, any> | null;
   terminationReason: string | null;
+  reviewRequired?: boolean | null;
+  reviewReason?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -158,6 +160,32 @@ function PastResultCard({ r, mode }: { r: InterviewResult; mode: "LANGUAGE" | "T
         <p className="mt-1.5 text-xs text-muted-foreground italic">
           {r.evaluationRationale["final"]}
         </p>
+      )}
+      {isLanguage && r.evaluationRationale?.["writing_accuracy"] && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Writing accuracy:{" "}
+          <strong className="text-foreground">
+            {Math.round(
+              Number(r.evaluationRationale["writing_accuracy"]?.["char_ratio"] ?? 0) * 100
+            )}
+            %
+          </strong>{" "}
+          vs reference
+          {r.evaluationRationale["writing_accuracy"]?.["submission_found"] === false
+            ? " (no submission detected)"
+            : ""}
+        </p>
+      )}
+      {(r.reviewRequired ?? r.evaluationRationale?.["review_required"]) && (
+        <div className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <strong>Flagged for human review.</strong>{" "}
+            {r.reviewReason ??
+              r.evaluationRationale?.["review_reason"] ??
+              "A reviewer will confirm this result; the outcome will appear here once reviewed."}
+          </span>
+        </div>
       )}
       {r.terminationReason && r.terminationReason !== "backend_ended" && (
         <p className="mt-1 text-xs text-muted-foreground">

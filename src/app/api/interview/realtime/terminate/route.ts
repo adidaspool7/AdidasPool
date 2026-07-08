@@ -46,6 +46,9 @@ type EvaluatorResult = {
   rationale: { technical: string; integrity: string; final: string; early_termination?: string };
   trajectory?: unknown;
   early_terminated?: boolean;
+  review_required?: boolean;
+  review_reason?: string | null;
+  writing_accuracy?: Record<string, unknown> | null;
   raw?: unknown;
 };
 
@@ -244,18 +247,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Human-review handoff (mirrors the turn route). Trust the Python evaluator's
+    // review flags; keep a TS safety net for unsupported FAIL / unreachable backend.
     const hasEvidence = (evaluation.evidence?.length ?? 0) > 0;
+    let reviewRequired = evaluation.review_required === true;
+    let reviewReason: string | null = evaluation.review_reason ?? null;
+
     if (!evaluation.technical.passed && !hasEvidence) {
+      reviewRequired = true;
+      reviewReason =
+        reviewReason ??
+        "Evaluator returned FAIL without cited evidence; defaulted to PASS pending human review.";
       evaluation = {
         ...evaluation,
         technical: { ...evaluation.technical, passed: true },
-        final: false,
-        rationale: {
-          ...evaluation.rationale,
-          technical: `${evaluation.rationale.technical} [overridden: no evidence cited]`,
-          final: "Inconclusive — manual HR review recommended",
-        },
+        final: evaluation.integrity.status !== "FAIL",
       };
+    }
+    if (evaluation.integrity.status === "REVIEW") {
+      reviewRequired = true;
+      reviewReason = reviewReason ?? "Integrity flagged for human review.";
     }
 
     const finalDecision = evaluation.final ? "PASS" : "FAIL";
@@ -271,9 +282,14 @@ export async function POST(request: NextRequest) {
     if (evaluation.technical.listening) rationaleWithMeta.listening = evaluation.technical.listening;
     if (evaluation.technical.writing) rationaleWithMeta.writing = evaluation.technical.writing;
     if (evaluation.trajectory) rationaleWithMeta.trajectory = evaluation.trajectory;
+    if (evaluation.writing_accuracy) rationaleWithMeta.writing_accuracy = evaluation.writing_accuracy;
     rationaleWithMeta.early_terminated = evaluation.early_terminated ?? true;
     if (evaluation.turn_count !== undefined) rationaleWithMeta.turn_count = evaluation.turn_count;
     if (evaluation.evidence?.length) rationaleWithMeta.evidence = evaluation.evidence;
+    if (reviewRequired) {
+      rationaleWithMeta.review_required = true;
+      if (reviewReason) rationaleWithMeta.review_reason = reviewReason;
+    }
 
     await db.from("interview_sessions").update({
       status: "EVALUATED",
@@ -284,6 +300,8 @@ export async function POST(request: NextRequest) {
       final_decision: finalDecision,
       evaluation_rationale: rationaleWithMeta,
       termination_reason: terminationReason,
+      review_required: reviewRequired,
+      review_reason: reviewReason,
     }).eq("id", interview.id);
 
     if (interview.targetSkill) {

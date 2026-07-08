@@ -108,4 +108,11 @@ class EvaluationResponse(BaseModel):
     trajectory: dict[str, Any] | None = None
     early_terminated: bool = False
     evidence: list[str] = Field(default_factory=list)
+    # Human-review handoff: the binary result above stays PASS/FAIL, but when the
+    # evaluator's verdict is unsupported or integrity is uncertain, these flag the
+    # case for the separate human-review process shown in the skill-validation tab.
+    review_required: bool = False
+    review_reason: str | None = None
+    # Deterministic writing-dictation accuracy (LANGUAGE mode only).
+    writing_accuracy: dict[str, Any] | None = None
     raw: dict[str, Any] | None = None

@@ -121,5 +121,8 @@ async def evaluate_interview(payload: EvaluationRequest) -> EvaluationResponse:
         trajectory=result.get("trajectory"),
         early_terminated=bool(result.get("early_terminated", False)),
         evidence=result.get("evidence", []),
+        review_required=bool(result.get("review_required", False)),
+        review_reason=result.get("review_reason"),
+        writing_accuracy=result.get("writing_accuracy"),
         raw=result.get("raw"),
     )

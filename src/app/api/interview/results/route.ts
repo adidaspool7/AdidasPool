@@ -34,7 +34,9 @@ export async function GET() {
         technical_decision,
         integrity_decision,
         evaluation_rationale,
-        termination_reason
+        termination_reason,
+        review_required,
+        review_reason
       `)
       .eq("candidate_id", candidate.id)
       .eq("status", "EVALUATED")

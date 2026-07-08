@@ -126,6 +126,15 @@ Presentation  →  Application  →  Domain  ←  Infrastructure
 - Mode selected via button toggle on `/dashboard/ai-interview`. Stored in `interview_sessions.interview_mode` (`TECHNICAL` | `LANGUAGE`).
 - DB schema: `interview_sessions.interview_mode` (`TECHNICAL` | `LANGUAGE`) is now part of the canonical `00000000000000_schema.sql`.
 
+### Interview scoping + evaluation hardening (2026-07-08)
+Backend lives in `ai_interviewer_backend/`. The interview is a **platform skill/language validation** for the talent pool — **not job-anchored**.
+- **Skill classification** (`skill_taxonomy.py`, shared by interviewer + evaluator): target skill is `language` (programming/SQL), `soft` (CV-parser `category` contains "soft", or keyword fallback), or `generic`.
+- **Soft-skill interviews**: a soft target skill routes to a behavioural (STAR) persona `build_soft_skill_system_prompt` and a dedicated `SOFT_SKILL_EVALUATION_PROMPT` (graded on behavioural evidence, not a "citable factual error"). Technical grilling is never applied to soft skills.
+- **Per-interview context**: all prompts state the validation purpose (not job-tied) and inject static `COMPANY_*` values (adidas: Courage, Ownership, Innovation, Teamplay, Integrity, Respect). Edit `COMPANY_CORE_VALUES` in `ai_interviewer.py`. LANGUAGE Q1–Q5 are candidate-centric (education/career/values) with reactive acknowledgement between questions.
+- **Evaluation/explainability** (`evaluator.py`): the silent FAIL→PASS override is gone — an unsupported FAIL is given benefit-of-doubt for the binary result but flagged `review_required` + `review_reason`. Integrity `REVIEW` no longer silently fails; only a proven integrity `FAIL` blocks a pass. Writing dictation is scored **deterministically** (`compute_writing_accuracy` char/word diff vs reference → `writing` CEFR + `writing_accuracy` payload). `trajectory` (HR audit trail) is guaranteed non-empty (`_ensure_trajectory`).
+- **Human-review handoff**: FastAPI `/interview/evaluate` returns `review_required`, `review_reason`, `writing_accuracy`. Both Next.js routes (`realtime/turn`, `realtime/terminate`) persist these to `interview_sessions.review_required` (BOOLEAN) + `review_reason` (TEXT) and mirror them into `evaluation_rationale` JSONB. The candidate skill-validation tab (`/dashboard/assessments`) shows a "Flagged for human review" banner + writing accuracy. The human-review outcome is applied by HR via the existing skill-verification override endpoint (`/api/candidates/[id]/skills/[skillId]/verification`), which writes `skills.verification_status`.
+- **Schema delta**: `interview_sessions` gained `review_required BOOLEAN NOT NULL DEFAULT FALSE` and `review_reason TEXT` (in canonical schema; run the ALTER on existing DBs).
+
 ---
 
 ## Job-Anchored Matching (as of 2026-04-23)
