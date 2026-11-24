@@ -62,14 +62,13 @@ type EvaluatorResult = {
 async function syncSkillVerification({
   candidateId,
   skillName,
-  decision,
+  status,
 }: {
   candidateId: string;
   skillName: string;
-  decision: "PASS" | "FAIL";
+  status: "PASSED" | "FAILED" | "PENDING";
 }): Promise<void> {
   try {
-    const newStatus = decision === "PASS" ? "PASSED" : "FAILED";
     // Find the skill row by candidate + case-insensitive name match
     const { data: rows } = await db
       .from("skills")
@@ -80,13 +79,17 @@ async function syncSkillVerification({
 
     if (!rows?.length) return;
 
+    // A review-flagged result must NOT auto-stamp PASSED/FAILED — leave it PENDING
+    // for the human reviewer, who applies the final status via the override endpoint.
+    const update: Record<string, unknown> = { verification_status: status };
+    if (status !== "PENDING") {
+      update.verified_at = new Date().toISOString();
+      update.verified_by = "AI";
+    }
+
     await db
       .from("skills")
-      .update({
-        verification_status: newStatus,
-        verified_at: new Date().toISOString(),
-        verified_by: "AI",
-      })
+      .update(update)
       .eq("id", rows[0].id)
       .then(() => null, () => null); // silent if column missing before migration
   } catch {
@@ -350,12 +353,18 @@ export async function POST(request: NextRequest) {
         review_reason: reviewReason,
       }).eq("id", interview.id);
 
-      // Sync skill verification status for TECHNICAL mode with a target skill
+      // Sync skill verification status for TECHNICAL mode with a target skill.
+      // Review-flagged results stay PENDING (awaiting a human decision) instead of
+      // auto-stamping PASSED/FAILED.
       if (interview.targetSkill) {
         await syncSkillVerification({
           candidateId: interview.candidateId as string,
           skillName: interview.targetSkill as string,
-          decision: finalDecision,
+          status: reviewRequired
+            ? "PENDING"
+            : finalDecision === "PASS"
+              ? "PASSED"
+              : "FAILED",
         });
       }
 

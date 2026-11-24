@@ -13,6 +13,12 @@ VALID_INTEGRITY_STATES = {"CLEAR", "REVIEW", "FAIL"}
 VALID_CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Coerce a value to a dict. LLMs occasionally return a string/None/list where a
+    JSON object is expected; treating those as {} keeps evaluation from crashing."""
+    return value if isinstance(value, dict) else {}
+
+
 TECHNICAL_EVALUATION_PROMPT = """
 You are a rigorous but fair technical interview evaluator.
 
@@ -439,7 +445,8 @@ Transcript ({turn_count} candidate turns):
         except Exception:
             return parsed
 
-        technical_data = parsed.get("technical", {})
+        parsed = _as_dict(parsed)
+        technical_data = _as_dict(parsed.get("technical"))
         technical_pass = bool(technical_data.get("passed"))
 
         # Explainability: track WHY a result is what it is, and flag borderline cases
@@ -461,7 +468,7 @@ Transcript ({turn_count} candidate turns):
                 "pending human review."
             )
 
-        integrity_status = str(parsed.get("integrity", {}).get("status", "REVIEW")).upper()
+        integrity_status = str(_as_dict(parsed.get("integrity")).get("status", "REVIEW")).upper()
         if integrity_status not in VALID_INTEGRITY_STATES:
             integrity_status = "REVIEW"
 
@@ -557,3 +564,53 @@ Transcript ({turn_count} candidate turns):
             "raw": parsed,
             "turn_count": turn_count,
         }
+
+    async def safe_evaluate(
+        self,
+        candidate: CandidateProfile,
+        transcript: list[ChatMessage],
+        mode: str = "TECHNICAL",
+        early_terminated: bool = False,
+    ) -> dict[str, Any]:
+        """Never raises. If the model call or parsing errors, return a benefit-of-doubt
+        result flagged for human review instead of letting the endpoint 500 (which would
+        otherwise hard-fail a legitimate interview via the caller's default fallback)."""
+        try:
+            return await self.evaluate(candidate, transcript, mode, early_terminated)
+        except Exception as error:  # noqa: BLE001 — deliberately catch-all safety net
+            import logging
+
+            logging.getLogger("evaluator").exception("evaluate() failed: %s", error)
+            skill = candidate.target_skill or (
+                "CEFR " + (candidate.target_language or "language")
+            )
+            return {
+                "technical": {"passed": True},
+                "integrity": {"status": "REVIEW"},
+                "final": False,
+                "evidence": [],
+                "rationale": {
+                    "technical": "Automatic evaluation could not complete.",
+                    "integrity": "Not assessed automatically.",
+                    "final": "Pending human review — the automatic evaluator errored.",
+                    "error": str(error),
+                },
+                "trajectory": _ensure_trajectory(
+                    {},
+                    skill,
+                    {
+                        "technical": "Automatic evaluation could not complete.",
+                        "final": "Pending human review.",
+                    },
+                    True,
+                ),
+                "review_required": True,
+                "review_reason": (
+                    "The automatic evaluator errored on this interview; it was NOT auto-failed "
+                    "and is flagged for a human decision."
+                ),
+                "writing_accuracy": None,
+                "early_terminated": early_terminated,
+                "raw": None,
+                "turn_count": _count_user_turns(transcript),
+            }

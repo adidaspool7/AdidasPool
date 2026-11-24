@@ -86,7 +86,7 @@ async def end_interview(payload: EndInterviewRequest) -> EndInterviewResponse:
         transcript = interviewer.get_transcript(payload.session_id)
         candidate = interviewer.get_candidate(payload.session_id)
         mode = interviewer.get_mode(payload.session_id)
-        result = await evaluator.evaluate(candidate, transcript, mode=mode)
+        result = await evaluator.safe_evaluate(candidate, transcript, mode=mode)
         interviewer.mark_evaluated(payload.session_id)
         lifecycle = InterviewSessionLifecycle(state=interviewer.get_lifecycle_state(payload.session_id))
         interviewer.close_session(payload.session_id)
@@ -107,7 +107,7 @@ async def end_interview(payload: EndInterviewRequest) -> EndInterviewResponse:
 
 @app.post("/interview/evaluate", response_model=EvaluationResponse)
 async def evaluate_interview(payload: EvaluationRequest) -> EvaluationResponse:
-    result = await evaluator.evaluate(
+    result = await evaluator.safe_evaluate(
         payload.candidate,
         payload.transcript,
         mode=payload.mode,
