@@ -55,13 +55,14 @@ type EvaluatorResult = {
 async function syncSkillVerification({
   candidateId,
   skillName,
-  status,
+  decision,
 }: {
   candidateId: string;
   skillName: string;
-  status: "PASSED" | "FAILED" | "PENDING";
+  decision: "PASS" | "FAIL";
 }): Promise<void> {
   try {
+    const newStatus = decision === "PASS" ? "PASSED" : "FAILED";
     const { data: rows } = await db
       .from("skills")
       .select("id")
@@ -71,17 +72,13 @@ async function syncSkillVerification({
 
     if (!rows?.length) return;
 
-    // A review-flagged result must NOT auto-stamp PASSED/FAILED — leave it PENDING
-    // for the human reviewer, who applies the final status via the override endpoint.
-    const update: Record<string, unknown> = { verification_status: status };
-    if (status !== "PENDING") {
-      update.verified_at = new Date().toISOString();
-      update.verified_by = "AI";
-    }
-
     await db
       .from("skills")
-      .update(update)
+      .update({
+        verification_status: newStatus,
+        verified_at: new Date().toISOString(),
+        verified_by: "AI",
+      })
       .eq("id", rows[0].id)
       .then(() => null, () => null);
   } catch {
@@ -307,17 +304,11 @@ export async function POST(request: NextRequest) {
       review_reason: reviewReason,
     }).eq("id", interview.id);
 
-    // Review-flagged results stay PENDING (awaiting a human decision) instead of
-    // auto-stamping PASSED/FAILED.
     if (interview.targetSkill) {
       await syncSkillVerification({
         candidateId: interview.candidateId as string,
         skillName: interview.targetSkill as string,
-        status: reviewRequired
-          ? "PENDING"
-          : finalDecision === "PASS"
-            ? "PASSED"
-            : "FAILED",
+        decision: finalDecision,
       });
     }
 
